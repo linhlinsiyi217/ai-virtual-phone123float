@@ -217,6 +217,7 @@ export function ChatPluginManager({ onBack }: { onBack: () => void }) {
                                                     {p.manifest.name}
                                                     {p.manifest.version && <span style={{ opacity: 0.5, fontWeight: 400, marginLeft: 6 }}>v{p.manifest.version}</span>}
                                                     {p.manifest.author && <span style={{ opacity: 0.5, fontWeight: 400, marginLeft: 6 }}>{p.manifest.author}</span>}
+                                                    {p.builtin && <span style={{ opacity: 0.55, fontWeight: 400, marginLeft: 6 }}>内置</span>}
                                                     {notRunning && <span style={{ color: "var(--c-danger)", fontWeight: 400, marginLeft: 6 }}>未运行</span>}
                                                 </span>
                                                 {p.manifest.description && <span className="menu-desc">{p.manifest.description}</span>}

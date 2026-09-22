@@ -340,9 +340,15 @@ export type ChatPluginContext = {
 
 export type InstalledChatPlugin = {
     manifest: ChatPluginManifest;
-    /** 插件 ES Module 源码全文 */
+    /**
+     * 插件 ES Module 源码全文。
+     * 内置插件（builtin: true）为空串 —— 实现由 lib/chat-plugin-builtin.ts 提供，
+     * 源码不落地；用户若手动安装同 id，则 code 非空并以用户版本为准。
+     */
     code: string;
     enabled: boolean;
+    /** true = 随应用发货的内置插件（管理页据此标注来源） */
+    builtin?: boolean;
     installedAt: string;
     updatedAt: string;
     /** manifest.settings 对应的用户配置值 */

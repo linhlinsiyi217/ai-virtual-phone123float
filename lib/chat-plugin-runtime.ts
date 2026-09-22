@@ -17,6 +17,7 @@ import { loadApiConfigs, loadBindingConfig } from "./settings-storage";
 import { simpleLLMCall } from "./api-helpers";
 import { getChatPluginHookBus } from "./chat-plugin-hooks";
 import { loadChatPluginModule } from "./chat-plugin-loader";
+import { getBuiltinChatPlugin, seedBuiltinChatPlugins } from "./chat-plugin-builtin";
 import {
     CHAT_PLUGINS_CHANGED_EVENT,
     getChatPluginVar,
@@ -33,6 +34,7 @@ import type {
     ChatPluginContext,
     ChatPluginMessageAction,
     ChatPluginMessageKindRenderer,
+    ChatPluginModule,
     ChatPluginSlotMount,
     ChatPluginSlotName,
     ChatPluginSlotProps,
@@ -129,6 +131,23 @@ class ChatPluginRuntime {
         const bus = getChatPluginHookBus();
         bus.onAutoDisable = (pluginId) => { void this.stopPlugin(pluginId); };
 
+        // 内置插件播种：随应用发货的插件在启动时登记进安装表，之后与用户手动
+        // 安装的插件完全同构（管理页可见、可停用、可卸载）。必须在 loadChatPlugins 之前。
+        try {
+            const seeded = seedBuiltinChatPlugins();
+            if (seeded > 0) {
+                recordChatPluginLog({
+                    pluginId: "*", where: "builtin", level: "info",
+                    message: `已登记 ${seeded} 个内置插件`,
+                });
+            }
+        } catch (e) {
+            recordChatPluginLog({
+                pluginId: "*", where: "builtin", level: "error",
+                message: `内置插件登记失败：${e instanceof Error ? e.message : String(e)}`,
+            });
+        }
+
         for (const installed of loadChatPlugins()) {
             if (installed.enabled) await this.startPlugin(installed);
         }
@@ -188,10 +207,23 @@ class ChatPluginRuntime {
     private async startPlugin(installed: InstalledChatPlugin): Promise<void> {
         const pluginId = installed.manifest.id;
         if (this.active.has(pluginId)) return;
-        const { module, error } = await loadChatPluginModule(installed.code);
-        if (!module) {
-            recordChatPluginLog({ pluginId, where: "setup", message: error ?? "加载失败", level: "error" });
-            return;
+        // 内置插件（随应用发货）：实现来自本地注册表，源码不落地、不走 Blob import。
+        // 用户若手动安装过同 id 版本（记录里 code 非空），以用户版本为准。
+        let module: ChatPluginModule | undefined;
+        if (!installed.code.trim()) {
+            const builtin = getBuiltinChatPlugin(pluginId);
+            if (!builtin) {
+                recordChatPluginLog({ pluginId, where: "setup", message: "内置插件记录缺少实现（注册表未登记该 id）", level: "error" });
+                return;
+            }
+            module = builtin;
+        } else {
+            const loaded = await loadChatPluginModule(installed.code);
+            if (!loaded.module) {
+                recordChatPluginLog({ pluginId, where: "setup", message: loaded.error ?? "加载失败", level: "error" });
+                return;
+            }
+            module = loaded.module;
         }
         if (module.manifest.id !== pluginId) {
             recordChatPluginLog({ pluginId, where: "setup", message: `源码内 manifest.id（${module.manifest.id}）与安装记录不一致，已拒绝加载`, level: "error" });

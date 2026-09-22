@@ -58,6 +58,30 @@ export function loadChatPlugins(): InstalledChatPlugin[] {
         && typeof p.code === "string");
 }
 
+// ── 内置插件的「已卸载」名单 ─────────────────────────
+// 用户主动卸载内置插件后，启动时不再自动播种；否则刷新即复活，等于卸不掉。
+const DISMISSED_BUILTINS_KEY = "chat_plugins_builtin_dismissed_v1";
+registerKvMigration(DISMISSED_BUILTINS_KEY);
+
+export function loadDismissedBuiltinPlugins(): Set<string> {
+    const raw = readJson<string[]>(DISMISSED_BUILTINS_KEY, []);
+    return new Set(Array.isArray(raw) ? raw.filter((id) => typeof id === "string") : []);
+}
+
+export function markBuiltinPluginDismissed(id: string): void {
+    const list = loadDismissedBuiltinPlugins();
+    list.add(id);
+    writeJson(DISMISSED_BUILTINS_KEY, [...list]);
+}
+
+/** 用户重新安装（粘贴源码）同 id 插件时，撤销"已卸载"标记 */
+export function clearBuiltinPluginDismissed(id: string): void {
+    const list = loadDismissedBuiltinPlugins();
+    if (!list.has(id)) return;
+    list.delete(id);
+    writeJson(DISMISSED_BUILTINS_KEY, [...list]);
+}
+
 export function saveChatPlugins(plugins: InstalledChatPlugin[]): void {
     writeJson(PLUGINS_KEY, plugins);
     emit(CHAT_PLUGINS_CHANGED_EVENT);
@@ -100,6 +124,9 @@ export function validateChatPluginManifest(input: unknown): { manifest?: ChatPlu
 /** 落库一个（已通过 loader 校验的）插件；同 id 覆盖安装保留原设置 */
 export function persistChatPlugin(manifest: ChatPluginManifest, code: string): { ok: boolean; error?: string } {
     if (code.length > MAX_CODE_LENGTH) return { ok: false, error: `插件源码过长（上限 ${MAX_CODE_LENGTH / 1000}KB）` };
+    // 用户手动安装/更新某个 id → 撤销它的"内置已卸载"标记，让记录恢复正常语义。
+    // 对没被卸载过的 id 是空操作，因此无条件调用安全。
+    clearBuiltinPluginDismissed(manifest.id);
     const plugins = loadChatPlugins();
     const now = new Date().toISOString();
     const idx = plugins.findIndex(p => p.manifest.id === manifest.id);
@@ -112,18 +139,24 @@ export function persistChatPlugin(manifest: ChatPluginManifest, code: string): {
             ...plugins[idx],
             manifest,
             code,
+            // 用户装了自己的源码 → 这条记录不再由内置注册表提供实现，去掉内置标记
+            builtin: false,
             updatedAt: now,
             settings: { ...defaults, ...plugins[idx].settings },
         };
     } else {
-        plugins.push({ manifest, code, enabled: true, installedAt: now, updatedAt: now, settings: defaults });
+        plugins.push({ manifest, code, builtin: false, enabled: true, installedAt: now, updatedAt: now, settings: defaults });
     }
     saveChatPlugins(plugins);
     return { ok: true };
 }
 
 export function uninstallChatPlugin(id: string): void {
+    // 内置插件（随包发货）：卸载必须落一条"已卸载"标记，否则下次启动又被播种回来。
+    // 标记会在用户重新安装同 id 时清除。
+    const target = loadChatPlugins().find(p => p.manifest.id === id);
     saveChatPlugins(loadChatPlugins().filter(p => p.manifest.id !== id));
+    if (target?.builtin) markBuiltinPluginDismissed(id);
     // 插件私有数据、提示词片段随卸载清除；共享变量池是世界状态，保留
     kvRemove(DATA_PREFIX + id);
     const fragments = readJson<Record<string, Record<string, string>>>(FRAGMENTS_KEY, {});
