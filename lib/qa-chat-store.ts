@@ -1,7 +1,7 @@
 import { callQaAgent, compactQaContext, formatQaErrorMessage, type QaContextEntry } from "./qa-agent-engine";
 import { QA_TOOLS, formatQaToolSubtitle, type QaCreatedContent, type QaProposedCommit } from "./qa-agent-tools";
 import { loadQaGithubConfig } from "./qa-github";
-import { commitQaFiles, revertQaCommit, type QaCommitResult } from "./qa-github-write";
+import { commitQaFiles, revertQaCommit, verifyQaCommitApplied, type QaCommitResult } from "./qa-github-write";
 
 // ── 答疑 App 会话存储 ─────────────────────────────────
 // 模式与 mascot-chat-store 一致：裸 IndexedDB + 模块级单例 + subscribe/snapshot。
@@ -43,9 +43,21 @@ export type QaSegment =
 
 export type QaPendingCommit = {
     proposal: QaProposedCommit;
-    status: "pending" | "applying" | "applied" | "reverting" | "reverted" | "canceled";
+    /**
+     * pending    提案已生成，等待用户确认（可应用）
+     * applying   正在提交
+     * applied    已成功提交（唯一可信的「已落地」态，必须持久化）
+     * unverified 提交结果无法确认（网络/422 后核对失败）：不给「应用」入口，防止重复提交
+     * reverting  正在撤销 / reverted 已撤销 / canceled 已取消
+     */
+    status: "pending" | "applying" | "applied" | "unverified" | "reverting" | "reverted" | "canceled";
     result?: QaCommitResult;
     error?: string;
+    /** 最后一次尝试提交的时间戳：用于识别「已尝试但状态仍是 pending」的脏状态并自愈核对 */
+    lastAttemptAt?: number;
+    /** 最后一次核对仓库现状的时间戳与结论说明 */
+    verifiedAt?: number;
+    verifyNote?: string;
 };
 
 export type QaMsg = {
@@ -621,7 +633,28 @@ export async function sendQaMessage(
             (s) => ({
                 ...s,
                 updatedAt: Date.now(),
-                messages: s.messages.map((m) => (m.id === assistantMsg.id ? { ...m, ...patch } : m)),
+                messages: s.messages.map((m) => {
+                    if (m.id !== assistantMsg.id) return m;
+                    const next = { ...m, ...patch };
+                    // ── 提交状态保护（防「已应用」被过期快照覆盖）──
+                    // stagedCommit 是本回合的闭包变量，流式收尾那一次 paintAssistant 会把
+                    // onStageCommit 时的旧快照（status: pending）再写一遍。若用户已点「应用」
+                    // 并成功提交，这次写回会把 applied 覆盖成 pending 并持久化——刷新后
+                    // 「应用」按钮复活甚至导致重复提交。这里守住：已落地的状态不允许被降级。
+                    const incoming = patch.pendingCommit;
+                    if (incoming && m.pendingCommit) {
+                        const current = m.pendingCommit;
+                        const currentSettled = current.status === "applied" || current.status === "reverted";
+                        if (currentSettled && incoming.status !== current.status) {
+                            return { ...next, pendingCommit: current };
+                        }
+                        // 已有提交结果（sha）时，也不接受把 result 清空或换掉
+                        if (current.result?.sha && !incoming.result?.sha) {
+                            return { ...next, pendingCommit: { ...incoming, result: current.result, status: current.status } };
+                        }
+                    }
+                    return next;
+                }),
             }),
             { persist: options?.persist !== false },
         );
@@ -711,6 +744,8 @@ export async function sendQaMessage(
                     stagedCommit = { proposal, status: "pending" };
                     paintAssistant({ pendingCommit: stagedCommit }, { force: true, persist: false });
                 },
+                // 注意：paintAssistant 内置提交状态保护——已 applied/reverted 的卡片
+                // 不会被这里的过期快照（pending）覆盖，详见 paintAssistant 注释。
                 // 全自动模式：工具内当场提交，保证同一轮里「创建PR」等后续工具看到已落地的提交
                 commitNow: async (proposal) => {
                     const config = loadQaGithubConfig();
@@ -724,12 +759,57 @@ export async function sendQaMessage(
                     try {
                         const result = await commitQaFiles(config, proposal, controller.signal);
                         stagedCommit = { proposal, status: "applied", result };
-                        paintAssistant({ pendingCommit: stagedCommit }, { force: true, persist: false });
+                        paintAssistant({ pendingCommit: stagedCommit }, { force: true, persist: true });
                         return { ok: true, htmlUrl: result.htmlUrl };
                     } catch (error) {
                         const message = formatQaErrorMessage(error);
-                        stagedCommit = { proposal, status: "pending", error: message };
-                        paintAssistant({ pendingCommit: stagedCommit }, { force: true, persist: false });
+                        // 与确认模式同构：失败后再核对一次仓库现状。
+                        // 422 Not a fast forward 这类错误往往意味着提交其实已落地，
+                        // 直接回退 pending 会让用户重复提交。
+                        try {
+                            const after = await verifyQaCommitApplied(config, proposal, controller.signal);
+                            if (after.applied) {
+                                stagedCommit = {
+                                    proposal,
+                                    status: "applied",
+                                    result: {
+                                        sha: after.sha ?? "",
+                                        branch: proposal.branch ?? "",
+                                        parentSha: after.headSha ?? "",
+                                        htmlUrl: after.htmlUrl ?? "",
+                                        fileCount: proposal.files.length + (proposal.deletes?.length ?? 0),
+                                        reconciled: true,
+                                    },
+                                    verifiedAt: Date.now(),
+                                    verifyNote: after.reason,
+                                };
+                                paintAssistant({ pendingCommit: stagedCommit }, { force: true, persist: true });
+                                return { ok: true, htmlUrl: after.htmlUrl };
+                            }
+                            if (after.inconclusive) {
+                                stagedCommit = {
+                                    proposal,
+                                    status: "unverified",
+                                    verifyNote: `${message}；随后核对仓库现状也未成功（${after.reason}）`,
+                                    verifiedAt: Date.now(),
+                                    error: message,
+                                };
+                                paintAssistant({ pendingCommit: stagedCommit }, { force: true, persist: true });
+                                return { ok: false, error: message };
+                            }
+                        } catch {
+                            stagedCommit = {
+                                proposal,
+                                status: "unverified",
+                                verifyNote: `${message}；随后核对仓库现状异常，状态待确认。`,
+                                verifiedAt: Date.now(),
+                                error: message,
+                            };
+                            paintAssistant({ pendingCommit: stagedCommit }, { force: true, persist: true });
+                            return { ok: false, error: message };
+                        }
+                        stagedCommit = { proposal, status: "pending", error: message, lastAttemptAt: Date.now() };
+                        paintAssistant({ pendingCommit: stagedCommit }, { force: true, persist: true });
                         return { ok: false, error: message };
                     }
                 },
@@ -770,6 +850,10 @@ export async function sendQaMessage(
         // 全自动模式下提交已在工具内完成（commitNow）；这里只兜底处理提交失败留下的待办提案
         if (autoCommit && stagedCommit?.status === "pending" && !stagedCommit.error) {
             await applyQaCommit(assistantMsg.id);
+            // 兜底提交也会更新 stagedCommit 之外的消息状态；重新读回最新状态，
+            // 避免后面若还有 paintAssistant 调用时拿旧快照覆盖（保护逻辑已内置，双保险）
+            const latest = sessions.find((s) => s.id === sessionId)?.messages.find((m) => m.id === assistantMsg.id)?.pendingCommit;
+            if (latest) stagedCommit = latest;
         }
         // 本轮结束后触顶：立即压缩（进度条回到低位）
         if (contextUsageOf(sessions.find((s) => s.id === sessionId) ?? null) >= 1) {
@@ -872,13 +956,39 @@ export async function retryQaMessage(assistantMsgId: string): Promise<void> {
 
 // ── 提交提案的确认 / 应用 / 撤销 ────────────────────
 
-function patchPendingCommit(sessionId: string, msgId: string, patch: Partial<QaPendingCommit>) {
-    updateSession(sessionId, (s) => ({
-        ...s,
-        messages: s.messages.map((m) =>
-            m.id === msgId && m.pendingCommit ? { ...m, pendingCommit: { ...m.pendingCommit, ...patch } } : m,
-        ),
-    }));
+/**
+ * 更新某条消息上的提交状态。
+ *
+ * 关键：默认强制持久化（publish）——提交状态是「钱一类的状态」，
+ * 绝不能只留在内存里，否则刷新页面后会退回 pending 并重新出现「应用」按钮。
+ * 另外支持 expectedStatus 乐观校验：状态已被别处改成 applied 时，
+ * 不把旧快照（pending）回写覆盖，避免「提交成功却又变回可应用」。
+ */
+function patchPendingCommit(
+    sessionId: string,
+    msgId: string,
+    patch: Partial<QaPendingCommit>,
+    options?: {
+        persist?: boolean;
+        /** 仅当当前状态属于这些值时才写入（防止过期快照覆盖新状态） */
+        onlyFrom?: QaPendingCommit["status"][];
+    },
+): boolean {
+    let wrote = false;
+    updateSession(
+        sessionId,
+        (s) => ({
+            ...s,
+            messages: s.messages.map((m) => {
+                if (m.id !== msgId || !m.pendingCommit) return m;
+                if (options?.onlyFrom && !options.onlyFrom.includes(m.pendingCommit.status)) return m;
+                wrote = true;
+                return { ...m, pendingCommit: { ...m.pendingCommit, ...patch } };
+            }),
+        }),
+        { persist: options?.persist !== false },
+    );
+    return wrote;
 }
 
 function findMsgWithPending(msgId: string): { sessionId: string; pending: QaPendingCommit } | null {
@@ -889,21 +999,121 @@ function findMsgWithPending(msgId: string): { sessionId: string; pending: QaPend
     return null;
 }
 
-/** 用户点「应用」：真正提交提案到 GitHub。 */
+/**
+ * 用户点「应用」：真正提交提案到 GitHub。
+ *
+ * 防重复提交的三道闸：
+ *  1. 前置：只有 status === "pending" 且没有 result.commitSha 才继续；
+ *  2. 提交前：先核对仓库现状，若提案内容已落地 → 直接记为 applied，不发提交请求；
+ *  3. 提交失败：区分「确认未落地」（可重试）与「无法确认」（unverified，不给应用入口）。
+ * 成功或形成结论后一律强制持久化，刷新页面不会退回 pending。
+ */
 export async function applyQaCommit(msgId: string): Promise<void> {
     const found = findMsgWithPending(msgId);
-    if (!found || found.pending.status !== "pending") return;
+    if (!found) return;
+    const { sessionId, pending } = found;
+    // 闸 1：已落地 / 已有提交记录 / 正在处理中，一律拒绝重复应用
+    if (pending.status !== "pending") return;
+    if (pending.result?.sha) return;
+
     const config = loadQaGithubConfig();
     if (!config) {
-        patchPendingCommit(found.sessionId, msgId, { status: "canceled", error: "仓库配置已丢失。" });
+        patchPendingCommit(sessionId, msgId, { status: "canceled", error: "仓库配置已丢失。" });
         return;
     }
-    patchPendingCommit(found.sessionId, msgId, { status: "applying" });
+
+    // 闸 2：提交前核对仓库现状，避免对已落地的提案重复提交（脏状态自愈）
+    // lastAttemptAt 落盘：即使提交中途页面被刷新，重进工坊时自愈扫描也能识别出
+    // 「点过应用但状态还在 pending」的卡片并去核对仓库，而不是重新给用户「应用」入口。
+    patchPendingCommit(sessionId, msgId, { status: "applying", error: undefined, lastAttemptAt: Date.now() }, { persist: true });
     try {
-        const result = await commitQaFiles(config, found.pending.proposal);
-        patchPendingCommit(found.sessionId, msgId, { status: "applied", result });
+        const precheck = await verifyQaCommitApplied(config, pending.proposal);
+        if (precheck.applied) {
+            // 内容已在仓库里：直接判定已应用，不再发提交请求
+            patchPendingCommit(sessionId, msgId, {
+                status: "applied",
+                result: {
+                    sha: precheck.sha ?? "",
+                    branch: pending.proposal.branch ?? "",
+                    parentSha: precheck.headSha ?? "",
+                    htmlUrl: precheck.htmlUrl ?? "",
+                    fileCount: pending.proposal.files.length + (pending.proposal.deletes?.length ?? 0),
+                    reconciled: true,
+                },
+                verifiedAt: Date.now(),
+                verifyNote: precheck.reason,
+                error: undefined,
+            }, { persist: true });
+            return;
+        }
+        if (precheck.inconclusive) {
+            // 读不到仓库现状：不冒险提交，也不谎称成功 → 待确认
+            patchPendingCommit(sessionId, msgId, {
+                status: "unverified",
+                verifyNote: precheck.reason,
+                verifiedAt: Date.now(),
+                error: undefined,
+            }, { persist: true });
+            return;
+        }
+    } catch {
+        // 核对本身异常不阻塞正常提交路径，继续走下面的真实提交
+    }
+
+    try {
+        const result = await commitQaFiles(config, pending.proposal);
+        // 闸 3（成功）：写入 sha 与结果，并强制持久化——刷新后仍是「已应用」
+        patchPendingCommit(sessionId, msgId, {
+            status: "applied",
+            result,
+            verifiedAt: Date.now(),
+            verifyNote: undefined,
+            error: undefined,
+        }, { persist: true });
     } catch (error) {
-        patchPendingCommit(found.sessionId, msgId, { status: "pending", error: formatQaErrorMessage(error) });
+        const message = formatQaErrorMessage(error);
+        // 提交失败不等于未落地（如 422 Not a fast forward：提交其实已成功、只是无法快进）。
+        // 重新核对一次：能确认已落地就记 applied，读不到就记 unverified（不给应用入口）。
+        try {
+            const after = await verifyQaCommitApplied(config, pending.proposal);
+            if (after.applied) {
+                patchPendingCommit(sessionId, msgId, {
+                    status: "applied",
+                    result: {
+                        sha: after.sha ?? "",
+                        branch: pending.proposal.branch ?? "",
+                        parentSha: after.headSha ?? "",
+                        htmlUrl: after.htmlUrl ?? "",
+                        fileCount: pending.proposal.files.length + (pending.proposal.deletes?.length ?? 0),
+                        reconciled: true,
+                    },
+                    verifiedAt: Date.now(),
+                    verifyNote: after.reason,
+                    error: undefined,
+                }, { persist: true });
+                return;
+            }
+            if (after.inconclusive) {
+                patchPendingCommit(sessionId, msgId, {
+                    status: "unverified",
+                    verifyNote: `${message}；随后核对仓库现状也未成功（${after.reason}）`,
+                    verifiedAt: Date.now(),
+                    error: message,
+                }, { persist: true });
+                return;
+            }
+        } catch {
+            // 核对抛错，按「无法确认」处理
+            patchPendingCommit(sessionId, msgId, {
+                status: "unverified",
+                verifyNote: `${message}；随后核对仓库现状异常，状态待确认。`,
+                verifiedAt: Date.now(),
+                error: message,
+            }, { persist: true });
+            return;
+        }
+        // 明确未落地：回到 pending，允许用户重试
+        patchPendingCommit(sessionId, msgId, { status: "pending", error: message, verifiedAt: Date.now() }, { persist: true });
     }
 }
 
@@ -912,6 +1122,90 @@ export function cancelQaCommit(msgId: string): void {
     const found = findMsgWithPending(msgId);
     if (!found || found.pending.status !== "pending") return;
     patchPendingCommit(found.sessionId, msgId, { status: "canceled" });
+}
+
+/**
+ * 对标记为 unverified 的提案做一次主动核对：确认已落地则升级为 applied。
+ * 供 UI 上「重新核对」按钮与进入工坊时的自动修复调用。
+ */
+export async function recheckQaCommit(msgId: string): Promise<"applied" | "pending" | "unverified" | null> {
+    const found = findMsgWithPending(msgId);
+    if (!found) return null;
+    const { sessionId, pending } = found;
+    if (pending.status === "applied" || pending.result?.sha) return "applied";
+    const config = loadQaGithubConfig();
+    if (!config) return null;
+    const result = await verifyQaCommitApplied(config, pending.proposal);
+    if (result.applied) {
+        patchPendingCommit(sessionId, msgId, {
+            status: "applied",
+            result: {
+                sha: result.sha ?? "",
+                branch: pending.proposal.branch ?? "",
+                parentSha: result.headSha ?? "",
+                htmlUrl: result.htmlUrl ?? "",
+                fileCount: pending.proposal.files.length + (pending.proposal.deletes?.length ?? 0),
+                reconciled: true,
+            },
+            verifiedAt: Date.now(),
+            verifyNote: result.reason,
+            error: undefined,
+        }, { persist: true });
+        return "applied";
+    }
+    if (result.inconclusive) {
+        patchPendingCommit(sessionId, msgId, { status: "unverified", verifyNote: result.reason, verifiedAt: Date.now() }, { persist: true });
+        return "unverified";
+    }
+    // 已确认未落地。若这张卡片本来就没被点过「应用」（没有尝试记录），
+    // 不写入核对说明——保持提案的干净初始态，只在用户主动点过应用后才留痕。
+    if (pending.lastAttemptAt) {
+        patchPendingCommit(sessionId, msgId, { status: "pending", verifyNote: result.reason, verifiedAt: Date.now() }, { persist: true });
+    }
+    return "pending";
+}
+
+/**
+ * 启动期状态自愈（只读，不创建任何提交）。
+ *
+ * 处理两类脏状态：
+ *  a. 「点过应用但状态还是 pending」——提交其实成功，本地状态被覆盖（含旧版本遗留）；
+ *  b. 当前会话里任何仍显示 pending 的提案——核对仓库现状，若内容已落地就改成 applied，
+ *     避免用户对着早已提交的卡片再点一次「应用」产生重复 Commit。
+ *
+ * 以当前会话为主、限制数量上限，避免进入工坊时发起过多请求。
+ * 核对不到的（网络/权限）不做武断结论，留给卡片上的「核对仓库现状」。
+ */
+export async function reconcileStaleQaCommits(options?: { maxChecks?: number }): Promise<number> {
+    const config = loadQaGithubConfig();
+    if (!config || isGenerating) return 0;
+    const maxChecks = options?.maxChecks ?? 6;
+    const targets: { sessionId: string; msgId: string; attempted: boolean }[] = [];
+    // 当前会话排在最前：用户能直接看到修复效果
+    const ordered = [
+        ...sessions.filter((s) => s.id === activeSessionId),
+        ...sessions.filter((s) => s.id !== activeSessionId),
+    ];
+    for (const session of ordered) {
+        for (const message of session.messages) {
+            const pending = message.pendingCommit;
+            if (!pending || pending.status !== "pending") continue;
+            if (pending.result?.sha) continue;
+            targets.push({ sessionId: session.id, msgId: message.id, attempted: Boolean(pending.lastAttemptAt) });
+        }
+    }
+    // 优先核对「点过应用」的（大概率是真脏状态），再补当前会话其余待办提案
+    targets.sort((a, b) => Number(b.attempted) - Number(a.attempted));
+    let fixed = 0;
+    for (const target of targets.slice(0, maxChecks)) {
+        try {
+            const outcome = await recheckQaCommit(target.msgId);
+            if (outcome === "applied" || outcome === "unverified") fixed += 1;
+        } catch {
+            // 单个核对失败不影响其它
+        }
+    }
+    return fixed;
 }
 
 /** 用户点「撤销」：回退已应用的提交。 */

@@ -35,6 +35,11 @@ export type QaCommitResult = {
     parentSha: string;
     htmlUrl: string;
     fileCount: number;
+    /**
+     * true = 本次并非新提交，而是核对后发现仓库里已经是提案内容（脏状态自愈）。
+     * 此时 sha / htmlUrl 为空，UI 不得提供「撤销」（没有可回退的本地提交记录）。
+     */
+    reconciled?: boolean;
 };
 
 async function resolveBranch(config: QaGithubConfig, signal?: AbortSignal): Promise<string> {
@@ -157,6 +162,190 @@ export async function commitQaFiles(
         parentSha,
         htmlUrl: commit.html_url || `https://github.com/${config.owner}/${config.repo}/commit/${commit.sha}`,
         fileCount: input.files.length + deletes.length,
+    };
+}
+
+// ── 提交现状核对（防重复提交）────────────────────────
+// 场景：Commit 其实已经成功推到 GitHub，但本地会话里的 pendingCommit 状态
+// 因为历史 bug / 刷新 / 存储异常而丢了，UI 又显示「应用」。用户再点一次就会
+// 产生内容完全相同的重复 Commit（并在分叉分支上触发 422 Not a fast forward）。
+// 这里提供只读核对：提案内容是否已经等于仓库现状。
+
+/** 只读 GitHub API 请求（无 PAT 时也能读公开仓库）。 */
+async function ghReadJson<T>(config: QaGithubConfig, path: string, signal?: AbortSignal): Promise<T> {
+    const headers: Record<string, string> = {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    };
+    if (config.token) headers.Authorization = `Bearer ${config.token}`;
+    const response = await fetch(`${apiBase(config)}${path}`, { method: "GET", headers, signal });
+    if (response.status === 404) throw new Error(`GitHub GET ${path} → 404`);
+    if (!response.ok) throw new Error(`GitHub GET ${path} → ${response.status}`);
+    return (await response.json()) as T;
+}
+
+/** base64（GitHub contents API 返回，带换行）→ UTF-8 文本 */
+function decodeBase64Utf8(base64: string): string {
+    const binary = atob(base64.replace(/\s/g, ""));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+}
+
+/** 行尾与首尾空行归一化：避免 CRLF / 尾换行差异把「已应用」误判成「未应用」 */
+function normalizeForCompare(text: string): string {
+    return text.replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "").trim();
+}
+
+export type QaVerifyResult = {
+    /** true = 提案内容已存在于仓库现状，绝不能再次提交 */
+    applied: boolean;
+    /** 尽力回溯到的对应提交 sha（按提交信息在分支近期历史里匹配；匹配不到则为空） */
+    sha?: string;
+    htmlUrl?: string;
+    /** 分支当前 HEAD（诊断信息） */
+    headSha?: string;
+    /**
+     * true = 核对过程未能完成（网络/权限/分支读取失败），applied 的 false 不可信。
+     * 调用方据此显示「状态待确认」，而不是当作「确定未落地」放行重复提交。
+     */
+    inconclusive?: boolean;
+    /** 判定依据说明，供 UI 展示与排障 */
+    reason: string;
+};
+
+/**
+ * 核对一份提交提案是否已经落地到目标分支。
+ *
+ * 判定逻辑（先内容、后信息）：
+ *  1. 目标分支 HEAD 不存在 → 未应用；
+ *  2. 提案里每个文件的目标内容与仓库现状逐一致（行尾归一化后比较）、
+ *     且要删除的文件确实已不存在 → applied=true（内容级铁证）；
+ *  3. 内容一致时，再按提交信息在分支近期提交里回溯对应的 sha，供 UI 显示
+ *     「已应用 · a5a17d3」；
+ *  4. 任何一步读取失败都不武断判定：返回 applied=false 但 reason 说明未能确认，
+ *     由调用方按「状态待确认」处理（宁可不给应用入口，也不重复提交）。
+ */
+export async function verifyQaCommitApplied(
+    config: QaGithubConfig,
+    proposal: { files: QaCommitFile[]; deletes?: string[]; message?: string; branch?: string },
+    signal?: AbortSignal,
+): Promise<QaVerifyResult> {
+    const base = `/repos/${config.owner}/${config.repo}`;
+    const deletes = (proposal.deletes ?? []).map((p) => p.replace(/^\/+/, "")).filter(Boolean);
+    // 注意：核对全程走只读 API（ghReadJson），没有 PAT 也能读公开仓库；
+    // 不能用 getRef / resolveBranch——它们走写路径的 headers，缺 PAT 会直接抛错，
+    // 会被误判成「分支不存在、提案未落地」，那就等于放行了一次重复提交。
+    let branch = proposal.branch?.trim() || "";
+    if (!branch) {
+        try {
+            const repo = await ghReadJson<{ default_branch?: string }>(config, base, signal);
+            branch = repo.default_branch || "main";
+        } catch (error) {
+            return {
+                applied: false,
+                inconclusive: true,
+                reason: `无法确定目标分支（${error instanceof Error ? error.message : String(error)}），未能核对仓库现状。`,
+            };
+        }
+    }
+    let headSha: string;
+    try {
+        const ref = await ghReadJson<{ object?: { sha?: string } }>(
+            config,
+            `${base}/git/ref/heads/${encodeURIComponent(branch)}`,
+            signal,
+        );
+        headSha = ref.object?.sha ?? "";
+        if (!headSha) throw new Error("分支引用缺少 sha");
+    } catch (error) {
+        if (error instanceof Error && /→ 404/.test(error.message)) {
+            // 分支确实不存在 = 这份提案不可能已经落地（确定结论）
+            return { applied: false, reason: `分支「${branch}」不存在，提案尚未落地。` };
+        }
+        return {
+            applied: false,
+            inconclusive: true,
+            reason: `读取分支「${branch}」现状失败（${error instanceof Error ? error.message : String(error)}），未能核对。`,
+        };
+    }
+
+    try {
+        // 1) 要删除的文件必须都不存在
+        for (const path of deletes) {
+            try {
+                await ghReadJson(config, `${base}/contents/${encodeURI(path)}?ref=${encodeURIComponent(branch)}`, signal);
+                return { applied: false, headSha, reason: `待删除文件 ${path} 仍存在于仓库中，提案未完全落地。` };
+            } catch (error) {
+                if (!(error instanceof Error) || !/→ 404/.test(error.message)) throw error;
+                // 404 = 已删除，符合预期
+            }
+        }
+        // 2) 每个文件的目标内容必须与仓库现状一致
+        for (const file of proposal.files) {
+            const path = file.path.replace(/^\/+/, "");
+            let entry: { content?: string; encoding?: string; sha?: string; size?: number };
+            try {
+                entry = await ghReadJson(
+                    config,
+                    `${base}/contents/${encodeURI(path)}?ref=${encodeURIComponent(branch)}`,
+                    signal,
+                );
+            } catch (error) {
+                if (error instanceof Error && /→ 404/.test(error.message)) {
+                    return { applied: false, headSha, reason: `文件 ${path} 尚未存在于仓库，提案未落地。` };
+                }
+                throw error;
+            }
+            let current = "";
+            if (entry.content) {
+                current = decodeBase64Utf8(entry.content);
+            } else if (entry.sha) {
+                // 大文件（>1MB）contents API 不返回 content，回退到 blob API
+                const blob = await ghReadJson<{ content?: string }>(config, `${base}/git/blobs/${entry.sha}`, signal);
+                current = blob.content ? decodeBase64Utf8(blob.content) : "";
+            }
+            if (normalizeForCompare(current) !== normalizeForCompare(file.content)) {
+                return { applied: false, headSha, reason: `文件 ${path} 的内容与提案不一致，提案未落地。` };
+            }
+        }
+    } catch (error) {
+        return {
+            applied: false,
+            inconclusive: true,
+            headSha,
+            reason: `核对仓库现状失败（${error instanceof Error ? error.message : String(error)}），未确认提案是否已落地。`,
+        };
+    }
+
+    // 3) 内容已一致：按提交信息回溯对应 sha，供 UI 显示具体 commit
+    let sha: string | undefined;
+    let htmlUrl: string | undefined;
+    const message = proposal.message?.trim();
+    if (message) {
+        try {
+            const commits = await ghReadJson<Array<{ sha: string; html_url?: string; commit?: { message?: string } }>>(
+                config,
+                `${base}/commits?sha=${encodeURIComponent(branch)}&per_page=50`,
+                signal,
+            );
+            const hit = commits.find((c) => (c.commit?.message ?? "").trim() === message);
+            if (hit) {
+                sha = hit.sha;
+                htmlUrl = hit.html_url || `https://github.com/${config.owner}/${config.repo}/commit/${hit.sha}`;
+            }
+        } catch {
+            // 回溯 sha 失败不影响「已应用」的结论
+        }
+    }
+    return {
+        applied: true,
+        sha,
+        htmlUrl,
+        headSha,
+        reason: sha
+            ? `仓库现状已与提案内容一致（对应提交 ${sha.slice(0, 7)}）。`
+            : "仓库现状已与提案内容一致，无需重复提交。",
     };
 }
 

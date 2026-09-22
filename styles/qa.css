@@ -2083,6 +2083,34 @@
   100% { background-position: -200% 0; }
 }
 
+/* ── 提交卡片：状态说明与已应用态 ─── */
+.qa-commit-note {
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--qa-text-tertiary);
+  word-break: break-word;
+}
+.qa-commit-note-inline {
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--qa-text-tertiary);
+}
+/* 已应用：整卡转成功色，视觉上明确不可再点「应用」 */
+.qa-commit-card.status-applied {
+  border-color: rgba(79, 158, 99, 0.32);
+}
+.qa-commit-card.status-applied .qa-commit-title {
+  color: var(--success);
+}
+/* 待确认：琥珀色，提示需要核对而不是重复提交 */
+.qa-commit-card.status-unverified {
+  border-color: rgba(240, 170, 80, 0.4);
+}
+.qa-commit-card.status-unverified .qa-commit-title {
+  color: #c98a2e;
+}
+
 /* 抽屉里正在结转的会话项 */
 .qa-drawer-item.is-carrying {
   position: relative;

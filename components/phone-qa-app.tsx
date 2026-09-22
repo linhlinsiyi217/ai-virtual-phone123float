@@ -23,6 +23,8 @@ import {
   cancelQaCommit,
   carryOverQaSession,
   clearQaToolHistory,
+  reconcileStaleQaCommits,
+  recheckQaCommit,
   createQaSession,
   deleteQaSession,
   editAndResendQaMessage,
@@ -160,17 +162,29 @@ function QaCommitCard({ msg }: { msg: QaMsg }) {
   const pending = msg.pendingCommit;
   const [busy, setBusy] = useState(false);
   if (!pending) return null;
-  const { proposal, status, result, error } = pending;
+  const { proposal, status, result, error, verifyNote } = pending;
   const files = proposal.files;
+  const sha = result?.sha || "";
+  // 已落地（applied）或结果待确认（unverified）都绝不再给「应用」入口——防重复提交
+  const settled = status === "applied" || status === "reverted";
+  const canApply = status === "pending" && !sha;
 
   const apply = async () => {
+    if (!canApply || busy) return;
     setBusy(true);
     await applyQaCommit(msg.id);
     setBusy(false);
   };
   const revert = async () => {
+    if (busy) return;
     setBusy(true);
     await revertQaAppliedCommit(msg.id);
+    setBusy(false);
+  };
+  const recheck = async () => {
+    if (busy) return;
+    setBusy(true);
+    await recheckQaCommit(msg.id);
     setBusy(false);
   };
 
@@ -178,7 +192,19 @@ function QaCommitCard({ msg }: { msg: QaMsg }) {
     <div className={`qa-commit-card status-${status}`}>
       <div className="qa-commit-head">
         <span className="qa-commit-title">
-          {status === "applied" ? "已提交" : status === "reverted" ? "已撤销" : status === "canceled" ? "已取消" : "修改提案"}
+          {status === "applied"
+            ? (sha ? `✓ 已应用 · ${sha.slice(0, 7)}` : "✓ 已应用")
+            : status === "unverified"
+              ? "状态待确认"
+              : status === "reverted"
+                ? "已撤销"
+                : status === "canceled"
+                  ? "已取消"
+                  : status === "applying"
+                    ? "正在应用…"
+                    : status === "reverting"
+                      ? "正在撤销…"
+                      : "修改提案"}
         </span>
         <span className="qa-commit-branch">{proposal.branch || "默认分支"} · {files.length + (proposal.deletes?.length ?? 0)} 个文件</span>
       </div>
@@ -192,7 +218,8 @@ function QaCommitCard({ msg }: { msg: QaMsg }) {
         ))}
       </ul>
       {error && <div className="qa-commit-error">{error}</div>}
-      {status === "pending" && (
+      {verifyNote && !settled && <div className="qa-commit-note">{verifyNote}</div>}
+      {canApply && (
         <div className="qa-commit-actions">
           <button type="button" className="qa-commit-btn is-primary" onClick={apply} disabled={busy}>
             {busy ? <Loader2 size={13} className="qa-spin" /> : "应用"}
@@ -209,13 +236,34 @@ function QaCommitCard({ msg }: { msg: QaMsg }) {
           </span>
         </div>
       )}
-      {status === "applied" && result && (
+      {status === "applied" && (
         <div className="qa-commit-actions">
-          <a className="qa-commit-link" href={result.htmlUrl} target="_blank" rel="noreferrer noopener">
-            查看 commit {result.sha.slice(0, 7)}
-          </a>
-          <button type="button" className="qa-commit-btn is-danger" onClick={revert} disabled={busy}>
-            撤销
+          {result?.htmlUrl ? (
+            <a className="qa-commit-link" href={result.htmlUrl} target="_blank" rel="noreferrer noopener">
+              查看 commit {sha ? sha.slice(0, 7) : ""}
+            </a>
+          ) : (
+            <span className="qa-commit-note-inline">已应用到仓库（未记录本地提交 sha）</span>
+          )}
+          {sha && !result?.reconciled && (
+            <button type="button" className="qa-commit-btn is-danger" onClick={revert} disabled={busy}>
+              {busy ? <Loader2 size={13} className="qa-spin" /> : "撤销"}
+            </button>
+          )}
+        </div>
+      )}
+      {/* 结果无法确认：不给「应用」入口，只允许只读核对——宁可待确认，也不重复提交 */}
+      {status === "unverified" && (
+        <div className="qa-commit-actions">
+          <button type="button" className="qa-commit-btn is-primary" onClick={recheck} disabled={busy}>
+            {busy ? <Loader2 size={13} className="qa-spin" /> : "核对仓库现状"}
+          </button>
+        </div>
+      )}
+      {status === "canceled" && (
+        <div className="qa-commit-actions">
+          <button type="button" className="qa-commit-btn" onClick={recheck} disabled={busy}>
+            {busy ? <Loader2 size={13} className="qa-spin" /> : "核对仓库现状"}
           </button>
         </div>
       )}
@@ -880,7 +928,11 @@ export function PhoneQaApp({ onClose, onNotice }: PhoneQaAppProps) {
   }, []);
 
   useEffect(() => {
-    void hydrateQaChat();
+    void hydrateQaChat().then(() => {
+      // 进入工坊时自愈历史脏状态：把「其实已提交、却仍显示应用」的卡片修成已应用，
+      // 防止用户对着早已落地的提案重复提交（只读核对，不创建任何提交）。
+      void reconcileStaleQaCommits({ maxChecks: 6 }).catch(() => {});
+    });
     refreshComposerMeta();
   }, [refreshComposerMeta]);
 
