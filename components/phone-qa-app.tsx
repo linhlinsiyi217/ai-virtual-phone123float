@@ -910,38 +910,6 @@ export function PhoneQaApp({ onClose, onNotice }: PhoneQaAppProps) {
     }
   }, [snapshot.activeSessionId, snapshot.isGenerating, snapshot.isCompacting, onNotice]);
 
-  // ── 开放运行时接口：window.__WORKSHOP_RUNTIME__ ──
-  // 供工坊扩展插件（如「工坊对话大纲与原生吸附胶囊」）读取消息、滚动、结转会话。
-  // 生命周期通过 workshop:open / workshop:update / workshop:close 事件广播。
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const runtime = {
-      version: "2.0.0",
-      getContainer: () => bodyRef.current,
-      getActiveSessionId: () => snapshot.activeSessionId,
-      getMessages: () => messages,
-      scrollToBottom: (smooth = true) => {
-        const target = bodyRef.current;
-        if (!target) return;
-        stickToBottomRef.current = true;
-        if (smooth) target.scrollTo({ top: target.scrollHeight, behavior: "smooth" });
-        else target.scrollTop = target.scrollHeight;
-      },
-      carryOverSession: (targetSessionId?: string) => handleCarryOverSession(targetSessionId),
-    };
-    const w = window as unknown as { __WORKSHOP_RUNTIME__?: typeof runtime };
-    const isFirstMount = !w.__WORKSHOP_RUNTIME__;
-    w.__WORKSHOP_RUNTIME__ = runtime;
-    window.dispatchEvent(new CustomEvent(isFirstMount ? "workshop:open" : "workshop:update", { detail: runtime }));
-
-    return () => {
-      window.dispatchEvent(new CustomEvent("workshop:close"));
-      if (w.__WORKSHOP_RUNTIME__ === runtime) {
-        delete w.__WORKSHOP_RUNTIME__;
-      }
-    };
-  }, [snapshot.activeSessionId, messages, handleCarryOverSession]);
-
   // 清理原生 tool 调用历史（防报错）：与小卷同款——移除上下文里的工具记录与原生元数据
   const handleClearToolHistory = useCallback(() => {
     if (snapshot.isGenerating) {
@@ -977,6 +945,52 @@ export function PhoneQaApp({ onClose, onNotice }: PhoneQaAppProps) {
   );
   const messages = useMemo(() => activeSession?.messages ?? [], [activeSession]);
   const createdContent = useMemo(() => activeSession?.createdContent ?? [], [activeSession]);
+
+  // ── 开放运行时接口：window.__WORKSHOP_RUNTIME__ ──
+  // 供工坊扩展插件（如「工坊对话大纲与原生吸附胶囊」）读取消息、滚动、结转会话。
+  //
+  // 声明位置很重要：useMemo / useEffect 的依赖数组在 render 期间「立即求值」，
+  // 若引用尚未初始化的 const（如 messages、handleCarryOverSession）会命中
+  // 暂时性死区（TDZ）抛 ReferenceError——本段必须留在这些声明之后。
+  const workshopRuntime = useMemo(() => ({
+    version: "2.0.0",
+    getContainer: () => bodyRef.current,
+    getActiveSessionId: () => snapshot.activeSessionId,
+    getMessages: () => messages,
+    scrollToBottom: (smooth = true) => {
+      const target = bodyRef.current;
+      if (!target) return;
+      stickToBottomRef.current = true;
+      if (smooth) target.scrollTo({ top: target.scrollHeight, behavior: "smooth" });
+      else target.scrollTop = target.scrollHeight;
+    },
+    carryOverSession: (targetSessionId?: string) => handleCarryOverSession(targetSessionId),
+  }), [snapshot.activeSessionId, messages, handleCarryOverSession]);
+
+  // 挂载 / 卸载：window 上的接口与 workshop:open、workshop:close 只在工坊
+  // 打开与关闭时各发一次。依赖必须为空——挂到 workshopRuntime 上的话，流式生成
+  // 期间 messages 高频变化会导致 Runtime 被反复删除重建、插件收到 close/open 抖动。
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const w = window as unknown as { __WORKSHOP_RUNTIME__?: typeof workshopRuntime };
+    w.__WORKSHOP_RUNTIME__ = workshopRuntime;
+    window.dispatchEvent(new CustomEvent("workshop:open", { detail: workshopRuntime }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("workshop:close"));
+      delete w.__WORKSHOP_RUNTIME__;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 引用刷新（会话切换 / 消息变化）：换掉 window 上的对象并广播 workshop:update，
+  // 不再触发 close/open。
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const w = window as unknown as { __WORKSHOP_RUNTIME__?: typeof workshopRuntime };
+    if (!w.__WORKSHOP_RUNTIME__) return; // 挂载 effect 尚未执行
+    w.__WORKSHOP_RUNTIME__ = workshopRuntime;
+    window.dispatchEvent(new CustomEvent("workshop:update", { detail: workshopRuntime }));
+  }, [workshopRuntime]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<QaCreatedContent | null>(null);
   const previewApp = useMemo(
