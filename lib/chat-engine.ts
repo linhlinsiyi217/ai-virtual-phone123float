@@ -815,7 +815,9 @@ export async function sendLLMStreamRequest(
     const request = buildProviderRequest(config, effectivePreset, requestMessages, { stream: true });
     publishDebugPromptSnapshot({ request, config, preset: effectivePreset, meta, options, requestKind: "completion" });
     const llmAbort = new AbortController();
-    const llmTimeout = setTimeout(() => llmAbort.abort(), 500_000);
+    // 长任务/思考模型（DeepSeek R1、o1、Gemini Thinking 等）单次请求最多允许 30 分钟，
+    // 避免慢中转与推理型模型被硬性 500s 掐断（工坊补丁 by 小坊升级 V2）
+    const llmTimeout = setTimeout(() => llmAbort.abort(), 1_800_000);
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
 
     try {
@@ -869,7 +871,7 @@ export async function sendLLMStreamRequest(
     } catch (error: unknown) {
         if (error instanceof DOMException && (error as DOMException).name === "AbortError") {
             if (options?.signal?.aborted) throw error;
-            throw new ChatEngineError("AI 流式回复超时（500秒），请重试。");
+            throw new ChatEngineError("AI 流式回复超时（30 分钟），请重试。");
         }
         if (error instanceof ChatEngineError) throw error;
         const detail = error instanceof Error ? error.message : String(error);
@@ -934,7 +936,9 @@ export async function sendLLMRequest(
     console.log("[ChatEngine] Request:", requestDebugInfo);
 
     const llmAbort = new AbortController();
-    const llmTimeout = setTimeout(() => llmAbort.abort(), 500_000);
+    // 长任务/思考模型（DeepSeek R1、o1、Gemini Thinking 等）单次请求最多允许 30 分钟，
+    // 避免慢中转与推理型模型被硬性 500s 掐断（工坊补丁 by 小坊升级 V2）
+    const llmTimeout = setTimeout(() => llmAbort.abort(), 1_800_000);
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
 
     try {
@@ -1004,7 +1008,7 @@ export async function sendLLMRequest(
         return applyOutputRegex(rawOutput, regexes, { macroEngine, activeTags });
     } catch (error: unknown) {
         if (error instanceof DOMException && (error as DOMException).name === "AbortError") {
-            throw new ChatEngineError("AI 回复超时（500秒），请重试。");
+            throw new ChatEngineError("AI 回复超时（30 分钟），请重试。");
         }
         if (error instanceof ChatEngineError) throw error;
         const detail = error instanceof Error ? error.message : String(error);
@@ -1104,7 +1108,9 @@ export async function sendLLMToolStreamRequest(
     const request = buildProviderRequest(config, effectivePreset, afterPlugins.messages, { tools, stream: true, maxTokens: options?.maxTokens });
     publishDebugPromptSnapshot({ request, config, preset: effectivePreset, meta, options, requestKind: "native-tools-stream", tools });
     const llmAbort = new AbortController();
-    const llmTimeout = setTimeout(() => llmAbort.abort(), 500_000);
+    // 长任务/思考模型（DeepSeek R1、o1、Gemini Thinking 等）单次请求最多允许 30 分钟，
+    // 避免慢中转与推理型模型被硬性 500s 掐断（工坊补丁 by 小坊升级 V2）
+    const llmTimeout = setTimeout(() => llmAbort.abort(), 1_800_000);
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
     let rawResponse = "";
     let content = "";
@@ -1224,7 +1230,7 @@ export async function sendLLMToolStreamRequest(
     } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") {
             if (options?.signal?.aborted) throw error;
-            throw new ChatEngineError("AI 原生动作流式回复超时（500秒），请重试。");
+            throw new ChatEngineError("AI 原生动作流式回复超时（30 分钟），请重试。");
         }
         if (error instanceof ChatEngineError) throw error;
         const detail = error instanceof Error ? error.message : String(error);
@@ -1258,7 +1264,9 @@ export async function sendLLMToolRequest(
     const request = buildProviderRequest(config, effectivePreset, afterPlugins.messages, { tools });
     publishDebugPromptSnapshot({ request, config, preset: effectivePreset, meta, options, requestKind: "native-tools", tools });
     const llmAbort = new AbortController();
-    const llmTimeout = setTimeout(() => llmAbort.abort(), 500_000);
+    // 长任务/思考模型（DeepSeek R1、o1、Gemini Thinking 等）单次请求最多允许 30 分钟，
+    // 避免慢中转与推理型模型被硬性 500s 掐断（工坊补丁 by 小坊升级 V2）
+    const llmTimeout = setTimeout(() => llmAbort.abort(), 1_800_000);
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
 
     try {
@@ -1331,7 +1339,7 @@ export async function sendLLMToolRequest(
     } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") {
             if (options?.signal?.aborted) throw error;
-            throw new ChatEngineError("AI 原生动作回复超时（500秒），请重试。");
+            throw new ChatEngineError("AI 原生动作回复超时（30 分钟），请重试。");
         }
         if (error instanceof ChatEngineError) throw error;
         const detail = error instanceof Error ? error.message : String(error);

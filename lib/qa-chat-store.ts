@@ -928,3 +928,61 @@ export async function revertQaAppliedCommit(msgId: string): Promise<void> {
         patchPendingCommit(found.sessionId, msgId, { status: "applied", error: formatQaErrorMessage(error) });
     }
 }
+
+// ── 跨会话记忆结转 ──────────────────────────────────
+// 把当前会话浓缩成备忘录，开一个新会话继承记忆但重置 Token 空间。
+// 供工坊 UI「结转新会话」与开放插件（workshop:runtime.carryOverSession）调用。
+
+/**
+ * 结转当前会话到新会话：压缩上下文为摘要 → 新建会话继承摘要 → 切换到新会话。
+ * 返回新会话 id；失败或会话为空返回 null。
+ */
+export async function carryOverQaSession(sessionId: string): Promise<string | null> {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session || isGenerating || isCompacting) return null;
+    const entries = sessionContext(session);
+    if (entries.length === 0) return null;
+
+    isCompacting = true;
+    emit();
+    try {
+        const summary = await compactQaContext(entries);
+        if (!summary?.trim()) return null;
+
+        const newId = makeId();
+        const newSession: QaSession = {
+            id: newId,
+            title: `${session.title}（接续）`.slice(0, 80),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            messages: [
+                {
+                    id: makeId(),
+                    role: "assistant",
+                    content: `已承接上一会话「${session.title}」的关键记忆与进展。\n\n**前情备忘**：\n${summary}\n\n新窗口 Token 空间已重置，我们可以继续下一步。`,
+                    ts: Date.now(),
+                },
+            ],
+            context: [
+                {
+                    role: "user",
+                    content: `[上一会话「${session.title}」的结转摘要备忘，供你延续上下文]\n${summary}`,
+                },
+                {
+                    role: "assistant",
+                    content: `已承接上一会话「${session.title}」的关键记忆与进展。新会话上下文已重置，可以继续下一步。`,
+                },
+            ],
+        };
+
+        sessions = [newSession, ...sessions].slice(0, MAX_SESSIONS);
+        activeSessionId = newId;
+        publish();
+        return newId;
+    } catch {
+        return null;
+    } finally {
+        isCompacting = false;
+        emit();
+    }
+}
