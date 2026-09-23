@@ -26,6 +26,8 @@ type Props = {
   kind: "book" | "manga";
   /** 当前不是真实 Float 角色时，引导用户去角色侧栏选择 */
   onChooseRole: () => void;
+  /** 阅读器划词「问 TA」：打开时自动发送的问题（含选中原文） */
+  initialAsk?: string;
   onClose: () => void;
 };
 
@@ -58,7 +60,7 @@ function friendlyError(error: unknown): string {
  * - 会话历史走 kv-db（短期），值得保留的事件才写长期记忆；
  * - 仅在用户主动发送 / 问 TA / 陪伴反馈时请求 AI，不做每页自动发言。
  */
-export function CoReadingChatSheet({ book, role, kind, onChooseRole, onClose }: Props) {
+export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk, onClose }: Props) {
   const contentRef = useMemo(() => buildBookRoomContentRef(book), [book]);
   const roleReady = isRealCompanionRole(role.id);
 
@@ -80,6 +82,7 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, onClose }: 
   const abortRef = useRef<AbortController | null>(null);
   const sendingRef = useRef(false);
   const timerRef = useRef<number | null>(null);
+  const initialAskFiredRef = useRef(false);
 
   useEffect(() => {
     const el = listRef.current;
@@ -189,6 +192,19 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, onClose }: 
     if (sending) return;
     send("我想听听你此刻陪我读的心情。");
   };
+
+  // 阅读器划词「问 TA」：挂载后自动发送一次；未选真实角色则先填入输入框
+  useEffect(() => {
+    if (!initialAsk || initialAskFiredRef.current) return;
+    initialAskFiredRef.current = true;
+    if (isRealCompanionRole(role.id)) {
+      void requestReply(initialAsk.trim(), false);
+    } else {
+      setDraft(initialAsk.trim());
+    }
+    // 只在挂载时触发一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <BottomSheet

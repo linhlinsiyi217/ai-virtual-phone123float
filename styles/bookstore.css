@@ -2672,3 +2672,470 @@
   font-size: calc(12px * var(--app-text-scale, 1));
   cursor: pointer;
 }
+
+/* ═══════════════════════════════════════════
+   Phase 3B — 阅读器长按工具 + 阅读辅助
+   划词菜单 / 标注 / 笔记 / 翻译 / 搜索 / TTS
+   ═══════════════════════════════════════════ */
+
+/* 正文允许原生选择；头尾与工具不参与选择 */
+.bookroom-app .reading-article {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+.bookroom-app .reading-header,
+.bookroom-app .reading-footer,
+.bookroom-app .reader-select-menu {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ── 划词工具菜单（浮出，不常驻） ── */
+.bookroom-app .reader-select-menu {
+  z-index: 130;
+  padding: 6px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: linear-gradient(180deg, rgba(252, 251, 248, 0.94), rgba(245, 244, 241, 0.92));
+  box-shadow: 0 14px 38px rgba(20, 20, 20, 0.2);
+  backdrop-filter: blur(24px) saturate(120%);
+  -webkit-backdrop-filter: blur(24px) saturate(120%);
+  animation: br-reader-menu-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes br-reader-menu-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.bookroom-app .reader-menu-row {
+  display: flex;
+}
+
+.bookroom-app .reader-menu-item {
+  flex: 1 1 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  font-family: inherit;
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.02em;
+  color: var(--reading-ink-secondary);
+  cursor: pointer;
+}
+
+.bookroom-app .reader-menu-item:not(:disabled):active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.bookroom-app .reader-menu-item:disabled {
+  opacity: 0.32;
+}
+
+/* ── 正文标注：高亮 / 划线 / 笔记标记（不改行高、不影响选择） ── */
+.bookroom-app .ra-mark {
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.bookroom-app .ra-highlight[data-color="blue"],
+.bookroom-app .ra-note[data-color="blue"] { background: rgba(106, 146, 198, 0.22); }
+.bookroom-app .ra-highlight[data-color="yellow"],
+.bookroom-app .ra-note[data-color="yellow"] { background: rgba(226, 199, 118, 0.30); }
+.bookroom-app .ra-highlight[data-color="red"],
+.bookroom-app .ra-note[data-color="red"] { background: rgba(212, 128, 122, 0.22); }
+.bookroom-app .ra-highlight[data-color="green"],
+.bookroom-app .ra-note[data-color="green"] { background: rgba(138, 180, 144, 0.24); }
+
+.bookroom-app .ra-underline {
+  background: transparent;
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+.bookroom-app .ra-underline[data-color="blue"] { text-decoration-color: rgba(86, 128, 186, 0.75); }
+.bookroom-app .ra-underline[data-color="yellow"] { text-decoration-color: rgba(196, 162, 72, 0.8); }
+.bookroom-app .ra-underline[data-color="red"] { text-decoration-color: rgba(192, 102, 96, 0.75); }
+.bookroom-app .ra-underline[data-color="green"] { text-decoration-color: rgba(104, 150, 112, 0.78); }
+
+.bookroom-app .ra-note-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin: 0 0 0 3px;
+  border-radius: 50%;
+  background: var(--reading-ink, #1b1b1b);
+  color: #f7f6f3;
+  font-size: 9px;
+  font-style: normal;
+  line-height: 1;
+  vertical-align: 1px;
+  cursor: pointer;
+}
+
+/* 跳转闪动 + 朗读中段落 */
+.bookroom-app .reading-body-paragraph.ra-flash {
+  animation: ra-paragraph-flash 1.7s ease both;
+}
+
+@keyframes ra-paragraph-flash {
+  0% { background: rgba(106, 146, 198, 0.28); }
+  100% { background: transparent; }
+}
+
+.bookroom-app .reading-body-paragraph.is-speaking {
+  background: rgba(21, 21, 21, 0.045);
+  border-radius: 8px;
+  transition: background-color 300ms ease;
+}
+
+/* ── 工具半弹窗共用 ── */
+.bookroom-app .reader-note-quote {
+  margin: 0 0 12px;
+  padding: 10px 13px;
+  border-left: 2px solid rgba(0, 0, 0, 0.28);
+  border-radius: 0 10px 10px 0;
+  background: rgba(0, 0, 0, 0.035);
+  font-size: calc(13px * var(--app-text-scale, 1));
+  line-height: 1.7;
+  color: var(--reading-ink-secondary);
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+.bookroom-app .reader-note-input {
+  width: 100%;
+  min-height: 124px;
+  resize: none;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  outline: none;
+  background: rgba(255, 255, 255, 0.72);
+  font-family: inherit;
+  font-size: calc(14px * var(--app-text-scale, 1));
+  line-height: 1.7;
+  color: var(--reading-ink);
+  transition: border-color 200ms ease;
+}
+
+.bookroom-app .reader-note-input:focus {
+  border-color: rgba(21, 21, 21, 0.35);
+}
+
+.bookroom-app .reader-sheet-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.bookroom-app .reader-primary-btn {
+  height: 38px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 999px;
+  background: var(--reading-ink, #1b1b1b);
+  color: #f7f6f3;
+  font-family: inherit;
+  font-size: calc(13px * var(--app-text-scale, 1));
+  cursor: pointer;
+}
+
+.bookroom-app .reader-primary-btn:disabled {
+  opacity: 0.4;
+}
+
+.bookroom-app .reader-ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: transparent;
+  font-family: inherit;
+  font-size: calc(13px * var(--app-text-scale, 1));
+  color: var(--reading-ink-secondary);
+  cursor: pointer;
+}
+
+.bookroom-app .reader-ghost-btn.is-danger {
+  color: #a3554f;
+  border-color: rgba(163, 85, 79, 0.35);
+}
+
+.bookroom-app .reader-sheet-hint {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  color: var(--reading-ink-tertiary);
+}
+
+.bookroom-app .reader-sheet-loading {
+  padding: 22px 4px;
+  font-size: calc(13px * var(--app-text-scale, 1));
+  color: var(--reading-ink-secondary);
+}
+
+.bookroom-app .reader-sheet-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 4px;
+  font-size: calc(13px * var(--app-text-scale, 1));
+  color: var(--reading-ink-secondary);
+}
+
+.bookroom-app .reader-retry-btn {
+  height: 30px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: rgba(255, 255, 255, 0.9);
+  font-family: inherit;
+  font-size: calc(12px * var(--app-text-scale, 1));
+  cursor: pointer;
+}
+
+.bookroom-app .reader-translate-target {
+  margin: 4px 0 8px;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  letter-spacing: 0.1em;
+  color: var(--reading-ink-tertiary);
+}
+
+.bookroom-app .reader-translate-result {
+  margin: 0;
+  font-size: calc(15.5px * var(--app-text-scale, 1));
+  line-height: 1.9;
+  color: var(--reading-ink);
+}
+
+/* ── 书内搜索 ── */
+.bookroom-app .reader-search-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  outline: none;
+  background: rgba(255, 255, 255, 0.72);
+  font-family: inherit;
+  font-size: calc(13.5px * var(--app-text-scale, 1));
+  color: var(--reading-ink);
+}
+
+.bookroom-app .reader-search-input + .br-segmented {
+  margin-top: 10px;
+}
+
+.bookroom-app .reader-search-count {
+  margin: 12px 2px 8px;
+  font-size: calc(11.5px * var(--app-text-scale, 1));
+  color: var(--reading-ink-tertiary);
+}
+
+.bookroom-app .reader-search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 44vh;
+  overflow-y: auto;
+}
+
+.bookroom-app .reader-search-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.6);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.bookroom-app .reader-search-loc {
+  display: block;
+  margin-bottom: 4px;
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.04em;
+  color: var(--reading-ink-tertiary);
+}
+
+.bookroom-app .reader-search-snippet {
+  font-size: calc(13px * var(--app-text-scale, 1));
+  line-height: 1.65;
+  color: var(--reading-ink-secondary);
+}
+
+.bookroom-app mark.reader-search-hit {
+  background: rgba(226, 199, 118, 0.6);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.bookroom-app .reader-sheet-empty {
+  margin: 0;
+  padding: 42px 22px;
+  text-align: center;
+  font-size: calc(13px * var(--app-text-scale, 1));
+  line-height: 1.9;
+  color: var(--reading-ink-tertiary);
+}
+
+/* ── 我的标注 ── */
+.bookroom-app .reader-ann-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 56vh;
+  overflow-y: auto;
+}
+
+.bookroom-app .reader-ann-item {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-left: 3px solid rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.bookroom-app .reader-ann-item[data-color="blue"] { border-left-color: rgba(86, 128, 186, 0.7); }
+.bookroom-app .reader-ann-item[data-color="yellow"] { border-left-color: rgba(196, 162, 72, 0.75); }
+.bookroom-app .reader-ann-item[data-color="red"] { border-left-color: rgba(192, 102, 96, 0.7); }
+.bookroom-app .reader-ann-item[data-color="green"] { border-left-color: rgba(104, 150, 112, 0.72); }
+
+.bookroom-app .reader-ann-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.bookroom-app .reader-ann-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  color: var(--reading-ink-tertiary);
+}
+
+.bookroom-app .reader-ann-type {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.07);
+  font-style: normal;
+  font-size: calc(10px * var(--app-text-scale, 1));
+  color: var(--reading-ink-secondary);
+}
+
+.bookroom-app .reader-ann-quote {
+  font-size: calc(13px * var(--app-text-scale, 1));
+  line-height: 1.65;
+  color: var(--reading-ink);
+}
+
+.bookroom-app .reader-ann-note,
+.bookroom-app .reader-ann-note-preview {
+  font-size: calc(12.5px * var(--app-text-scale, 1));
+  line-height: 1.6;
+  color: var(--reading-ink-secondary);
+}
+
+.bookroom-app .reader-ann-note {
+  padding-top: 6px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.1);
+}
+
+.bookroom-app .reader-ann-delete {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--reading-ink-tertiary);
+  cursor: pointer;
+}
+
+/* ── 标注改色 ── */
+.bookroom-app .reader-color-row {
+  display: flex;
+  gap: 16px;
+  margin: 16px 0 4px;
+}
+
+.bookroom-app .reader-color-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.bookroom-app .reader-color-dot.is-blue { background: rgba(106, 146, 198, 0.55); }
+.bookroom-app .reader-color-dot.is-yellow { background: rgba(226, 199, 118, 0.7); }
+.bookroom-app .reader-color-dot.is-red { background: rgba(212, 128, 122, 0.55); }
+.bookroom-app .reader-color-dot.is-green { background: rgba(138, 180, 144, 0.6); }
+
+.bookroom-app .reader-color-dot.is-selected {
+  border-color: var(--reading-ink, #1b1b1b);
+}
+
+/* ── 从此听 TTS ── */
+.bookroom-app .reader-tts-status {
+  margin: 6px 0 18px;
+  text-align: center;
+  font-size: calc(13px * var(--app-text-scale, 1));
+  color: var(--reading-ink-secondary);
+}
+
+.bookroom-app .reader-tts-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.bookroom-app .reader-tts-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--reading-ink);
+  cursor: pointer;
+}

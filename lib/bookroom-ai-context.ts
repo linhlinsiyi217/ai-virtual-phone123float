@@ -207,23 +207,19 @@ export type GenerateBookRoomReplyInput = {
   signal?: AbortSignal;
 };
 
-export async function generateBookRoomReply(input: GenerateBookRoomReplyInput): Promise<{ reply: string; characterName: string }> {
-  const { roleId, content, history, userText, signal } = input;
-
+/** 解析当前角色在「阅读」场景绑定的真实 AI 配置（共读 / 翻译共用），不新建 provider */
+function resolveRoleAiSlot(roleId: string) {
   const character = loadCharacters().find(item => item.id === roleId);
   if (!character) {
     throw new BookRoomAiError("no-character", "先选择一位陪读角色");
   }
-
-  const bindings = loadBindingConfig();
-  const slot = resolveBinding(bindings, roleId, BOOKROOM_APP_ID);
+  const slot = resolveBinding(loadBindingConfig(), roleId, BOOKROOM_APP_ID);
   const apiConfig = slot.apiConfigId
     ? (loadApiConfigs().find(item => item.id === slot.apiConfigId) ?? null)
     : null;
   if (!apiConfig) {
     throw new BookRoomAiError("no-config", "AI 还没有配置好，请先在设置中为该角色绑定 API");
   }
-
   const presets = loadPresets();
   const preset = (slot.presetId ? presets.find(item => item.id === slot.presetId) ?? null : null)
     ?? presets.find(item => item.builtIn)
@@ -232,6 +228,59 @@ export async function generateBookRoomReply(input: GenerateBookRoomReplyInput): 
   const regexes = (slot.regexIds ?? [])
     .map(id => loadRegexes().find(item => item.id === id))
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
+  return { character, apiConfig, preset, regexes, worldBookIds: slot.worldBookIds };
+}
+
+/**
+ * 阅读器划词翻译：复用当前角色已绑定的 Float AI，专用翻译 prompt。
+ * 中文 → 英文；其他语言 → 简体中文。只返回译文，不改正文、不写任何记忆。
+ */
+export async function translateBookRoomText(
+  roleId: string,
+  text: string,
+  signal?: AbortSignal,
+): Promise<{ translation: string; targetLanguage: string }> {
+  const source = text.trim();
+  if (!source) throw new BookRoomAiError("failed", "没有可翻译的文字");
+  const { character, apiConfig, preset, regexes } = resolveRoleAiSlot(roleId);
+
+  const cjkCount = (source.match(/[\u4e00-\u9fff]/g) ?? []).length;
+  const toEnglish = cjkCount / Math.max(1, source.replace(/\s/g, "").length) > 0.3;
+  const targetLanguage = toEnglish ? "英文" : "简体中文";
+
+  const system = [
+    `你是 ${character.name}，正在书房陪用户读书，兼任翻译。`,
+    `把用户给出的文字准确翻译成${targetLanguage}：保留原意、语气与原文的断句节奏；`,
+    "诗歌/对白保持文学感，不要添加解释、注释或任何原文与译文以外的内容。",
+    `直接输出${targetLanguage}译文本身。`,
+  ].join("\n");
+
+  let raw: string;
+  try {
+    raw = await sendLLMRequest(
+      apiConfig,
+      preset,
+      [
+        { role: "system", content: system },
+        { role: "user", content: source },
+      ],
+      regexes,
+      { characterName: character.name, userName: "用户" },
+      { appId: BOOKROOM_APP_ID, appTags: [...BOOKROOM_APP_TAGS, "translate"], signal, skipOutputRegex: false },
+    );
+  } catch (error) {
+    if ((error as Error)?.name === "AbortError") throw new BookRoomAiError("aborted", "已取消");
+    throw new BookRoomAiError("failed", (error as Error)?.message || "翻译失败，稍后再试。");
+  }
+  const translation = raw.trim();
+  if (!translation) throw new BookRoomAiError("empty-reply", "翻译失败，稍后再试。");
+  return { translation, targetLanguage };
+}
+
+export async function generateBookRoomReply(input: GenerateBookRoomReplyInput): Promise<{ reply: string; characterName: string }> {
+  const { roleId, content, history, userText, signal } = input;
+
+  const { character, apiConfig, preset, regexes, worldBookIds } = resolveRoleAiSlot(roleId);
   const userIdentity = resolveUserIdentity(roleId, BOOKROOM_APP_ID);
 
   const memConfig = loadMemoryConfig();
@@ -268,7 +317,7 @@ export async function generateBookRoomReply(input: GenerateBookRoomReplyInput): 
     persona: character.persona?.trim() || "（暂无详细人设，请自然地扮演该角色）",
     personality: character.personality?.trim() ?? "",
     userBlock,
-    worldBookBlock: formatWorldBookSection(slot.worldBookIds),
+    worldBookBlock: formatWorldBookSection(worldBookIds),
     coreMemoriesBlock: coreText ? `<核心记忆>\n${clip(coreText, 1800)}\n</核心记忆>` : "",
     longTermMemoriesBlock: longTermText ? `<你与用户的过往记忆>\n${clip(longTermText, 2200)}\n</你与用户的过往记忆>` : "",
     recentBlock: recentBlockText,

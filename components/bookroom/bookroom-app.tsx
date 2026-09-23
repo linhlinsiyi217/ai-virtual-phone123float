@@ -54,7 +54,7 @@ export default function BookRoomApp({ onClose }: Props) {
   const [companionId, setCompanionId] = useState<string>(() => loadCompanionId() ?? "");
   const [roleDrawerOpen, setRoleDrawerOpen] = useState(false);
   const [nightTarget, setNightTarget] = useState<{ book: Book; mode: "night" | "companion" } | null>(null);
-  const [coTarget, setCoTarget] = useState<Book | null>(null);
+  const [coTarget, setCoTarget] = useState<{ book: Book; initialAsk?: string } | null>(null);
   const [colorTab, setColorTab] = useState<ColorTab>("grid");
   const [colorOpen, setColorOpen] = useState(false);
 
@@ -97,6 +97,7 @@ export default function BookRoomApp({ onClose }: Props) {
             book={readingBook}
             onBack={() => setReadingBook(null)}
             onOpenNight={() => setNightTarget({ book: readingBook, mode: "night" })}
+            onAskRole={(askText) => setCoTarget({ book: readingBook, initialAsk: askText })}
           />
         )
       ) : activeBook ? (
@@ -104,7 +105,7 @@ export default function BookRoomApp({ onClose }: Props) {
           book={activeBook}
           onBack={() => setActiveBook(null)}
           onStartReading={book => setReadingBook(book)}
-          onCoRead={book => setCoTarget(book)}
+          onCoRead={book => setCoTarget({ book })}
           onNight={openNight}
         />
       ) : statsOpen ? (
@@ -185,9 +186,10 @@ export default function BookRoomApp({ onClose }: Props) {
 
       {coTarget && (
         <CoReadingChatSheet
-          book={coTarget}
+          book={coTarget.book}
           role={companion}
-          kind={coTarget.type === "manga" ? "manga" : "book"}
+          kind={coTarget.book.type === "manga" ? "manga" : "book"}
+          initialAsk={coTarget.initialAsk}
           onChooseRole={() => {
             setCoTarget(null);
             setRoleDrawerOpen(true);
