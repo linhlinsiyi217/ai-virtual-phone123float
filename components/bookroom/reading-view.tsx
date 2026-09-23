@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, MoonStar } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import { loadReadingProgress, saveReadingProgress } from "@/lib/reading-progress";
 
@@ -9,6 +9,8 @@ type Props = {
     book: Book;
     /** 返回：回到书籍详情（不退出书房） */
     onBack: () => void;
+    /** 打开夜读工具半弹窗 */
+    onOpenNight: () => void;
 };
 
 /**
@@ -16,11 +18,10 @@ type Props = {
  * 进度（章节 + 章节内滚动百分比）经 kv-db 持久化，再次进入时恢复。
  * 不做分页/翻页动画/阅读设置面板；漫画不进入此视图。
  */
-export function ReadingView({ book, onBack }: Props) {
+export function ReadingView({ book, onBack, onOpenNight }: Props) {
     const chapters = book.chapters ?? [];
     const total = chapters.length;
 
-    const [hint, setHint] = useState(false);
     const [chapterIndex, setChapterIndex] = useState<number>(() => {
         const saved = loadReadingProgress(book.id);
         if (saved && saved.chapterIndex >= 0 && saved.chapterIndex < total) {
@@ -99,7 +100,7 @@ export function ReadingView({ book, onBack }: Props) {
     const canNext = chapterIndex < total - 1;
 
     return (
-        <div className="reading-view absolute inset-0 z-[100] flex flex-col">
+        <div className="reading-view br-page">
             <header className="reading-header">
                 <button className="book-icon-btn book-pressable" type="button" onClick={onBack} aria-label="返回书籍详情">
                     <ChevronLeft size={22} strokeWidth={2} />
@@ -108,13 +109,10 @@ export function ReadingView({ book, onBack }: Props) {
                 <button
                     className="book-icon-btn book-pressable"
                     type="button"
-                    aria-label="阅读设置"
-                    onClick={() => {
-                        setHint(true);
-                        window.setTimeout(() => setHint(false), 1600);
-                    }}
+                    aria-label="夜读设置"
+                    onClick={onOpenNight}
                 >
-                    <SlidersHorizontal size={17} strokeWidth={2} />
+                    <MoonStar size={17} strokeWidth={2} />
                 </button>
             </header>
 
@@ -161,10 +159,6 @@ export function ReadingView({ book, onBack }: Props) {
                     </button>
                 </div>
             </footer>
-
-            {hint && (
-                <div className="reading-toast" aria-live="polite">阅读设置后续接入</div>
-            )}
         </div>
     );
 }

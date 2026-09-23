@@ -10,9 +10,38 @@
    层级：.bookroom-app → .bookstore-app（书城模块）
    ═══════════════════════════════════════════ */
 
+/*
+ * Phase 2 Shell：设计 token 提升到书房根层，Dock 各页 / 抽屉 / 半弹窗共用。
+ * 黑白高级感：奶白底、墨色文字、极低对比边框、克制的单点彩色（封面色板除外）。
+ */
 .bookroom-app {
+  --book-bg: #f7f6f3;
+  --book-surface: rgba(255, 255, 255, 0.56);
+  --book-surface-strong: rgba(255, 255, 255, 0.72);
+  --book-border: rgba(0, 0, 0, 0.08);
+  --book-text: #151515;
+  --book-text-secondary: #6e6e73;
+  --book-text-tertiary: rgba(21, 21, 21, 0.42);
+  --book-radius-xl: 30px;
+  --book-radius-lg: 24px;
+  --book-radius-md: 18px;
+  --book-radius-sm: 13px;
+  --book-accent-red: #c96c63;
+  --book-accent-blue: #70869a;
+  --book-accent-gold: #d7b96e;
+
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   font-family: var(--app-font-family);
-  background: #f5f4f1;
+  color: var(--book-text);
+  background:
+    radial-gradient(120% 56% at 16% 0%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 60%),
+    radial-gradient(110% 60% at 100% 100%, rgba(224, 220, 212, 0.5), rgba(224, 220, 212, 0) 64%),
+    var(--book-bg);
 }
 
 .bookstore-app {
@@ -760,6 +789,1693 @@
 
 .book-pressable:active {
   transform: scale(0.975);
+}
+
+/* ═══════════════════════════════════════════
+   Phase 2 Shell — 书房壳层（Dock / 四页 / 抽屉 / 半弹窗 / 启动画面）
+   黑白灰高级感：奶白 × 墨色 × Pearl Glass；全部 scope 在 .bookroom-app
+   ═══════════════════════════════════════════ */
+
+/* ── 页面骨架：Dock 各页 / 详情 / 阅读器 / 子页共用 ── */
+.bookroom-app .br-page {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bookroom-app .br-body {
+  padding-bottom: calc(118px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ── Dock：悬浮奶白磨砂导航条 ── */
+.bookroom-app .br-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  padding: 0 18px calc(10px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+
+.bookroom-app .br-dock-inner {
+  pointer-events: auto;
+  display: flex;
+  gap: 4px;
+  padding: 7px 8px;
+  border-radius: 26px;
+}
+
+.bookroom-app .br-dock-item {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0 5px;
+  border: none;
+  border-radius: 19px;
+  background: transparent;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-dock-item.is-active {
+  color: var(--book-text);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 2px 8px rgba(20, 20, 20, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.bookroom-app .br-dock-label {
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  font-weight: 520;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+}
+
+/* ── 顶栏角色入口（替代旧放大镜） ── */
+.bookroom-app .br-role-entry {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(14px * var(--app-text-scale, 1));
+  font-weight: 600;
+  color: #f7f6f3;
+  background: linear-gradient(150deg, #5c5a55, #302f2c);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 10px rgba(20, 20, 20, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.bookroom-app .br-role-entry-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.bookroom-app .br-role-entry-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bookroom-app .br-role-dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.bookroom-app .br-role-dot-online { background: #1c1c1e; }
+.bookroom-app .br-role-dot-reading { background: #817c73; }
+.bookroom-app .br-role-dot-idle { background: rgba(21, 21, 21, 0.22); }
+
+.bookroom-app .br-role-entry .br-role-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(247, 246, 243, 0.96);
+}
+
+/* ── 分段控件 / chips ── */
+.bookroom-app .br-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(21, 21, 21, 0.06);
+}
+
+.bookroom-app .br-segmented-item {
+  border: none;
+  padding: 6px 15px;
+  border-radius: 999px;
+  background: transparent;
+  font-family: inherit;
+  font-size: calc(12px * var(--app-text-scale, 1));
+  font-weight: 520;
+  letter-spacing: 0.08em;
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-segmented-item.is-active {
+  background: #fff;
+  color: var(--book-text);
+  font-weight: 600;
+  box-shadow:
+    0 2px 7px rgba(20, 20, 20, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.bookroom-app .br-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bookroom-app .br-chip-row[aria-disabled="true"] {
+  opacity: 0.38;
+}
+
+.bookroom-app .br-chip {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-family: inherit;
+  font-size: calc(12px * var(--app-text-scale, 1));
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-chip.is-active {
+  background: var(--book-text);
+  border-color: var(--book-text);
+  color: #f7f6f3;
+}
+
+/* ── 书架：真实书脊 + 层板 ── */
+.bookroom-app .br-shelf-switch-row {
+  margin-top: 24px;
+}
+
+.bookroom-app .br-shelf-board {
+  position: relative;
+  padding: 20px 14px 0;
+}
+
+.bookroom-app .br-shelf-board::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 9px;
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.05) 0 7px, rgba(255, 255, 255, 0.05) 7px 15px),
+    linear-gradient(180deg, rgba(178, 168, 150, 0.6), rgba(120, 110, 95, 0.46));
+  box-shadow: 0 14px 22px -12px rgba(70, 60, 45, 0.45);
+}
+
+.bookroom-app .br-shelf-spines {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  min-height: 118px;
+  padding: 0 2px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.bookroom-app .br-shelf-spines::-webkit-scrollbar { display: none; }
+
+.bookroom-app .br-spine {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0 9px;
+  border-radius: 3px 3px 1px 1px;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-bottom: none;
+  font-family: inherit;
+  color: var(--br-spine-ink, #ecebe6);
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.05) 20%, rgba(255, 255, 255, 0.1) 62%, rgba(0, 0, 0, 0.04)),
+    var(--br-spine-bg, #4a4946);
+  box-shadow:
+    0 12px 20px -9px rgba(30, 28, 24, 0.4),
+    0 2px 4px rgba(30, 28, 24, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.bookroom-app .br-spine-title {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  max-width: 100%;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  line-height: 1.15;
+  overflow: hidden;
+}
+
+.bookroom-app .br-spine-author {
+  writing-mode: vertical-rl;
+  margin-top: 7px;
+  max-height: 24px;
+  font-size: calc(8px * var(--app-text-scale, 1));
+  letter-spacing: 0.1em;
+  opacity: 0.62;
+  overflow: hidden;
+}
+
+.bookroom-app .br-spine-line {
+  width: 10px;
+  height: 1.5px;
+  margin-top: 7px;
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.bookroom-app .br-shelf-import {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 18px 18px;
+  border-radius: var(--book-radius-lg);
+  font-size: calc(13px * var(--app-text-scale, 1));
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-shelf-import-sub {
+  font-size: calc(11px * var(--app-text-scale, 1));
+  letter-spacing: 0.04em;
+  color: var(--book-text-tertiary);
+}
+
+/* ── 书城分类 chips ── */
+.bookroom-app .br-category-row {
+  margin-top: 18px;
+}
+
+/* ── 书桌 ── */
+.bookroom-app .br-write-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 18px;
+  border: none;
+  border-radius: var(--book-radius-xl);
+  font-family: inherit;
+  text-align: left;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-write-hero-icon {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--book-text);
+  background: rgba(0, 0, 0, 0.055);
+}
+
+.bookroom-app .br-write-hero-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.bookroom-app .br-write-hero-title {
+  font-size: calc(15px * var(--app-text-scale, 1));
+  font-weight: 620;
+  letter-spacing: 0.02em;
+}
+
+.bookroom-app .br-write-hero-desc {
+  font-size: calc(11.5px * var(--app-text-scale, 1));
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-write-hero-arrow {
+  flex: 0 0 auto;
+  color: rgba(21, 21, 21, 0.3);
+}
+
+.bookroom-app .br-list {
+  padding: 4px 8px;
+  border-radius: var(--book-radius-lg);
+}
+
+.bookroom-app .br-list-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 13px 8px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-list-row + .br-list-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.bookroom-app .br-list-icon {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--book-text);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.bookroom-app .br-list-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bookroom-app .br-list-label {
+  font-size: calc(13.5px * var(--app-text-scale, 1));
+  font-weight: 580;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-list-desc {
+  font-size: calc(11px * var(--app-text-scale, 1));
+  letter-spacing: 0.02em;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-list-arrow {
+  flex: 0 0 auto;
+  color: rgba(21, 21, 21, 0.28);
+}
+
+.bookroom-app .br-draft-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bookroom-app .br-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+  padding: 16px 17px;
+  border: none;
+  border-radius: var(--book-radius-lg);
+  font-family: inherit;
+  text-align: left;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-draft-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bookroom-app .br-draft-title {
+  min-width: 0;
+  font-size: calc(14.5px * var(--app-text-scale, 1));
+  font-weight: 620;
+  letter-spacing: 0.02em;
+}
+
+.bookroom-app .br-draft-kind {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: calc(10px * var(--app-text-scale, 1));
+  letter-spacing: 0.1em;
+  color: var(--book-text-secondary);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.bookroom-app .br-draft-excerpt {
+  font-size: calc(12px * var(--app-text-scale, 1));
+  line-height: 1.75;
+  color: var(--book-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bookroom-app .br-draft-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  color: var(--book-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 我的：个人主页 ── */
+.bookroom-app .br-profile {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  border-radius: var(--book-radius-xl);
+}
+
+.bookroom-app .br-profile-avatar {
+  flex: 0 0 auto;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(22px * var(--app-text-scale, 1));
+  font-weight: 600;
+  color: #f7f6f3;
+  background: linear-gradient(150deg, #5c5a55, #302f2c);
+  box-shadow:
+    0 10px 22px rgba(20, 20, 20, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.bookroom-app .br-profile-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.bookroom-app .br-profile-name {
+  font-size: calc(18px * var(--app-text-scale, 1));
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.bookroom-app .br-profile-handle {
+  font-size: calc(11.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.04em;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-profile-bio {
+  margin: 2px 0 0;
+  font-size: calc(12.5px * var(--app-text-scale, 1));
+  line-height: 1.8;
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 4px;
+}
+
+.bookroom-app .br-profile-tag {
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.05em;
+  color: var(--book-text-secondary);
+  background: rgba(0, 0, 0, 0.045);
+}
+
+.bookroom-app .br-companion-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-radius: var(--book-radius-lg);
+  font-family: inherit;
+  text-align: left;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-title-icon {
+  display: inline-flex;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-quote-list {
+  padding: 6px 18px;
+  border-radius: var(--book-radius-lg);
+}
+
+.bookroom-app .br-quote {
+  margin: 0;
+  padding: 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bookroom-app .br-quote.is-divided {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.bookroom-app .br-quote-text {
+  margin: 0;
+  font-size: calc(13px * var(--app-text-scale, 1));
+  font-weight: 450;
+  line-height: 1.85;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-quote-source {
+  align-self: flex-end;
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.08em;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-mine-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 28px 0 8px;
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.18em;
+  color: var(--book-text-tertiary);
+}
+
+/* 圆形头像（我的 / 聊天共用） */
+.bookroom-app .br-chat-avatar {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: calc(14px * var(--app-text-scale, 1));
+  font-weight: 600;
+  color: #f7f6f3;
+  background: linear-gradient(150deg, #5c5a55, #302f2c);
+}
+
+.bookroom-app .br-companion-avatar {
+  width: 42px;
+  height: 42px;
+}
+
+.bookroom-app .br-chat-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── 统计页 ── */
+.bookroom-app .br-stats-body {
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+}
+
+.bookroom-app .br-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.bookroom-app .br-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 17px 18px;
+  border-radius: var(--book-radius-lg);
+}
+
+.bookroom-app .br-metric-value {
+  font-size: calc(22px * var(--app-text-scale, 1));
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--book-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.bookroom-app .br-metric-label {
+  font-size: calc(11.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.06em;
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-stats-body .book-section-head {
+  align-items: center;
+}
+
+.bookroom-app .br-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 132px;
+  padding: 16px 14px 10px;
+  border-radius: var(--book-radius-lg);
+}
+
+.bookroom-app .br-bar-col {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.bookroom-app .br-bar {
+  display: block;
+  width: 100%;
+  border-radius: 3px 3px 1px 1px;
+  background: rgba(21, 21, 21, 0.2);
+  transition: height 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.bookroom-app .br-bar.is-today {
+  background: var(--book-text);
+}
+
+.bookroom-app .br-bars-axis {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 9px;
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.08em;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-stats-note {
+  margin: 22px 2px 0;
+  text-align: center;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  letter-spacing: 0.06em;
+  color: var(--book-text-tertiary);
+}
+
+/* ── 详情页操作区 ── */
+.bookroom-app .br-detail-body {
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+}
+
+.bookroom-app .br-detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.bookroom-app .br-detail-primary {
+  width: 100%;
+  flex: none;
+  align-self: stretch;
+  height: 46px;
+  margin-top: 0;
+  justify-content: center;
+  font-size: calc(13.5px * var(--app-text-scale, 1));
+}
+
+.bookroom-app .br-detail-tool-row {
+  display: flex;
+  gap: 10px;
+}
+
+.bookroom-app .br-detail-tool {
+  flex: 1 1 0;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: var(--book-surface-strong);
+  box-shadow: 0 2px 8px rgba(20, 20, 20, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  font-family: inherit;
+  font-size: calc(12.5px * var(--app-text-scale, 1));
+  font-weight: 540;
+  letter-spacing: 0.03em;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-detail-quiet-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.bookroom-app .br-quiet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 4px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: calc(11.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.05em;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-quiet-btn.is-active {
+  color: var(--book-text);
+}
+
+/* ── 半弹窗 BottomSheet 通用骨架 ── */
+.bookroom-app .br-sheet-root {
+  position: absolute;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bookroom-app .br-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: rgba(20, 20, 20, 0.28);
+  animation: br-scrim-in 240ms ease both;
+}
+
+.bookroom-app .br-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 78%;
+  padding: 8px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-radius: 28px 28px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.7);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 246, 243, 0.84));
+  box-shadow: 0 -18px 50px rgba(20, 20, 20, 0.16);
+  backdrop-filter: blur(30px) saturate(120%);
+  -webkit-backdrop-filter: blur(30px) saturate(120%);
+  animation: br-sheet-up 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.bookroom-app .br-sheet-tall {
+  max-height: 82%;
+}
+
+.bookroom-app .br-sheet-chat {
+  height: 86%;
+  max-height: 86%;
+}
+
+.bookroom-app .br-sheet-grabber {
+  align-self: center;
+  width: 38px;
+  height: 4px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  background: rgba(21, 21, 21, 0.14);
+}
+
+.bookroom-app .br-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+}
+
+.bookroom-app .br-sheet-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: calc(15px * var(--app-text-scale, 1));
+  font-weight: 620;
+  letter-spacing: 0.03em;
+  color: var(--book-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bookroom-app .br-sheet-close {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+}
+
+.bookroom-app .br-sheet-body {
+  flex: 1;
+  min-height: 0;
+  padding-top: 4px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.bookroom-app .br-sheet-body::-webkit-scrollbar { display: none; }
+
+.bookroom-app .br-sheet-chat .br-sheet-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bookroom-app .br-sheet-section {
+  padding: 16px 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.bookroom-app .br-sheet-section:first-child {
+  padding-top: 8px;
+  border-top: none;
+}
+
+.bookroom-app .br-sheet-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 13px;
+  font-size: calc(12px * var(--app-text-scale, 1));
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-sheet-primary {
+  width: 100%;
+  height: 46px;
+  margin-top: 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--book-text);
+  color: #f7f6f3;
+  font-family: inherit;
+  font-size: calc(13.5px * var(--app-text-scale, 1));
+  font-weight: 550;
+  letter-spacing: 0.1em;
+  box-shadow: 0 10px 22px rgba(20, 20, 20, 0.16);
+}
+
+/* ── 夜读：环境音 / 开关 / 滑杆 ── */
+.bookroom-app .br-ambient-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bookroom-app .br-ambient-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 4px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  background: rgba(255, 255, 255, 0.5);
+  font-family: inherit;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-ambient-item.is-active {
+  border-color: var(--book-text);
+  background: var(--book-text);
+  color: #f7f6f3;
+}
+
+.bookroom-app .br-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 13px;
+}
+
+.bookroom-app .br-switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: calc(13px * var(--app-text-scale, 1));
+  color: var(--book-text);
+}
+
+.bookroom-app .br-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease;
+}
+
+.bookroom-app .br-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.bookroom-app .br-switch.is-on {
+  border-color: var(--book-text);
+  background: var(--book-text);
+}
+
+.bookroom-app .br-switch.is-on .br-switch-knob {
+  transform: translateX(18px);
+}
+
+.bookroom-app .br-slider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+
+.bookroom-app .br-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bookroom-app .br-slider-name {
+  flex: 0 0 64px;
+  font-size: calc(12px * var(--app-text-scale, 1));
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-range {
+  flex: 1;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.bookroom-app .br-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(21, 21, 21, 0.14);
+}
+
+.bookroom-app .br-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7.5px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.bookroom-app .br-range::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(21, 21, 21, 0.14);
+}
+
+.bookroom-app .br-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+/* ── 颜色调试：格线 / 光谱 / 快捷色 / 预览（无圆环取色器） ── */
+.bookroom-app .br-color-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bookroom-app .br-color-cell {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 0;
+}
+
+.bookroom-app .br-color-cell.is-active {
+  box-shadow:
+    0 0 0 2px var(--book-bg),
+    0 0 0 3.5px var(--book-text);
+}
+
+.bookroom-app .br-spectrum-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+}
+
+.bookroom-app .br-spectrum-row + .br-spectrum-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.bookroom-app .br-spectrum-name {
+  flex: 0 0 34px;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  letter-spacing: 0.08em;
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-spectrum-blocks {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+}
+
+.bookroom-app .br-spectrum-cell {
+  flex: 1 1 0;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  padding: 0;
+}
+
+.bookroom-app .br-spectrum-cell.is-active,
+.bookroom-app .br-quick-cell.is-active {
+  box-shadow:
+    0 0 0 2px var(--book-bg),
+    0 0 0 3.5px var(--book-text);
+}
+
+.bookroom-app .br-quick-row {
+  display: flex;
+  gap: 8px;
+}
+
+.bookroom-app .br-quick-cell {
+  flex: 1 1 0;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  padding: 0;
+}
+
+.bookroom-app .br-color-preview {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  border-radius: var(--book-radius-lg);
+}
+
+.bookroom-app .br-color-preview-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 22px 20px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.bookroom-app .br-color-preview-title {
+  font-size: calc(13px * var(--app-text-scale, 1));
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.bookroom-app .br-color-preview-line {
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.14;
+}
+
+.bookroom-app .br-color-preview-line-short {
+  width: 58%;
+}
+
+.bookroom-app .br-color-note {
+  margin: 12px 2px 0;
+  text-align: center;
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.05em;
+  color: var(--book-text-tertiary);
+}
+
+/* ── 共读聊天半弹层 ── */
+.bookroom-app .br-chat-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 4px 0 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.bookroom-app .br-chat-head .br-chat-avatar {
+  width: 42px;
+  height: 42px;
+}
+
+.bookroom-app .br-chat-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bookroom-app .br-chat-name {
+  font-size: calc(14px * var(--app-text-scale, 1));
+  font-weight: 620;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-chat-sub {
+  font-size: calc(11px * var(--app-text-scale, 1));
+  color: var(--book-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bookroom-app .br-chat-state {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.08em;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-chat-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.bookroom-app .br-chat-list::-webkit-scrollbar { display: none; }
+
+.bookroom-app .br-chat-system {
+  align-self: center;
+  margin: 2px 0;
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.08em;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-chat-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.bookroom-app .br-chat-row.is-mine {
+  justify-content: flex-end;
+}
+
+.bookroom-app .br-chat-bubble-avatar {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  font-weight: 600;
+  color: #f7f6f3;
+  background: linear-gradient(150deg, #5c5a55, #302f2c);
+}
+
+.bookroom-app .br-chat-bubble-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bookroom-app .br-chat-bubble {
+  max-width: 74%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  border-bottom-left-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  background: rgba(255, 255, 255, 0.86);
+  font-size: calc(13.5px * var(--app-text-scale, 1));
+  line-height: 1.65;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-chat-row.is-mine .br-chat-bubble {
+  border-color: var(--book-text);
+  border-radius: 18px;
+  border-bottom-right-radius: 6px;
+  background: var(--book-text);
+  color: rgba(247, 246, 243, 0.94);
+}
+
+.bookroom-app .br-chat-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.bookroom-app .br-chat-action {
+  flex: 1 1 0;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  background: rgba(255, 255, 255, 0.55);
+  font-family: inherit;
+  font-size: calc(11.5px * var(--app-text-scale, 1));
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-chat-inputbar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.bookroom-app .br-chat-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  outline: none;
+  background: rgba(255, 255, 255, 0.7);
+  font-family: inherit;
+  font-size: calc(13px * var(--app-text-scale, 1));
+  color: var(--book-text);
+  transition: border-color 200ms ease;
+}
+
+.bookroom-app .br-chat-input::placeholder { color: var(--book-text-tertiary); }
+
+.bookroom-app .br-chat-input:focus {
+  border-color: rgba(21, 21, 21, 0.35);
+}
+
+.bookroom-app .br-chat-send {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--book-text);
+  color: #f7f6f3;
+  transition:
+    background-color 200ms ease,
+    opacity 200ms ease;
+}
+
+.bookroom-app .br-chat-send:disabled {
+  background: rgba(21, 21, 21, 0.18);
+  color: rgba(247, 246, 243, 0.7);
+}
+
+.bookroom-app .br-chat-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 76px;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(27, 27, 27, 0.82);
+  color: rgba(255, 255, 255, 0.94);
+  font-size: calc(11.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: book-hint-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* ── 角色侧栏（右侧抽屉） ── */
+.bookroom-app .br-drawer-root {
+  position: absolute;
+  inset: 0;
+  z-index: 140;
+}
+
+.bookroom-app .br-drawer-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: rgba(20, 20, 20, 0.26);
+  animation: br-scrim-in 240ms ease both;
+}
+
+.bookroom-app .br-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 82%;
+  max-width: 330px;
+  display: flex;
+  flex-direction: column;
+  padding:
+    calc(var(--page-header-safe-top, max(48px, env(safe-area-inset-top, 48px))) + 10px)
+    16px
+    calc(16px + env(safe-area-inset-bottom, 0px));
+  border-left: 1px solid rgba(255, 255, 255, 0.7);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 246, 243, 0.86));
+  box-shadow: -16px 0 44px rgba(20, 20, 20, 0.14);
+  backdrop-filter: blur(30px) saturate(120%);
+  -webkit-backdrop-filter: blur(30px) saturate(120%);
+  animation: br-drawer-in 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.bookroom-app .br-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 2px 18px;
+}
+
+.bookroom-app .br-drawer-title {
+  margin: 0;
+  font-size: calc(17px * var(--app-text-scale, 1));
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-drawer-sub {
+  margin: 5px 0 0;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  letter-spacing: 0.06em;
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .br-drawer-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.bookroom-app .br-drawer-list::-webkit-scrollbar { display: none; }
+
+.bookroom-app .br-drawer-foot {
+  margin: 12px 2px 0;
+  padding-top: 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-role-avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  font-size: calc(15px * var(--app-text-scale, 1));
+  font-weight: 600;
+  color: #f7f6f3;
+  background: linear-gradient(150deg, #5c5a55, #302f2c);
+}
+
+.bookroom-app .br-role-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bookroom-app .br-role-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.45);
+  font-family: inherit;
+  text-align: left;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-role-item.is-active {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 6px 18px rgba(20, 20, 20, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.bookroom-app .br-role-item-avatar {
+  position: relative;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+
+.bookroom-app .br-role-item-avatar .br-role-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(247, 246, 243, 0.96);
+}
+
+.bookroom-app .br-role-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bookroom-app .br-role-item-name {
+  font-size: calc(14px * var(--app-text-scale, 1));
+  font-weight: 600;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-role-item-sub {
+  font-size: calc(11px * var(--app-text-scale, 1));
+  color: var(--book-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bookroom-app .br-role-item-side {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bookroom-app .br-role-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: calc(10px * var(--app-text-scale, 1));
+  letter-spacing: 0.06em;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-role-check {
+  color: var(--book-text);
+}
+
+/* ── 启动画面 ── */
+.bookroom-app .br-splash-host {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  transition: opacity 500ms ease;
+}
+
+.bookroom-app .br-splash-host.is-fading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bookroom-app .br-splash {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(120% 60% at 50% 28%, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0) 60%),
+    radial-gradient(100% 80% at 50% 100%, rgba(224, 220, 212, 0.55), rgba(224, 220, 212, 0) 62%),
+    #f7f6f3;
+}
+
+.bookroom-app .br-splash-card {
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 34px 26px 30px;
+  border-radius: 30px;
+  animation: br-splash-rise 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.bookroom-app .br-splash-mark {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 14px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--book-text);
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 8px 20px rgba(20, 20, 20, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.bookroom-app .br-splash-name {
+  font-size: calc(22px * var(--app-text-scale, 1));
+  font-weight: 650;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
+  color: var(--book-text);
+}
+
+.bookroom-app .br-splash-sub {
+  margin-top: 7px;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  letter-spacing: 0.18em;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-splash-track {
+  width: 100%;
+  height: 2px;
+  margin-top: 24px;
+  border-radius: 999px;
+  background: rgba(21, 21, 21, 0.08);
+  overflow: hidden;
+}
+
+.bookroom-app .br-splash-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(21, 21, 21, 0.25), var(--book-text));
+  animation: br-splash-loading 1200ms 120ms cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+
+/* ── 页面轻提示 ── */
+.bookroom-app .br-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 120px;
+  z-index: 90;
+  transform: translateX(-50%);
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: rgba(27, 27, 27, 0.82);
+  color: rgba(255, 255, 255, 0.94);
+  font-size: calc(12px * var(--app-text-scale, 1));
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(20, 20, 20, 0.18);
+  animation: book-hint-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes br-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes br-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes br-drawer-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes br-splash-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes br-splash-loading {
+  from { width: 0; }
+  to { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
