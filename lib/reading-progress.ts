@@ -87,12 +87,19 @@ export function listReadingProgress(): ReadingProgress[] {
 }
 
 /**
- * 总体阅读百分比（0~100）：按章节均分，章节内滚动计入当前章。
- * 无章节信息时回退为 0；已读完全部章节时封顶 100。
+ * 总体阅读百分比（0~100）：
+ * - 普通书：按章节均分，章节内滚动计入当前章。
+ * - 漫画：scrollProgress 即整卷纵向滚动比例，直接换算。
+ * 无章节/页信息时回退为 0。
  */
 export function getOverallPercent(book: Book, progress?: ReadingProgress | null): number {
+  if (!progress) return 0;
+  // 漫画：以整体滚动比例作为阅读百分比
+  if (book.pages && book.pages.length > 0) {
+    return Math.round(clamp01(progress.scrollProgress) * 100);
+  }
   const total = book.chapters?.length ?? 0;
-  if (!total || !progress) return 0;
+  if (!total) return 0;
   const index = Math.min(progress.chapterIndex, total - 1);
   const fraction = (index + clamp01(progress.scrollProgress)) / total;
   // 最后一章滚动到底即视为读完

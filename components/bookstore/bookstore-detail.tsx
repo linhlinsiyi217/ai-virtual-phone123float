@@ -49,7 +49,11 @@ export function BookstoreDetail({ book, onBack, onStartReading, onCoRead, onNigh
 
   const handlePrimary = () => {
     if (isManga) {
-      showHint("漫画阅读器将在下一阶段接入");
+      if (book.pages?.length) {
+        onStartReading(book);
+        return;
+      }
+      showHint("漫画内容准备中");
       return;
     }
     if (hasChapters) {
@@ -74,7 +78,9 @@ export function BookstoreDetail({ book, onBack, onStartReading, onCoRead, onNigh
   };
 
   const primaryLabel = isManga
-    ? "开始看漫画"
+    ? percent > 0
+      ? "继续看"
+      : "开始看漫画"
     : hasChapters && percent > 0
       ? "继续阅读"
       : "开始阅读";

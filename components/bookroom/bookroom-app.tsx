@@ -18,6 +18,7 @@ import { CoReadingChatSheet } from "./co-reading-chat-sheet";
 import { ColorTuningSheet } from "./color-tuning-sheet";
 import { BookroomSplash } from "./bookroom-splash";
 import { ReadingView } from "./reading-view";
+import { MangaReaderView } from "./manga-reader-view";
 
 type Props = { onClose: () => void };
 
@@ -86,11 +87,18 @@ export default function BookRoomApp({ onClose }: Props) {
   return (
     <div className="bookroom-app br-root">
       {readingBook ? (
-        <ReadingView
-          book={readingBook}
-          onBack={() => setReadingBook(null)}
-          onOpenNight={() => setNightTarget({ book: readingBook, mode: "night" })}
-        />
+        readingBook.type === "manga" ? (
+          <MangaReaderView
+            book={readingBook}
+            onBack={() => setReadingBook(null)}
+          />
+        ) : (
+          <ReadingView
+            book={readingBook}
+            onBack={() => setReadingBook(null)}
+            onOpenNight={() => setNightTarget({ book: readingBook, mode: "night" })}
+          />
+        )
       ) : activeBook ? (
         <BookstoreDetail
           book={activeBook}

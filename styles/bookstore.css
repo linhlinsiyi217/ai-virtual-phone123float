@@ -2486,3 +2486,96 @@
     animation-duration: 1ms !important;
   }
 }
+
+/* ═══════════════════════════════════════════
+   Phase 2B — 漫画阅读器 MangaReaderView
+   纵向连续滚动；漫画主体不加玻璃/大卡片/大圆角/强阴影，仅顶底工具条轻磨砂
+   ═══════════════════════════════════════════ */
+
+.bookroom-app .manga-view {
+  background: #f7f6f3;
+}
+
+/* 顶部工具条：极轻磨砂 + 细边框，不遮挡漫画 */
+.bookroom-app .manga-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: var(--page-header-safe-top, max(48px, env(safe-area-inset-top, 48px))) 16px 8px;
+  background: linear-gradient(180deg, rgba(247, 246, 243, 0.86), rgba(247, 246, 243, 0));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.bookroom-app .manga-header-title {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: calc(13px * var(--app-text-scale, 1));
+  font-weight: 560;
+  letter-spacing: 0.06em;
+  color: var(--book-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 唯一一层纵向滚动：分镜页堆叠 */
+.bookroom-app .manga-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 6px 0;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.bookroom-app .manga-content::-webkit-scrollbar { display: none; }
+
+/* 漫画页：视觉主体，无玻璃无大圆角无强阴影，页间距极轻 */
+.bookroom-app .manga-page {
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.bookroom-app .manga-page img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  /* 仅极轻投影以分离页面，不做卡片感 */
+  box-shadow: 0 1px 3px rgba(20, 20, 20, 0.06);
+}
+
+/* 底部工具条：页码 + 百分比，极轻 */
+.bookroom-app .manga-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 20px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(0deg, rgba(247, 246, 243, 0.94), rgba(247, 246, 243, 0));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-variant-numeric: tabular-nums;
+}
+
+.bookroom-app .manga-page-info {
+  font-size: calc(11.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.08em;
+  color: var(--book-text-secondary);
+}
+
+.bookroom-app .manga-percent {
+  font-size: calc(11px * var(--app-text-scale, 1));
+  font-weight: 560;
+  color: var(--book-text);
+}
+
+.bookroom-app .manga-toast {
+  bottom: 80px;
+}

@@ -13,6 +13,14 @@
  */
 
 import { CAMELLIA_CHAPTERS, NORWEGIAN_WOOD_CHAPTERS } from "./bookstore-mock-chapters";
+import { buildMangaPages } from "./bookstore-mock-manga";
+
+/** 漫画单页：src 为自制分镜 SVG（data: URL），caption 为可选页说明 */
+export type MangaPage = {
+  id: string;
+  src: string;
+  caption?: string;
+};
 
 /** 内容类型：普通书 → 未来文字阅读器（自己读 / 一起读）；漫画 → 未来漫画阅读器（自己看 / 一起看漫画） */
 export type BookContentType = "book" | "manga";
@@ -53,8 +61,10 @@ export type Book = {
   coverTone: BookCoverTone;
   /** 来源预留：缺省按内置 Mock 处理 */
   source?: BookContentSource;
-  /** 普通书的本地 mock 章节（漫画未来走图片/分页模型，本轮不使用） */
+  /** 普通书的本地 mock 章节 */
   chapters?: BookChapter[];
+  /** 漫画的本地 mock 分镜页（Phase 2B：纵向连续滚动阅读） */
+  pages?: MangaPage[];
 };
 
 export const MOCK_BOOKS: Book[] = [
@@ -144,6 +154,7 @@ export const MOCK_BOOKS: Book[] = [
     inShelf: false,
     coverTone: "blue",
     source: "builtin",
+    pages: buildMangaPages("blue-period", "蓝色时期", 10),
   },
   {
     id: "skip-and-loafer",
@@ -156,5 +167,6 @@ export const MOCK_BOOKS: Book[] = [
     inShelf: false,
     coverTone: "gold",
     source: "builtin",
+    pages: buildMangaPages("skip-and-loafer", "跃动青春", 10),
   },
 ];

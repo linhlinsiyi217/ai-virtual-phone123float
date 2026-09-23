@@ -116,7 +116,9 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
     setRecent(recentBooks);
 
     for (const record of records) {
-      const book = MOCK_BOOKS.find(item => item.id === record.bookId && item.chapters?.length);
+      const book = MOCK_BOOKS.find(
+        item => item.id === record.bookId && (item.chapters?.length || item.pages?.length)
+      );
       if (book) {
         setContinueInfo({ book, percent: getOverallPercent(book, record) });
         return;
@@ -132,7 +134,7 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
   const favorites = MOCK_BOOKS.filter(book => favoriteIds.has(book.id));
 
   const handleContinueClick = (info: ContinueInfo) => {
-    if (info.book.chapters?.length) onContinue(info.book);
+    if (info.book.chapters?.length || info.book.pages?.length) onContinue(info.book);
     else onOpenBook(info.book);
   };
 
