@@ -98,9 +98,12 @@ function flowIconsToPositions(icons: DesktopIconId[], occupied?: boolean[][]): I
 
 export function createDefaultDesktopIconLayout(_widgets: WidgetInstance[] = []): DesktopIconLayout {
   return {
+    // 第一页：组件占第 1~3 行（大时钟 2 行 + 心情气泡 1 行），图标从第 4 行
+    // 起排——9 个默认图标正好占第 4~6 行。若仍从第 5 行起，第 9 个会落到
+    // 第 7 行、超出 GRID_ROWS(6) 被裁掉。
     page1: PAGE_1_DEFAULT.map((id, i) => ({
       id,
-      row: 5 + Math.floor(i / GRID_COLS),
+      row: 4 + Math.floor(i / GRID_COLS),
       col: (i % GRID_COLS) + 1,
     })),
     // 第二页：第 4 行留给 iOS 操作菜单组件，图标从第 5 行开始

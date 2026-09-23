@@ -28,6 +28,7 @@ import { XiaohongshuApp } from "@/components/xiaohongshu/xiaohongshu-app";
 import { StoryApp } from "@/components/story/story-app";
 import { VnApp } from "@/components/vn/vn-app";
 import ReadingApp from "@/components/reading/reading-app";
+import BookRoomApp from "@/components/bookroom/bookroom-app";
 import MapApp from "@/components/map/map-app";
 import { DwellingApp } from "@/components/dwelling/dwelling-app";
 import { MascotFloat } from "@/components/mascot/mascot-float";
@@ -1481,11 +1482,17 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       const rawV2 = kvGet(ICON_LAYOUT_STORAGE_KEY);
       if (rawV2) {
         try {
-          const normalized = normalizeLayout(JSON.parse(rawV2), hydratedWidgets, dockIds, hydratedFolders);
+          const storedLayout = JSON.parse(rawV2);
+          const normalized = normalizeLayout(storedLayout, hydratedWidgets, dockIds, hydratedFolders);
           const sane = sanitizeDesktopFolders(hydratedFolders, normalized, hydratedDock, hydratedWidgets);
           setFolders(sane.folders);
           setLayout(sane.layout);
-          if (sane.changed) {
+          // 布局本身被规整过也要落盘：典型场景是老用户的存量布局缺少新版
+          // 内置图标（如「书房」），normalizeLayout 已把它补到第一个有空位的
+          // 桌面页；若只在文件夹变化时写回，补位结果只存在于内存，存量布局
+          // 永远缺图标、只能靠每次启动临时补。这里不重置、不移动物标。
+          const layoutChanged = JSON.stringify(storedLayout) !== JSON.stringify(sane.layout);
+          if (sane.changed || layoutChanged) {
             writeDesktopFolders(sane.folders);
             kvSet(ICON_LAYOUT_STORAGE_KEY, JSON.stringify(sane.layout));
           }
@@ -1499,10 +1506,18 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
           const parsed = JSON.parse(rawV1) as Record<string, unknown>;
           const w1 = hydratedWidgets.filter(w => w.page === 1);
           const w2 = hydratedWidgets.filter(w => w.page === 2);
-          setLayout({
+          const migrated = {
             page1: migratePageV1(parsed.page1, PAGE_1_DEFAULT, w1).filter(ic => !dockIds.has(ic.id)),
             page2: migratePageV1(parsed.page2, PAGE_2_DEFAULT, w2).filter(ic => !dockIds.has(ic.id)),
-          } as DesktopLayout);
+          } as DesktopLayout;
+          // 同样过一遍 normalize/sanitize：补齐 v1 之后新增的内置图标（如书房），
+          // 并立即写为 v2 持久化，避免迁移结果只停留在内存。
+          const normalizedV1 = normalizeLayout(migrated, hydratedWidgets, dockIds, hydratedFolders);
+          const saneV1 = sanitizeDesktopFolders(hydratedFolders, normalizedV1, hydratedDock, hydratedWidgets);
+          setFolders(saneV1.folders);
+          setLayout(saneV1.layout);
+          writeDesktopFolders(saneV1.folders);
+          kvSet(ICON_LAYOUT_STORAGE_KEY, JSON.stringify(saneV1.layout));
           kvRemove(ICON_LAYOUT_STORAGE_KEY_V1);
           setDesktopReady(true);
           return;
@@ -4068,6 +4083,10 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
 
     if (activeApp === "reading") {
       return <ReadingApp onClose={() => setActiveApp(null)} />;
+    }
+
+    if (activeApp === "bookroom") {
+      return <BookRoomApp onClose={() => setActiveApp(null)} />;
     }
 
     if (activeApp === "mapmode") {
