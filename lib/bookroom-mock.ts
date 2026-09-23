@@ -64,6 +64,19 @@ export function resolveCompanionRoles(): CompanionRole[] {
   return FALLBACK_ROLES;
 }
 
+/**
+ * 某陪读角色 id 当前是否对应一张真实 Float 角色卡。
+ * mock 兜底角色 / 已被删除的角色卡返回 false（共读 AI 需要真实人设）。
+ */
+export function isRealCompanionRole(roleId: string): boolean {
+  if (!roleId) return false;
+  try {
+    return loadCharacters().some(character => character.id === roleId);
+  } catch {
+    return false;
+  }
+}
+
 /* ───────────────────────── 我的页 ───────────────────────── */
 
 export const MINE_PROFILE = {

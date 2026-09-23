@@ -1,9 +1,22 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, MessageCircleHeart, Send, Sparkles } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
-import type { CompanionRole } from "@/lib/bookroom-mock";
+import { isRealCompanionRole, type CompanionRole } from "@/lib/bookroom-mock";
+import {
+  buildBookRoomContentRef,
+  buildBookRoomGreeting,
+  detectNotableBookroomEvent,
+  generateBookRoomReply,
+  recordBookroomMemoryEvent,
+  BookRoomAiError,
+} from "@/lib/bookroom-ai-context";
+import {
+  appendCoSessionMessage,
+  loadCoSession,
+  type CoSessionMessage,
+} from "@/lib/bookroom-co-session";
 import { BottomSheet } from "./bookroom-ui";
 
 type Props = {
@@ -11,78 +24,170 @@ type Props = {
   role: CompanionRole;
   /** book=「一起读」；manga=「一起看漫画」 */
   kind: "book" | "manga";
+  /** 当前不是真实 Float 角色时，引导用户去角色侧栏选择 */
+  onChooseRole: () => void;
   onClose: () => void;
 };
 
-type ChatMessage = {
-  id: number;
-  from: "role" | "me" | "system";
-  text: string;
+type UiMessage = CoSessionMessage;
+
+type ErrorState = {
+  /** 发送失败的那条用户消息（用于 retry） */
+  failedText: string;
+  /** 该用户消息是否已落盘（retry 时避免重复追加） */
+  persisted: boolean;
+  message: string;
+  /** 是否允许「重试」（取消 / 无角色不可重试） */
+  retryable: boolean;
+  /** 是否引导去选择角色 */
+  chooseRole: boolean;
 };
 
-const READ_ACTION = "读到想停下来的句子，就发给我。";
-
-function buildSeed(book: Book, roleName: string, kind: "book" | "manga"): ChatMessage[] {
-  if (kind === "manga") {
-    return [
-      { id: 1, from: "role", text: `我在。我们一起看《${book.title}》，这一格的分镜我也很喜欢。` },
-      { id: 2, from: "me", text: "这里人物的表情变化好细腻。" },
-      { id: 3, from: "role", text: "嗯，作者把没有说出口的话都画在停顿里了。慢慢翻，我陪你。" },
-    ];
+function friendlyError(error: unknown): string {
+  if (error instanceof BookRoomAiError) {
+    if (error.code === "no-config") return "AI 还没有配置好，请先在设置中为该角色绑定 API。";
+    if (error.code === "aborted") return "已取消。";
+    return "AI 暂时没有回应，稍后再试。";
   }
-  return [
-    { id: 1, from: "role", text: `今晚我们一起读《${book.title}》吧，我是${roleName}。` },
-    { id: 2, from: "me", text: "好，我刚翻开第一章。" },
-    { id: 3, from: "role", text: READ_ACTION },
-  ];
+  return "AI 暂时没有回应，稍后再试。";
 }
 
-const ROLE_REPLIES = [
-  "这一句我也停下来了，像有人轻轻把灯调暗了一点。",
-  "我在听，你慢慢说，不用着急。",
-  "要不要把它收进语录？以后夜读的时候，我再念给你听。",
-  "读到这里会想起谁，也是书送给你的一部分。",
-];
-
 /**
- * 共读 / 共看半弹层：高级灰白气泡 + 当前陪读角色 + 问 TA / 批注 / 陪伴反馈。
- * 纯本地 mock 对话，不接真实 AI。
+ * 共读 / 共看半弹层（Phase 3A）：接入 Float 真实角色 AI。
+ * - 角色 / 人设 / 世界书 / 记忆 / Provider 全部复用 Float 现有系统；
+ * - 会话历史走 kv-db（短期），值得保留的事件才写长期记忆；
+ * - 仅在用户主动发送 / 问 TA / 陪伴反馈时请求 AI，不做每页自动发言。
  */
-export function CoReadingChatSheet({ book, role, kind, onClose }: Props) {
-  const [messages, setMessages] = useState<ChatMessage[]>(() => buildSeed(book, role.name, kind));
+export function CoReadingChatSheet({ book, role, kind, onChooseRole, onClose }: Props) {
+  const contentRef = useMemo(() => buildBookRoomContentRef(book), [book]);
+  const roleReady = isRealCompanionRole(role.id);
+
+  const [messages, setMessages] = useState<UiMessage[]>(() => {
+    const existing = loadCoSession(role.id, book.id);
+    if (existing.length > 0) return existing;
+    // 本地开场白（非 AI 请求），落盘以保持上下文连续
+    return appendCoSessionMessage(role.id, book.id, {
+      role: "assistant",
+      content: buildBookRoomGreeting(role.name, contentRef),
+    });
+  });
   const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<ErrorState | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+
   const listRef = useRef<HTMLDivElement | null>(null);
-  const seqRef = useRef(100);
+  const abortRef = useRef<AbortController | null>(null);
+  const sendingRef = useRef(false);
   const timerRef = useRef<number | null>(null);
 
-  const pushMessage = (message: Omit<ChatMessage, "id">) => {
-    seqRef.current += 1;
-    setMessages(prev => [...prev, { ...message, id: seqRef.current }]);
-    window.requestAnimationFrame(() => {
-      const el = listRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    });
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, sending]);
+
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+  }, []);
+
+  const flashHint = (text: string) => {
+    setHint(text);
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => setHint(null), 1600);
+  };
+
+  /**
+   * 统一 AI 请求。
+   * @param persistedUser 该用户消息是否已经在会话中（retry 时为 true，避免重复落盘）
+   */
+  const requestReply = async (userText: string, persistedUser: boolean) => {
+    if (sendingRef.current) return;
+    if (!roleReady) {
+      setError({ failedText: userText, persisted: persistedUser, message: "先选择一位陪读角色。", retryable: false, chooseRole: true });
+      return;
+    }
+    sendingRef.current = true;
+    setSending(true);
+    setError(null);
+
+    const before = loadCoSession(role.id, book.id);
+    if (!persistedUser) {
+      setMessages(appendCoSessionMessage(role.id, book.id, { role: "user", content: userText }));
+    }
+    setDraft("");
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    // retry 时失败的用户消息已在会话末尾，避免与 userText 重复传给模型
+    const historyForAi = persistedUser
+      && before.length > 0
+      && before[before.length - 1].role === "user"
+      ? before.slice(0, -1)
+      : before;
+
+    try {
+      const { reply } = await generateBookRoomReply({
+        roleId: role.id,
+        content: contentRef,
+        history: historyForAi,
+        userText,
+        signal: controller.signal,
+      });
+      const next = appendCoSessionMessage(role.id, book.id, { role: "assistant", content: reply });
+      setMessages(next);
+
+      // 选择性长期记忆写回：仅显式要求记住 / 强烈好恶，失败静默不影响聊天
+      const notable = detectNotableBookroomEvent(userText, contentRef);
+      if (notable) {
+        await recordBookroomMemoryEvent({
+          roleId: role.id,
+          content: contentRef,
+          kind: notable.kind,
+          summary: notable.summary,
+          importance: notable.importance,
+        }).catch(() => undefined);
+      }
+    } catch (requestError) {
+      const code = requestError instanceof BookRoomAiError ? requestError.code : "failed";
+      setError({
+        failedText: userText,
+        persisted: true,
+        message: friendlyError(requestError),
+        retryable: code !== "aborted" && code !== "no-character",
+        chooseRole: code === "no-character",
+      });
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+      abortRef.current = null;
+    }
   };
 
   const send = (text: string) => {
     const content = text.trim();
-    if (!content) return;
-    pushMessage({ from: "me", text: content });
-    setDraft("");
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(() => {
-      pushMessage({ from: "role", text: ROLE_REPLIES[Math.floor(Math.random() * ROLE_REPLIES.length)] });
-    }, 650);
+    if (!content || sending) return;
+    void requestReply(content, false);
   };
 
-  const flashHint = (text: string) => {
-    setHint(text);
-    window.setTimeout(() => setHint(null), 1600);
+  const retry = () => {
+    if (!error || sending) return;
+    const failedText = error.failedText;
+    setError(null);
+    void requestReply(failedText, true);
   };
 
   const askRole = () => {
-    pushMessage({ from: "role", text: kind === "manga" ? "这一格想聊什么？分镜、情绪，或者角色，我都在。" : READ_ACTION });
+    if (sending) return;
+    send(kind === "manga"
+      ? "你怎么看现在这一格分镜？想听听你的感受。"
+      : "你怎么看现在这一段？想听听你的感受。");
+  };
+
+  const companionFeedback = () => {
+    if (sending) return;
+    send("我想听听你此刻陪我读的心情。");
   };
 
   return (
@@ -100,19 +205,17 @@ export function CoReadingChatSheet({ book, role, kind, onClose }: Props) {
           <span className="br-chat-sub">{role.subtitle}</span>
         </span>
         <span className="br-chat-state">
-          <span className="br-role-dot br-role-dot-reading" />
-          共读中
+          <span className={`br-role-dot ${sending ? "br-role-dot-online" : "br-role-dot-reading"}`} />
+          {sending ? "回复中" : "共读中"}
         </span>
       </div>
 
       <div className="br-chat-list" ref={listRef}>
         {messages.map(message => {
-          if (message.from === "system") {
-            return (
-              <p key={message.id} className="br-chat-system">{message.text}</p>
-            );
+          if (message.role === "system") {
+            return <p key={message.id} className="br-chat-system">{message.content}</p>;
           }
-          const mine = message.from === "me";
+          const mine = message.role === "user";
           return (
             <div key={message.id} className={`br-chat-row ${mine ? "is-mine" : ""}`}>
               {!mine && (
@@ -120,14 +223,53 @@ export function CoReadingChatSheet({ book, role, kind, onClose }: Props) {
                   {role.avatar ? <img src={role.avatar} alt="" /> : role.name.slice(0, 1)}
                 </span>
               )}
-              <span className="br-chat-bubble">{message.text}</span>
+              <span className="br-chat-bubble">{message.content}</span>
             </div>
           );
         })}
+
+        {sending && (
+          <div className="br-chat-row">
+            <span className="br-chat-bubble-avatar">
+              {role.avatar ? <img src={role.avatar} alt="" /> : role.name.slice(0, 1)}
+            </span>
+            <span className="br-chat-bubble br-chat-bubble-typing" aria-label="对方正在输入">
+              <i />
+              <i />
+              <i />
+            </span>
+          </div>
+        )}
+
+        {error && (
+          <div className="br-chat-row">
+            <span className="br-chat-bubble-avatar">
+              {role.avatar ? <img src={role.avatar} alt="" /> : role.name.slice(0, 1)}
+            </span>
+            <span className="br-chat-error">
+              <span className="br-chat-error-text">{error.message}</span>
+              {error.retryable && (
+                <button type="button" className="br-chat-retry book-pressable" onClick={retry}>
+                  重试
+                </button>
+              )}
+              {error.chooseRole && (
+                <button type="button" className="br-chat-retry book-pressable" onClick={onChooseRole}>
+                  选择角色
+                </button>
+              )}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="br-chat-actions">
-        <button type="button" className="br-chat-action book-pressable" onClick={askRole}>
+        <button
+          type="button"
+          className="br-chat-action book-pressable"
+          onClick={askRole}
+          disabled={sending || !roleReady}
+        >
           <Sparkles size={13} strokeWidth={2} />
           问 TA
         </button>
@@ -142,35 +284,46 @@ export function CoReadingChatSheet({ book, role, kind, onClose }: Props) {
         <button
           type="button"
           className="br-chat-action book-pressable"
-          onClick={() => flashHint("谢谢你的反馈，TA 会记得这一刻")}
+          onClick={companionFeedback}
+          disabled={sending || !roleReady}
         >
           <MessageCircleHeart size={13} strokeWidth={2} />
           陪伴反馈
         </button>
       </div>
 
-      <div className="br-chat-inputbar">
-        <input
-          type="text"
-          className="br-chat-input"
-          value={draft}
-          onChange={event => setDraft(event.target.value)}
-          onKeyDown={event => {
-            if (event.key === "Enter") send(draft);
-          }}
-          placeholder={kind === "manga" ? "和 TA 聊聊这一格……" : "和 TA 聊聊这一段……"}
-          autoComplete="off"
-        />
-        <button
-          type="button"
-          className="br-chat-send book-pressable"
-          onClick={() => send(draft)}
-          disabled={!draft.trim()}
-          aria-label="发送"
-        >
-          <Send size={15} strokeWidth={2} />
-        </button>
-      </div>
+      {roleReady ? (
+        <div className="br-chat-inputbar">
+          <input
+            type="text"
+            className="br-chat-input"
+            value={draft}
+            onChange={event => setDraft(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === "Enter") send(draft);
+            }}
+            placeholder={kind === "manga" ? "和 TA 聊聊这一格……" : "和 TA 聊聊这一段……"}
+            autoComplete="off"
+            disabled={sending}
+          />
+          <button
+            type="button"
+            className="br-chat-send book-pressable"
+            onClick={() => send(draft)}
+            disabled={!draft.trim() || sending}
+            aria-label="发送"
+          >
+            <Send size={15} strokeWidth={2} />
+          </button>
+        </div>
+      ) : (
+        <div className="br-chat-norole">
+          <span>先选择一位 Float 角色，才能一起读。</span>
+          <button type="button" className="br-chat-norole-btn book-pressable" onClick={onChooseRole}>
+            去选择角色
+          </button>
+        </div>
+      )}
 
       {hint && <div className="br-chat-hint" aria-live="polite">{hint}</div>}
     </BottomSheet>

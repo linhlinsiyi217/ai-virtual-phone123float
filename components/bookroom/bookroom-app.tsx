@@ -188,6 +188,10 @@ export default function BookRoomApp({ onClose }: Props) {
           book={coTarget}
           role={companion}
           kind={coTarget.type === "manga" ? "manga" : "book"}
+          onChooseRole={() => {
+            setCoTarget(null);
+            setRoleDrawerOpen(true);
+          }}
           onClose={() => setCoTarget(null)}
         />
       )}
