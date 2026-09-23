@@ -1,4 +1,4 @@
-import { DOCK_DEFAULT, ICONS, PAGE_1_DEFAULT, PAGE_2_DEFAULT, PAGE_3_DEFAULT, type DesktopIconId, type IconId, type IconPosition } from "@/lib/desktop-config";
+import { DOCK_DEFAULT, ICONS, PAGE_1_DEFAULT, PAGE_2_DEFAULT, PAGE_3_DEFAULT, RETIRED_DESKTOP_ICON_IDS, type DesktopIconId, type IconId, type IconPosition } from "@/lib/desktop-config";
 import { isCustomAppIconId } from "@/lib/custom-app-types";
 import { loadInstalledCustomApps } from "@/lib/custom-app-storage";
 import { GRID_COLS, GRID_ROWS, WIDGET_SIZE_CELLS, type WidgetInstance } from "@/lib/widget-types";
@@ -52,9 +52,21 @@ function getInstalledCustomIconIds(): Set<string> {
   return new Set(loadInstalledCustomApps().map(app => `custom_app:${app.id}`));
 }
 
+/**
+ * 已退役的桌面图标一律判为"未知"，返回 null。
+ *
+ * 这里是所有布局读取的唯一闸口——分页、dock、文件夹成员都经由本函数校验，
+ * 所以退役只在这一处生效就够：老布局里残留的该图标会被静默丢弃，
+ * 不再补进桌面，也不会被默认图标兜底重新捡回来。
+ */
+function isRetiredDesktopIconId(id: string): boolean {
+  return RETIRED_DESKTOP_ICON_IDS.has(id);
+}
+
 function migrateLegacyDesktopIconId(id: string, customIconIds = getInstalledCustomIconIds()): DesktopIconId | null {
   if (id === "forum") return "cocreate";
   if (id === "fortune") return "interview_magazine";
+  if (isRetiredDesktopIconId(id)) return null;
   if (isCustomAppIconId(id) && customIconIds.has(id)) return id;
   return id in ICONS ? id as IconId : null;
 }
@@ -99,8 +111,9 @@ function flowIconsToPositions(icons: DesktopIconId[], occupied?: boolean[][]): I
 export function createDefaultDesktopIconLayout(_widgets: WidgetInstance[] = []): DesktopIconLayout {
   return {
     // 第一页：组件占第 1~3 行（大时钟 2 行 + 心情气泡 1 行），图标从第 4 行
-    // 起排——9 个默认图标正好占第 4~6 行。若仍从第 5 行起，第 9 个会落到
-    // 第 7 行、超出 GRID_ROWS(6) 被裁掉。
+    // 起排。数量变化时要重算占位：「阅读」退役后是 8 个 = 两行(第 4~5 行)；
+    // 之前 9 个时正好占满第 4~6 行——再多一个就会落到第 7 行、超出
+    // GRID_ROWS(6) 被裁掉。
     page1: PAGE_1_DEFAULT.map((id, i) => ({
       id,
       row: 4 + Math.floor(i / GRID_COLS),

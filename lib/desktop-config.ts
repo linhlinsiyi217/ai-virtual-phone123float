@@ -56,7 +56,20 @@ export type IconMeta = {
   path?: string;
 };
 
-export const PAGE_1_DEFAULT: IconId[] = ["chat", "diary", "music", "calendar", "checkphone", "shopping", "reading", "bookroom", "interview_magazine"];
+// 注意：「阅读」（reading）已从桌面入口退役，见 RETIRED_DESKTOP_ICON_IDS。
+// 但 IconId / ICONS 里仍然保留它——APP 本体（components/reading/*、lib/reading-*.ts）
+// 全部原样留着，要恢复只需把它加回本数组、并清掉退役集合。
+export const PAGE_1_DEFAULT: IconId[] = ["chat", "diary", "music", "calendar", "checkphone", "shopping", "bookroom", "interview_magazine"];
+
+/**
+ * 桌面退役图标：不再出现在默认布局、桌面、dock 和文件夹里。
+ *
+ * 只删默认值是不够的——老设备浏览器里已经存了一份带该图标的桌面布局，
+ * 归一化时只要 ICONS 里还有它，图标就会照旧渲染出来。所以所有读布局的
+ * 入口（分页/dock/文件夹）都要在同一处按本集合统一过滤。
+ * 放在这里而不是直接删 IconId，是为了让 APP 代码保持可编译、随时一行恢复。
+ */
+export const RETIRED_DESKTOP_ICON_IDS: ReadonlySet<string> = new Set(["reading"]);
 
 export const PAGE_2_DEFAULT: IconId[] = [
   "cocreate",

@@ -58,6 +58,7 @@ import {
   PAGE_1_DEFAULT,
   PAGE_2_DEFAULT,
   PAGE_3_DEFAULT,
+  RETIRED_DESKTOP_ICON_IDS,
   createFolderIconId,
   isFolderIconId,
   type DesktopIconId,
@@ -412,6 +413,9 @@ function migrateLegacyDesktopIconId(id: string, customIconIds = getInstalledCust
   if (id === "weibo") return "game";
   if (id === "fortune") return "interview_magazine";
   if (id === "forum") return "cocreate";
+  // 已退役的桌面图标（如「阅读」）视为未知：老布局里残留的格子会被丢弃，
+  // 且不会被默认图标兜底重新捡回桌面。与 lib/desktop-layout-storage.ts 同一口径。
+  if (RETIRED_DESKTOP_ICON_IDS.has(id)) return null;
   if (isCustomAppIconId(id) && customIconIds.has(id)) return id;
   return id in ICONS ? id as IconId : null;
 }
@@ -568,6 +572,7 @@ function sanitizeDesktopFolders(
     const members = folder.icons.filter(id =>
       !placedOutside.has(id)
       && !isFolderIconId(id)
+      && !RETIRED_DESKTOP_ICON_IDS.has(id)
       && (id in ICONS || customIconIds.has(id)));
     if (members.length !== folder.icons.length) changed = true;
     if (members.length <= 1) {
