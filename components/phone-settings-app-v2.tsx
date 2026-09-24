@@ -29,18 +29,23 @@ import { Toggle } from "./ui/form";
 import { SettingsShellV2 } from "./settings-preview-v2/shell";
 import { SettingsListGroup, SettingsListItem } from "./settings-preview-v2/controls";
 import { SettingsNavigationContext } from "./settings-preview-v2/nav-shell";
-
-export const SettingsContext = createContext<{
-    setSubpageTitle: (title: string | null) => void;
-    setOverrideBack: (action: (() => void) | null) => void;
-    setSubpageRightAction: (page: string, action: ReactNode | null) => void;
-}>({ setSubpageTitle: () => { }, setOverrideBack: () => { }, setSubpageRightAction: () => { } });
+import { SettingsContext } from "./phone-settings-app";
 
 export function PhoneSettingsApp({ onClose, onNotice }: { onClose: () => void, onNotice: (msg: string) => void }) {
+    const [title, setTitle] = useState<string | null>(null);
+    const [overrideBack, setOverrideBack] = useState<(() => void) | null>(null);
+    const [rightActions, setRightActions] = useState<Record<string, ReactNode>>({});
+
+    const setSubpageRightAction = useCallback((page: string, action: ReactNode | null) => {
+        setRightActions(prev => ({ ...prev, [page]: action }));
+    }, []);
+
     return (
-        <SettingsShellV2>
-            <PhoneSettingsContent onClose={onClose} onNotice={onNotice} />
-        </SettingsShellV2>
+        <SettingsContext.Provider value={{ setSubpageTitle: setTitle, setOverrideBack, setSubpageRightAction }}>
+            <SettingsShellV2 initialTitle={title || "设置"}>
+                <PhoneSettingsContent onClose={onClose} onNotice={onNotice} rightActions={rightActions} />
+            </SettingsShellV2>
+        </SettingsContext.Provider>
     );
 }
 
@@ -69,11 +74,10 @@ function SubpageRenderer({ pageId, onNotice }: { pageId: string, onNotice: (msg:
     return renderSubPage(pageId);
 }
 
-function PhoneSettingsContent({ onClose, onNotice }: { onClose: () => void, onNotice: (msg: string) => void }) {
+function PhoneSettingsContent({ onClose, onNotice, rightActions }: { onClose: () => void, onNotice: (msg: string) => void, rightActions: Record<string, ReactNode> }) {
     const { push } = useContext(SettingsNavigationContext);
     const [currentPageId, setCurrentPageId] = useState<string | null>(null);
 
-    // 监听导航变化
     useEffect(() => {
         const handleNav = (e: any) => setCurrentPageId(e.detail?.page || null);
         window.addEventListener("settings-nav-v2", handleNav);
