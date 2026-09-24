@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, SlidersHorizontal } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import { loadReadingProgress, saveReadingProgress } from "@/lib/reading-progress";
+import { markFinished, markReading } from "@/lib/bookroom-shelf";
 
 type Props = {
   book: Book;
@@ -32,12 +33,20 @@ export function MangaReaderView({ book, onBack }: Props) {
   const restoringRef = useRef(false);
 
   const persist = () => {
+    const fraction = stateRef.current.fraction;
     saveReadingProgress({
       bookId: book.id,
       chapterIndex: stateRef.current.pageIndex,
-      scrollProgress: stateRef.current.fraction,
+      scrollProgress: fraction,
     });
+    // 完成判定：整卷滚动接近底部 → 标记已读
+    if (fraction >= 0.98) markFinished(book.id);
   };
+
+  // 打开漫画阅读器：标记为阅读中
+  useEffect(() => {
+    markReading(book.id);
+  }, [book.id]);
 
   // 离开 / 切后台时落盘一次最新进度
   useEffect(() => {

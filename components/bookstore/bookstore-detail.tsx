@@ -5,10 +5,12 @@ import { BookMarked, Check, ChevronLeft, ExternalLink, Heart, Loader2, MoonStar,
 import type { Book } from "@/lib/bookstore-data";
 import { getOverallPercent, loadReadingProgress } from "@/lib/reading-progress";
 import {
-  loadFavoriteIds,
-  loadShelfIds,
-  toggleFavoriteId,
-  toggleShelfId,
+  addToShelf,
+  isFavorite,
+  isInShelf,
+  removeFromShelf,
+  saveOnlineSnapshot,
+  toggleFavorite as toggleShelfFavorite,
 } from "@/lib/bookroom-shelf";
 import { fetchFullText } from "@/lib/bookroom/providers";
 import { BookCover } from "./book-card";
@@ -42,8 +44,8 @@ export function BookstoreDetail({ book, onBack, onStartReading, onCoRead, onNigh
 
   useEffect(() => {
     setPercent(getOverallPercent(book, loadReadingProgress(book.id)));
-    setInShelf(loadShelfIds().has(book.id) || Boolean(book.inShelf));
-    setFavorite(loadFavoriteIds().has(book.id));
+    setInShelf(isInShelf(book.id) || Boolean(book.inShelf));
+    setFavorite(isFavorite(book.id));
   }, [book]);
 
   const showHint = (text: string) => {
@@ -108,14 +110,26 @@ export function BookstoreDetail({ book, onBack, onStartReading, onCoRead, onNigh
 
   const handleShelfToggle = () => {
     const next = !inShelf;
-    toggleShelfId(book.id, next);
+    if (next) {
+      const source: "builtin" | "imported" | "online" =
+        book.source === "imported"
+          ? "imported"
+          : book.source === "external" || Boolean(book.externalId)
+            ? "online"
+            : "builtin";
+      addToShelf(book.id, source);
+      // 在线书：持久化 metadata 快照（不含正文），供书架列表展示
+      if (source === "online") saveOnlineSnapshot(book);
+    } else {
+      removeFromShelf(book.id);
+    }
     setInShelf(next);
     showHint(next ? "已放上书架" : "已从书架取下");
   };
 
   const handleFavoriteToggle = () => {
     const next = !favorite;
-    toggleFavoriteId(book.id, next);
+    toggleShelfFavorite(book.id, next);
     setFavorite(next);
     showHint(next ? "已加入收藏" : "已取消收藏");
   };

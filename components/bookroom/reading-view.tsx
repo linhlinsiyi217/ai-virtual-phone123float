@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Bookmark, ChevronLeft, ChevronRight, MoonStar } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
-import { loadReadingProgress, saveReadingProgress } from "@/lib/reading-progress";
+import { loadReadingProgress, saveReadingProgress, getOverallPercent } from "@/lib/reading-progress";
+import { markFinished, markReading } from "@/lib/bookroom-shelf";
 import {
   loadBookAnnotations,
   saveBookAnnotation,
@@ -164,6 +165,15 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
   const persist = useCallback((index: number, fraction: number) => {
     const clamped = Math.min(1, Math.max(0, fraction));
     saveReadingProgress({ bookId: book.id, chapterIndex: index, scrollProgress: clamped });
+    // 完成判定：最后一章且滚动接近底部 → 标记已读
+    if (getOverallPercent(book, { bookId: book.id, chapterIndex: index, scrollProgress: clamped }) >= 100) {
+      markFinished(book.id);
+    }
+  }, [book]);
+
+  /* 打开阅读器：标记为阅读中 */
+  useEffect(() => {
+    markReading(book.id);
   }, [book.id]);
 
   /* ── 进度：离开 / 切后台落盘 ── */

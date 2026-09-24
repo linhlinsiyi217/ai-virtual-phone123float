@@ -3635,3 +3635,268 @@
     animation: none;
   }
 }
+
+/* ════════════════════════════════════════════════════════
+   Phase 5A — 完整书架管理（统一 entries / 选中聚焦 / 分组 / 排序 / 拖动）
+   ════════════════════════════════════════════════════════ */
+
+/* 书架工具栏 */
+.bookroom-app .br-shelf-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.bookroom-app .br-shelf-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--book-text-tertiary);
+}
+.bookroom-app .br-shelf-search input {
+  flex: 1 1 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--book-text-primary);
+  font-family: inherit;
+}
+.bookroom-app .br-shelf-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--book-text-tertiary);
+  cursor: pointer;
+}
+
+.bookroom-app .br-shelf-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bookroom-app .br-shelf-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--book-text-secondary);
+}
+.bookroom-app .br-shelf-sort select {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--book-text-primary);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.bookroom-app .br-shelf-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bookroom-app .br-shelf-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--book-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* 书架网格卡片：点击先聚焦，不直接跳阅读器 */
+.bookroom-app .br-shelf-grid {
+  gap: 14px;
+}
+.bookroom-app .br-shelf-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: transform 0.18s ease;
+}
+.bookroom-app .br-shelf-card.is-dragging {
+  opacity: 0.5;
+}
+.bookroom-app .br-shelf-card .book-card {
+  background: transparent;
+  padding: 0;
+}
+.bookroom-app .br-shelf-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 2px;
+}
+.bookroom-app .br-shelf-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.bookroom-app .br-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--book-text-tertiary);
+  line-height: 1.4;
+}
+.bookroom-app .br-badge-fav { color: #c06660; background: rgba(192, 102, 96, 0.1); }
+.bookroom-app .br-badge-reading { color: #5a7fa8; background: rgba(106, 146, 198, 0.1); }
+.bookroom-app .br-badge-done { color: #4a7a5a; background: rgba(80, 140, 100, 0.1); }
+.bookroom-app .br-shelf-card-date {
+  font-size: 10px;
+  color: var(--book-text-tertiary);
+  margin-left: auto;
+}
+
+/* 书脊进度条 */
+.bookroom-app .br-spine-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 0 0 3px 3px;
+  pointer-events: none;
+  transition: height 0.2s ease;
+}
+
+/* 空状态 */
+.bookroom-app .br-shelf-empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--book-text-tertiary);
+  font-size: 13px;
+}
+
+/* 选中书操作面板 */
+.bookroom-app .br-shelf-focus {
+  max-height: 80vh;
+}
+.bookroom-app .br-focus-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bookroom-app .br-focus-author {
+  font-size: 12px;
+  color: var(--book-text-tertiary);
+}
+.bookroom-app .br-focus-status {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--book-text-secondary);
+}
+.bookroom-app .br-focus-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.bookroom-app .br-focus-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--book-text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.bookroom-app .br-focus-btn.is-fav { color: #c06660; }
+.bookroom-app .br-focus-btn:hover { background: rgba(0, 0, 0, 0.03); }
+
+.bookroom-app .br-focus-sub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bookroom-app .br-focus-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  color: var(--book-text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.bookroom-app .br-focus-sub-row.is-danger { color: #b04a44; }
+.bookroom-app .br-focus-empty {
+  font-size: 12px;
+  color: var(--book-text-tertiary);
+  padding: 8px 4px;
+}
+.bookroom-app .br-focus-danger .br-focus-sub-row {
+  margin-bottom: 4px;
+}
+.bookroom-app .br-focus-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--book-text-tertiary);
+  padding: 4px 4px 0;
+}
+
+/* 分组管理 */
+.bookroom-app .br-col-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+.bookroom-app .br-col-name {
+  font-size: 14px;
+  color: var(--book-text-primary);
+}
+.bookroom-app .br-col-actions {
+  display: flex;
+  gap: 6px;
+}
+.bookroom-app .br-col-actions .is-danger { color: #b04a44; }
+
+/* 小进度条 */
+.bookroom-app .book-progress-sm .book-progress-track {
+  height: 4px;
+}
+.bookroom-app .book-progress-sm .book-progress-num { display: none; }

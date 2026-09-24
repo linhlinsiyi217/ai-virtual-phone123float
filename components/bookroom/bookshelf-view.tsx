@@ -1,45 +1,106 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { BookPlus, Trash2 } from "lucide-react";
-import { MOCK_BOOKS, type Book, type BookCoverTone } from "@/lib/bookstore-data";
-import { deleteReadingProgress, getOverallPercent, listReadingProgress } from "@/lib/reading-progress";
-import { loadFavoriteIds, loadShelfIds } from "@/lib/bookroom-shelf";
-import { clearBookAnnotations } from "@/lib/bookroom-annotations";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  BookPlus,
+  ChevronDown,
+  FolderPlus,
+  Pencil,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
+import { MOCK_BOOKS, type Book, type BookContentType, type BookCoverTone } from "@/lib/bookstore-data";
+import {
+  deleteReadingProgress,
+  getOverallPercent,
+  listReadingProgress,
+  type ReadingProgress,
+} from "@/lib/reading-progress";
+import {
+  addToCollection,
+  addToShelf,
+  createCollection,
+  deleteCollection,
+  getOnlineSnapshot,
+  listCollections,
+  listShelfEntries,
+  loadShelfOrder,
+  markReading,
+  removeFromShelf,
+  renameCollection,
+  saveShelfOrder,
+  setShelfStatus,
+  toggleFavorite,
+  type BookshelfEntry,
+  type BookCollection,
+  type ShelfStatus,
+} from "@/lib/bookroom-shelf";
+import {
+  clearBookAnnotations,
+} from "@/lib/bookroom-annotations";
 import {
   deleteImportedBook,
   getImportedBookMeta,
   getImportedBookWithChapters,
-  listImportedBooks,
 } from "@/lib/bookroom-import";
 import { BookCard, BookCover } from "@/components/bookstore/book-card";
-import { Segmented } from "./bookroom-ui";
+import { BottomSheet, Segmented } from "./bookroom-ui";
 import { ImportSheet } from "./import-sheet";
+import { ShelfFocusSheet } from "./shelf-focus-sheet";
 
 type Props = {
   onOpenBook: (book: Book) => void;
   onContinue: (book: Book) => void;
 };
 
-/** 由 id 查找书籍：内置 mock 优先，回退到导入书 meta */
-function findBookById(id: string, imported: Book[]): Book | undefined {
-  return MOCK_BOOKS.find(item => item.id === id) ?? imported.find(item => item.id === id);
-}
+type ShelfView =
+  | "all"
+  | "reading"
+  | "unread"
+  | "finished"
+  | "favorite"
+  | "recent"
+  | "imported";
 
-/** 格式化导入时间 */
-function formatImportedAt(ts?: number): string {
-  if (!ts) return "";
-  const d = new Date(ts);
-  const m = `${d.getMonth() + 1}`.padStart(2, "0");
-  const day = `${d.getDate()}`.padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
+type TypeFilter = "all" | BookContentType;
 
-type ShelfMode = "cover" | "spine";
+type SortKey =
+  | "recent"
+  | "added"
+  | "title"
+  | "author"
+  | "progress"
+  | "custom";
 
-type ContinueInfo = { book: Book; percent: number };
+const VIEW_OPTIONS = [
+  { value: "all", label: "全部" },
+  { value: "reading", label: "阅读中" },
+  { value: "unread", label: "未读" },
+  { value: "finished", label: "已读" },
+  { value: "favorite", label: "收藏" },
+  { value: "recent", label: "最近阅读" },
+  { value: "imported", label: "已导入" },
+] as const;
 
-/* 书脊使用去饱和的纸 / 墨灰阶，只保留极轻微色相，维持黑白高级感 */
+const TYPE_OPTIONS = [
+  { value: "all", label: "全部内容" },
+  { value: "book", label: "书籍" },
+  { value: "manga", label: "漫画" },
+] as const;
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "recent", label: "最近阅读" },
+  { value: "added", label: "最近加入" },
+  { value: "title", label: "书名" },
+  { value: "author", label: "作者" },
+  { value: "progress", label: "阅读进度" },
+  { value: "custom", label: "自定义" },
+];
+
+/* ───────────────────────── 书脊视图 ───────────────────────── */
+
 const SPINE_TONE: Record<BookCoverTone, { bg: string; ink: string }> = {
   paper: { bg: "#e7e4dc", ink: "#4b483f" },
   blue: { bg: "#9aa3ab", ink: "#f4f5f3" },
@@ -49,7 +110,6 @@ const SPINE_TONE: Record<BookCoverTone, { bg: string; ink: string }> = {
   warm: { bg: "#cfc9bd", ink: "#4c473e" },
 };
 
-/** 由 id 生成稳定的书脊宽高微差，避免一排书像复制出来的 */
 function variance(id: string): { width: number; height: number } {
   let hash = 0;
   for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
@@ -59,7 +119,15 @@ function variance(id: string): { width: number; height: number } {
   };
 }
 
-function BookSpine({ book, onOpen }: { book: Book; onOpen: (book: Book) => void }) {
+function BookSpine({
+  book,
+  percent,
+  onSelect,
+}: {
+  book: Book;
+  percent: number;
+  onSelect: (book: Book) => void;
+}) {
   const tone = SPINE_TONE[book.coverTone];
   const size = variance(book.id);
   const style = {
@@ -72,233 +140,316 @@ function BookSpine({ book, onOpen }: { book: Book; onOpen: (book: Book) => void 
     <button
       type="button"
       className="br-spine book-pressable"
-      onClick={() => onOpen(book)}
+      onClick={() => onSelect(book)}
       style={style}
-      aria-label={`取下《${book.title}》`}
+      aria-label={`聚焦《${book.title}》`}
     >
       <span className="br-spine-title">{book.title}</span>
       <span className="br-spine-author">{book.author}</span>
       <span className="br-spine-line" aria-hidden />
+      {percent > 0 && (
+        <span className="br-spine-progress" style={{ height: `${percent}%` }} />
+      )}
     </button>
   );
 }
 
-function ShelfBoard({ books, onOpen }: { books: Book[]; onOpen: (book: Book) => void }) {
-  return (
-    <div className="br-shelf-board">
-      <div className="br-shelf-spines">
-        {books.map(book => (
-          <BookSpine key={book.id} book={book} onOpen={onOpen} />
-        ))}
-      </div>
-    </div>
-  );
+/* ───────────────────────── 工具函数 ───────────────────────── */
+
+/** 由 bookId 解析 Book：builtin→MOCK_BOOKS，imported→kv-db meta，online→snapshot */
+function resolveBook(bookId: string): Book | null {
+  const builtin = MOCK_BOOKS.find(b => b.id === bookId);
+  if (builtin) return builtin;
+  const imported = getImportedBookMeta(bookId);
+  if (imported) return imported;
+  return getOnlineSnapshot(bookId);
 }
 
-/** 导入书条目：封面 + 格式标签 + 导入时间 + 进度 + 删除 */
-function ImportedItem({
-  book,
-  onOpen,
-  onDelete,
-}: {
-  book: Book;
-  onOpen: (book: Book) => void;
-  onDelete: (book: Book) => void;
-}) {
-  const fmt = book.importInfo?.format?.toUpperCase();
-  const date = formatImportedAt(book.importInfo?.importedAt);
-  const progress = book.progress ?? 0;
-  return (
-    <div className="br-imported-item">
-      <button
-        type="button"
-        className="br-imported-cover book-pressable"
-        onClick={() => onOpen(book)}
-        aria-label={`打开《${book.title}》`}
-      >
-        <BookCover book={book} />
-      </button>
-      <div className="br-imported-meta">
-        <span className="br-imported-title">{book.title}</span>
-        <span className="br-imported-sub">
-          {book.author}
-        </span>
-        <div className="br-imported-tags">
-          {fmt && <span className="br-imported-fmt">{fmt}</span>}
-          {date && <span className="br-imported-date">{date}</span>}
-        </div>
-        {progress > 0 && (
-          <div className="book-progress">
-            <div className="book-progress-track">
-              <div className="book-progress-fill" style={{ width: `${progress}%` }} />
-            </div>
-            <span className="book-progress-num">{progress}%</span>
-          </div>
-        )}
-      </div>
-      <button
-        type="button"
-        className="br-imported-del book-pressable"
-        onClick={() => onDelete(book)}
-        aria-label={`删除《${book.title}》`}
-      >
-        <Trash2 size={14} strokeWidth={1.8} />
-      </button>
-    </div>
-  );
+function formatDate(ts?: number): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const m = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 
-/** 已导入区块内容（spine / cover 共用） */
-function ImportedSection({
-  books,
-  onOpen,
-  onDelete,
-  onImport,
-}: {
-  books: Book[];
-  onOpen: (book: Book) => void;
-  onDelete: (book: Book) => void;
-  onImport: () => void;
-}) {
-  return (
-    <ShelfSection title="已导入" count={books.length}>
-      {books.length > 0 ? (
-        <div className="br-imported-list">
-          {books.map(book => (
-            <ImportedItem
-              key={book.id}
-              book={book}
-              onOpen={onOpen}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
-      ) : (
-        <button
-          type="button"
-          className="br-shelf-import book-glass book-pressable"
-          onClick={onImport}
-        >
-          <BookPlus size={18} strokeWidth={1.9} />
-          <span>导入书籍</span>
-          <span className="br-shelf-import-sub">支持 TXT / EPUB / PDF</span>
-        </button>
-      )}
-    </ShelfSection>
-  );
-}
+/* ───────────────────────── 主组件 ───────────────────────── */
 
-function ShelfSection({
-  title,
-  count,
-  children,
-}: {
-  title: string;
-  count?: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="book-section br-shelf-section">
-      <div className="book-section-head">
-        <h2 className="book-section-title">{title}</h2>
-        {typeof count === "number" && <span className="book-section-more">{count} 本</span>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/**
- * 书架页：真实书房的书架感（封面视图 / 书脊视图）。
- * 承载：继续阅读、最近阅读、我的书、我的漫画、收藏、已导入。
- * 书架/收藏集合读 kv-db（每次挂载重新读取，从详情返回即刷新）。
- */
 export function BookshelfView({ onOpenBook, onContinue }: Props) {
-  const [mode, setMode] = useState<ShelfMode>("spine");
-  const [continueInfo, setContinueInfo] = useState<ContinueInfo | null>(null);
-  const [recent, setRecent] = useState<Book[]>([]);
-  const [imported, setImported] = useState<Book[]>([]);
+  const [entries, setEntries] = useState<BookshelfEntry[]>([]);
+  const [progressMap, setProgressMap] = useState<Record<string, ReadingProgress>>({});
+  const [collections, setCollections] = useState<BookCollection[]>([]);
+  const [customOrder, setCustomOrder] = useState<string[]>([]);
+
+  const [view, setView] = useState<ShelfView>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("recent");
+  const [search, setSearch] = useState("");
+  const [mode, setMode] = useState<"spine" | "cover">("cover");
+
   const [importOpen, setImportOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Book | null>(null);
+  const [focusTarget, setFocusTarget] = useState<{ book: Book; entry: BookshelfEntry } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ book: Book; kind: "remove" | "delete" } | null>(null);
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
 
-  const shelfIds = useMemo(loadShelfIds, []);
-  const favoriteIds = useMemo(loadFavoriteIds, []);
+  // 拖动排序
+  const dragId = useRef<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
-  const refreshImported = () => setImported(listImportedBooks());
+  const refresh = () => {
+    setEntries(listShelfEntries());
+    const progs: Record<string, ReadingProgress> = {};
+    for (const p of listReadingProgress()) progs[p.bookId] = p;
+    setProgressMap(progs);
+    setCollections(listCollections());
+    setCustomOrder(loadShelfOrder());
+  };
 
   useEffect(() => {
-    refreshImported();
-    const records = listReadingProgress();
-    const recentBooks: Book[] = [];
-    for (const record of records) {
-      const book = findBookById(record.bookId, []);
-      if (book && !recentBooks.some(item => item.id === book.id)) recentBooks.push(book);
-      if (recentBooks.length >= 6) break;
-    }
-    setRecent(recentBooks);
-
-    for (const record of records) {
-      const book = findBookById(record.bookId, imported);
-      if (book && (book.chapters?.length || book.pages?.length)) {
-        setContinueInfo({ book, percent: getOverallPercent(book, record) });
-        return;
-      }
-    }
-    // 导入书虽无内置 chapters（meta 不含），但有解析数据，继续阅读仍可识别
-    for (const record of records) {
-      const meta = getImportedBookMeta(record.bookId);
-      if (meta) {
-        setContinueInfo({ book: meta, percent: getOverallPercent(meta, record) });
-        return;
-      }
-    }
-    const fallback = MOCK_BOOKS.find(book => typeof book.progress === "number") ?? null;
-    setContinueInfo(fallback ? { book: fallback, percent: fallback.progress ?? 0 } : null);
+    refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const inShelf = (book: Book) => shelfIds.has(book.id) || Boolean(book.inShelf);
-  const myBooks = MOCK_BOOKS.filter(book => book.type === "book" && inShelf(book));
-  const myManga = MOCK_BOOKS.filter(book => book.type === "manga" && inShelf(book));
-  const favorites = MOCK_BOOKS.filter(book => favoriteIds.has(book.id));
+  /** entry → Book + 进度 */
+  const items = useMemo(() => {
+    return entries
+      .map(e => {
+        const book = resolveBook(e.bookId);
+        if (!book) return null;
+        const progress = progressMap[e.bookId];
+        const percent = getOverallPercent(book, progress);
+        return { entry: e, book, percent, progress };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+  }, [entries, progressMap]);
 
-  const handleContinueClick = (info: ContinueInfo) => {
-    // 导入书：加载章节后进入阅读
-    if (info.book.source === "imported") {
-      const full = getImportedBookWithChapters(info.book.id);
-      if (full && full.chapters?.length) {
-        onContinue(full);
-        return;
+  /** 一级分类筛选 */
+  const viewFiltered = useMemo(() => {
+    const now = Date.now();
+    return items.filter(({ entry }) => {
+      switch (view) {
+        case "reading":
+          return entry.status === "reading";
+        case "unread":
+          return entry.status === "unread";
+        case "finished":
+          return entry.status === "finished";
+        case "favorite":
+          return Boolean(entry.favorite);
+        case "recent":
+          return (entry.lastReadAt ?? 0) > 0 && now - (entry.lastReadAt ?? 0) < 1000 * 60 * 60 * 24 * 365;
+        case "imported":
+          return entry.source === "imported";
+        default:
+          return true;
       }
-      onOpenBook(info.book);
-      return;
+    });
+  }, [items, view]);
+
+  /** 类型筛选 */
+  const typeFiltered = useMemo(() => {
+    if (typeFilter === "all") return viewFiltered;
+    return viewFiltered.filter(({ book }) => book.type === typeFilter);
+  }, [viewFiltered, typeFilter]);
+
+  /** 搜索 */
+  const searched = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return typeFiltered;
+    return typeFiltered.filter(({ book, entry }) => {
+      const colNames = (entry.collectionIds ?? [])
+        .map(id => collections.find(c => c.id === id)?.name ?? "")
+        .join(" ");
+      const hay = `${book.title} ${book.author} ${book.category} ${colNames}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [typeFiltered, search, collections]);
+
+  /** 排序 */
+  const sorted = useMemo(() => {
+    const arr = [...searched];
+    if (sortKey === "custom") {
+      const orderMap = new Map<string, number>();
+      customOrder.forEach((id, i) => orderMap.set(id, i));
+      arr.sort((a, b) => {
+        const pa = orderMap.get(a.entry.bookId);
+        const pb = orderMap.get(b.entry.bookId);
+        if (pa !== undefined && pb !== undefined) return pa - pb;
+        if (pa !== undefined) return -1;
+        if (pb !== undefined) return 1;
+        return (a.entry.addedAt ?? 0) - (b.entry.addedAt ?? 0);
+      });
+      return arr;
     }
-    if (info.book.chapters?.length || info.book.pages?.length) onContinue(info.book);
-    else onOpenBook(info.book);
+    arr.sort((a, b) => {
+      switch (sortKey) {
+        case "recent":
+          return (b.entry.lastReadAt ?? 0) - (a.entry.lastReadAt ?? 0);
+        case "added":
+          return (b.entry.addedAt ?? 0) - (a.entry.addedAt ?? 0);
+        case "title":
+          return a.book.title.localeCompare(b.book.title, "zh");
+        case "author":
+          return a.book.author.localeCompare(b.book.author, "zh");
+        case "progress":
+          return b.percent - a.percent;
+        default:
+          return 0;
+      }
+    });
+    return arr;
+  }, [searched, sortKey, customOrder]);
+
+  /* ───── Continue Reading：阅读中且有进度的最近一本 ───── */
+  const continueInfo = useMemo(() => {
+    const candidates = items
+      .filter(({ entry, percent }) => entry.status === "reading" && percent > 0)
+      .sort((a, b) => (b.entry.lastReadAt ?? 0) - (a.entry.lastReadAt ?? 0));
+    if (candidates[0]) return candidates[0];
+    // 回退：最近阅读且有进度
+    const recents = items
+      .filter(({ percent }) => percent > 0)
+      .sort((a, b) => (b.entry.lastReadAt ?? 0) - (a.entry.lastReadAt ?? 0));
+    return recents[0] ?? null;
+  }, [items]);
+
+  /* ───── 选中 / 聚焦：不直接跳阅读器 ───── */
+  const handleSelect = (book: Book) => {
+    const entry = entries.find(e => e.bookId === book.id);
+    if (entry) setFocusTarget({ book, entry });
   };
 
-  /** 打开导入书：先加载章节（meta 不含正文），再进详情 */
-  const openImported = (book: Book) => {
-    const full = getImportedBookWithChapters(book.id);
-    if (full && full.chapters?.length) onOpenBook(full);
-    else onOpenBook(book);
+  const handleContinueClick = () => {
+    if (!continueInfo) return;
+    const { book, entry } = continueInfo;
+    markReading(book.id);
+    if (entry.source === "imported") {
+      const full = getImportedBookWithChapters(book.id);
+      onContinue(full ?? book);
+    } else {
+      onContinue(book);
+    }
   };
 
-  /** 确认删除导入书：清解析数据 + 进度 + 标注；不删原文件 */
-  const handleDeleteImported = (book: Book) => {
-    deleteImportedBook(book.id);
-    deleteReadingProgress(book.id);
-    clearBookAnnotations(book.id);
+  const handleReadFromFocus = (book: Book, entry: BookshelfEntry) => {
+    markReading(book.id);
+    setFocusTarget(null);
+    if (entry.source === "imported") {
+      const full = getImportedBookWithChapters(book.id);
+      onContinue(full ?? book);
+    } else {
+      onContinue(book);
+    }
+  };
+
+  const handleFavorite = (bookId: string, favorite: boolean) => {
+    toggleFavorite(bookId, favorite);
+    refresh();
+    if (focusTarget?.entry.bookId === bookId) {
+      setFocusTarget({ ...focusTarget, entry: { ...focusTarget.entry, favorite } });
+    }
+  };
+
+  const handleStatus = (bookId: string, status: ShelfStatus) => {
+    setShelfStatus(bookId, status);
+    refresh();
+    setFocusTarget(null);
+  };
+
+  const handleAddToCollection = (bookId: string, collectionId: string) => {
+    addToCollection(bookId, collectionId);
+    refresh();
+  };
+
+  const confirmRemove = (book: Book) => {
+    setDeleteTarget({ book, kind: "remove" });
+  };
+
+  const confirmDeleteImported = (book: Book) => {
+    setDeleteTarget({ book, kind: "delete" });
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deleteTarget) return;
+    const { book, kind } = deleteTarget;
+    if (kind === "remove") {
+      removeFromShelf(book.id);
+    } else {
+      // 删除导入内容：清 entry + 正文 + 进度 + 标注
+      removeFromShelf(book.id);
+      deleteImportedBook(book.id);
+      deleteReadingProgress(book.id);
+      clearBookAnnotations(book.id);
+    }
     setDeleteTarget(null);
-    refreshImported();
+    setFocusTarget(null);
+    refresh();
   };
 
   const handleImported = (book: Book) => {
-    refreshImported();
+    // 导入成功：自动加入书架（entry）
+    addToShelf(book.id, "imported");
+    refresh();
     setImportOpen(false);
-    // 自动跳转到该书详情（已含章节）
     const full = getImportedBookWithChapters(book.id);
     onOpenBook(full ?? book);
+  };
+
+  /* ───── 拖动排序（cover 视图，自定义排序模式） ───── */
+  const onDragStart = (id: string) => {
+    if (sortKey !== "custom") return;
+    dragId.current = id;
+    setDraggingId(id);
+  };
+
+  const onDragOver = (e: React.DragEvent, id: string) => {
+    if (sortKey !== "custom" || !dragId.current || dragId.current === id) return;
+    e.preventDefault();
+    const from = customOrder.indexOf(dragId.current);
+    const to = customOrder.indexOf(id);
+    if (from < 0 || to < 0) return;
+    const next = [...customOrder];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setCustomOrder(next);
+    saveShelfOrder(next);
+  };
+
+  const onDragEnd = () => {
+    dragId.current = null;
+    setDraggingId(null);
+  };
+
+  /* ───── 分组管理 ───── */
+  const handleCreateCollection = () => {
+    const name = window.prompt("新建分组名称");
+    if (!name?.trim()) return;
+    createCollection(name.trim());
+    setCollections(listCollections());
+  };
+
+  const handleRenameCollection = (col: BookCollection) => {
+    const name = window.prompt("重命名分组", col.name);
+    if (!name?.trim()) return;
+    renameCollection(col.id, name.trim());
+    setCollections(listCollections());
+  };
+
+  const handleDeleteCollection = (col: BookCollection) => {
+    if (!window.confirm(`删除分组「${col.name}」？分组中的书不会被删除。`)) return;
+    deleteCollection(col.id);
+    setCollections(listCollections());
+    refresh();
+  };
+
+  const emptyText: Record<ShelfView, string> = {
+    all: "书架还是空的，去书城挑一本，或导入你的书。",
+    reading: "还没有正在阅读的书。",
+    unread: "没有未读的书。",
+    finished: "还没有读完的书。",
+    favorite: "还没有收藏内容。",
+    recent: "还没有阅读记录。",
+    imported: "还没有导入书籍。",
   };
 
   return (
@@ -311,7 +462,7 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
             <button
               type="button"
               className="book-continue-cover book-pressable"
-              onClick={() => handleContinueClick(continueInfo)}
+              onClick={handleContinueClick}
               aria-label={`继续阅读《${continueInfo.book.title}》`}
             >
               <BookCover book={continueInfo.book} />
@@ -328,7 +479,7 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
               <button
                 type="button"
                 className="book-cta book-pressable"
-                onClick={() => handleContinueClick(continueInfo)}
+                onClick={handleContinueClick}
               >
                 继续阅读
               </button>
@@ -337,115 +488,192 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
         </section>
       )}
 
-      {/* 视图切换 + 导入入口 */}
-      <section className="book-section br-shelf-switch-row">
-        <Segmented<ShelfMode>
-          ariaLabel="书架视图切换"
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: "spine", label: "书脊" },
-            { value: "cover", label: "封面" },
-          ]}
-        />
-        <button
-          type="button"
-          className="br-shelf-import-entry book-pressable"
-          onClick={() => setImportOpen(true)}
-          aria-label="导入书籍"
-        >
-          <BookPlus size={15} strokeWidth={2} />
-          <span>导入</span>
-        </button>
+      {/* 搜索 + 视图切换行 */}
+      <section className="br-shelf-toolbar book-section">
+        <div className="br-shelf-search">
+          <Search size={15} strokeWidth={2} />
+          <input
+            type="text"
+            placeholder="搜索我的书架…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            aria-label="书架搜索"
+          />
+          {search && (
+            <button
+              type="button"
+              className="br-shelf-search-clear"
+              onClick={() => setSearch("")}
+              aria-label="清除搜索"
+            >
+              <X size={13} strokeWidth={2.4} />
+            </button>
+          )}
+        </div>
+
+        <div className="br-shelf-controls">
+          <Segmented<ShelfView>
+            ariaLabel="书架分类"
+            value={view}
+            onChange={setView}
+            options={VIEW_OPTIONS as unknown as { value: ShelfView; label: string }[]}
+          />
+          <Segmented<TypeFilter>
+            ariaLabel="内容类型筛选"
+            value={typeFilter}
+            onChange={setTypeFilter}
+            options={TYPE_OPTIONS as unknown as { value: TypeFilter; label: string }[]}
+          />
+        </div>
+
+        <div className="br-shelf-controls">
+          <div className="br-shelf-sort">
+            <SlidersHorizontal size={14} strokeWidth={2} />
+            <select
+              value={sortKey}
+              onChange={e => setSortKey(e.target.value as SortKey)}
+              aria-label="排序方式"
+            >
+              {SORT_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={13} strokeWidth={2} />
+          </div>
+          <Segmented<"spine" | "cover">
+            ariaLabel="书架展示模式"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "cover", label: "封面" },
+              { value: "spine", label: "书脊" },
+            ]}
+          />
+        </div>
+
+        <div className="br-shelf-actions">
+          <button
+            type="button"
+            className="br-shelf-action book-pressable"
+            onClick={handleCreateCollection}
+            aria-label="新建分组"
+          >
+            <FolderPlus size={15} strokeWidth={2} />
+            <span>分组</span>
+          </button>
+          {collections.length > 0 && (
+            <button
+              type="button"
+              className="br-shelf-action book-pressable"
+              onClick={() => setCollectionsOpen(true)}
+              aria-label="管理分组"
+            >
+              <Pencil size={14} strokeWidth={2} />
+              <span>管理</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="br-shelf-import-entry book-pressable"
+            onClick={() => setImportOpen(true)}
+            aria-label="导入书籍"
+          >
+            <BookPlus size={15} strokeWidth={2} />
+            <span>导入</span>
+          </button>
+        </div>
       </section>
 
-      {mode === "spine" ? (
-        <>
-          {recent.length > 0 && (
-            <ShelfSection title="最近阅读">
-              <ShelfBoard books={recent} onOpen={onOpenBook} />
-            </ShelfSection>
-          )}
-          <ShelfSection title="我的书" count={myBooks.length}>
-            {myBooks.length > 0 ? (
-              <ShelfBoard books={myBooks} onOpen={onOpenBook} />
-            ) : (
-              <p className="book-empty">书架空着，去书城挑一本吧。</p>
-            )}
-          </ShelfSection>
-          <ShelfSection title="我的漫画" count={myManga.length}>
-            {myManga.length > 0 ? (
-              <ShelfBoard books={myManga} onOpen={onOpenBook} />
-            ) : (
-              <p className="book-empty">还没有收藏漫画。</p>
-            )}
-          </ShelfSection>
-          <ShelfSection title="收藏" count={favorites.length}>
-            {favorites.length > 0 ? (
-              <ShelfBoard books={favorites} onOpen={onOpenBook} />
-            ) : (
-              <p className="book-empty">在详情页点亮爱心，喜欢的书会收在这里。</p>
-            )}
-          </ShelfSection>
-          <ImportedSection
-            books={imported}
-            onOpen={openImported}
-            onDelete={setDeleteTarget}
-            onImport={() => setImportOpen(true)}
-          />
-        </>
+      {/* 书架主体 */}
+      {sorted.length === 0 ? (
+        <p className="book-empty br-shelf-empty">{emptyText[view]}</p>
+      ) : mode === "spine" ? (
+        <div className="br-shelf-board">
+          <div className="br-shelf-spines">
+            {sorted.map(({ book, percent }) => (
+              <BookSpine key={book.id} book={book} percent={percent} onSelect={handleSelect} />
+            ))}
+          </div>
+        </div>
       ) : (
-        <>
-          {recent.length > 0 && (
-            <ShelfSection title="最近阅读">
-              <div className="book-shelf-row">
-                {recent.map(book => (
-                  <BookCard key={book.id} book={book} onOpen={onOpenBook} showCategory={false} />
-                ))}
+        <div className="book-grid br-shelf-grid">
+          {sorted.map(({ book, percent, entry }) => (
+            <div
+              key={book.id}
+              className={`br-shelf-card ${draggingId === book.id ? "is-dragging" : ""}`}
+              draggable={sortKey === "custom"}
+              onDragStart={() => onDragStart(book.id)}
+              onDragOver={e => onDragOver(e, book.id)}
+              onDragEnd={onDragEnd}
+            >
+              <BookCard book={book} onOpen={handleSelect} showCategory={false} />
+              <div className="br-shelf-card-meta">
+                {percent > 0 && (
+                  <div className="book-progress book-progress-sm">
+                    <div className="book-progress-track">
+                      <div className="book-progress-fill" style={{ width: `${percent}%` }} />
+                    </div>
+                  </div>
+                )}
+                <div className="br-shelf-card-badges">
+                  {entry.favorite && <span className="br-badge br-badge-fav">♥</span>}
+                  {entry.status === "reading" && <span className="br-badge br-badge-reading">在读</span>}
+                  {entry.status === "finished" && <span className="br-badge br-badge-done">已读</span>}
+                  {entry.source === "imported" && book.importInfo && (
+                    <span className="br-badge">{book.importInfo.format.toUpperCase()}</span>
+                  )}
+                  {entry.lastReadAt && (
+                    <span className="br-shelf-card-date">{formatDate(entry.lastReadAt)}</span>
+                  )}
+                </div>
               </div>
-            </ShelfSection>
-          )}
-          <ShelfSection title="我的书" count={myBooks.length}>
-            <div className="book-grid">
-              {myBooks.map(book => (
-                <BookCard key={book.id} book={book} onOpen={onOpenBook} showCategory={false} />
-              ))}
             </div>
-          </ShelfSection>
-          <ShelfSection title="我的漫画" count={myManga.length}>
-            <div className="book-grid">
-              {myManga.map(book => (
-                <BookCard key={book.id} book={book} onOpen={onOpenBook} showCategory={false} />
-              ))}
-            </div>
-          </ShelfSection>
-          <ShelfSection title="收藏" count={favorites.length}>
-            <div className="book-grid">
-              {favorites.map(book => (
-                <BookCard key={book.id} book={book} onOpen={onOpenBook} showCategory={false} />
-              ))}
-            </div>
-          </ShelfSection>
-          <ImportedSection
-            books={imported}
-            onOpen={openImported}
-            onDelete={setDeleteTarget}
-            onImport={() => setImportOpen(true)}
-          />
-        </>
+          ))}
+        </div>
+      )}
+
+      <footer className="book-footer">BOOKROOM · SHELF</footer>
+
+      {/* 选中书操作面板 */}
+      {focusTarget && (
+        <ShelfFocusSheet
+          book={focusTarget.book}
+          entry={focusTarget.entry}
+          percent={getOverallPercent(focusTarget.book, progressMap[focusTarget.book.id])}
+          onClose={() => setFocusTarget(null)}
+          onRead={() => handleReadFromFocus(focusTarget.book, focusTarget.entry)}
+          onDetail={() => {
+            const b = focusTarget.book;
+            setFocusTarget(null);
+            if (focusTarget.entry.source === "imported") {
+              const full = getImportedBookWithChapters(b.id);
+              onOpenBook(full ?? b);
+            } else {
+              onOpenBook(b);
+            }
+          }}
+          onFavorite={fav => handleFavorite(focusTarget.book.id, fav)}
+          onStatus={status => handleStatus(focusTarget.book.id, status)}
+          onAddToCollection={colId => handleAddToCollection(focusTarget.book.id, colId)}
+          onRemoveFromShelf={() => confirmRemove(focusTarget.book)}
+          onDeleteImported={
+            focusTarget.book.source === "imported"
+              ? () => confirmDeleteImported(focusTarget.book)
+              : undefined
+          }
+        />
       )}
 
       {/* 导入半弹窗 */}
       {importOpen && (
-        <ImportSheet
-          onClose={() => setImportOpen(false)}
-          onImported={handleImported}
-        />
+        <ImportSheet onClose={() => setImportOpen(false)} onImported={handleImported} />
       )}
 
-      {/* 删除导入书确认 */}
+      {/* 移出 / 删除确认 */}
       {deleteTarget && (
-        <div className="br-del-confirm" role="dialog" aria-modal="true" aria-label="删除导入书">
+        <div className="br-del-confirm" role="dialog" aria-modal="true" aria-label="确认操作">
           <button
             type="button"
             className="br-sheet-scrim"
@@ -453,11 +681,15 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
             tabIndex={-1}
           />
           <div className="br-del-confirm-panel book-glass">
-            <h3 className="br-del-confirm-title">移除《{deleteTarget.title}》</h3>
+            <h3 className="br-del-confirm-title">
+              {deleteTarget.kind === "remove"
+                ? `移出书架《${deleteTarget.book.title}》？`
+                : `删除导入内容《${deleteTarget.book.title}》？`}
+            </h3>
             <p className="br-del-confirm-text">
-              将从书架移除并清除解析内容、阅读进度与标注。
-              <br />
-              这不会删除你设备上的原文件。
+              {deleteTarget.kind === "remove"
+                ? "从书架移除，阅读记录与标注会保留。"
+                : "将清除解析内容、阅读进度与标注。不会删除你设备上的原文件。"}
             </p>
             <div className="br-del-confirm-actions">
               <button
@@ -470,16 +702,53 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
               <button
                 type="button"
                 className="br-del-confirm-yes book-pressable"
-                onClick={() => handleDeleteImported(deleteTarget)}
+                onClick={handleDeleteConfirm}
               >
-                移除
+                {deleteTarget.kind === "remove" ? "移出" : "删除"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <footer className="book-footer">BOOKROOM · SHELF</footer>
+      {/* 分组管理半弹窗 */}
+      {collectionsOpen && (
+        <BottomSheet title="分组管理" onClose={() => setCollectionsOpen(false)}>
+          <section className="br-sheet-section">
+            {collections.map(col => (
+              <div key={col.id} className="br-col-row">
+                <span className="br-col-name">{col.name}</span>
+                <div className="br-col-actions">
+                  <button
+                    type="button"
+                    className="br-quiet-btn book-pressable"
+                    onClick={() => handleRenameCollection(col)}
+                  >
+                    <Pencil size={13} strokeWidth={2} />
+                  </button>
+                  <button
+                    type="button"
+                    className="br-quiet-btn book-pressable is-danger"
+                    onClick={() => handleDeleteCollection(col)}
+                  >
+                    <Trash2 size={13} strokeWidth={2} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {collections.length === 0 && (
+              <p className="book-empty">还没有分组。</p>
+            )}
+            <button
+              type="button"
+              className="br-sheet-primary book-pressable"
+              onClick={handleCreateCollection}
+            >
+              + 新建分组
+            </button>
+          </section>
+        </BottomSheet>
+      )}
     </>
   );
 }
