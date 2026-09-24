@@ -16,10 +16,12 @@ import { WritingProjectView } from "./writing-project-view";
 import { MineView } from "./mine-view";
 import { StatsView } from "./stats-view";
 import { CoReadingHistoryView } from "./co-reading-history-view";
+import { FavoriteQuotesView } from "./favorite-quotes-view";
 import { RoleSwitcherDrawer } from "./role-switcher-drawer";
 import { NightReadingSheet } from "./night-reading-sheet";
 import { CoReadingChatSheet } from "./co-reading-chat-sheet";
-import { ColorTuningSheet } from "./color-tuning-sheet";
+import { AppearanceStudioSheet } from "./appearance-studio-sheet";
+import { ReadingSkinSheet } from "./reading-skin-sheet";
 import { BookroomSplash } from "./bookroom-splash";
 import { ReadingView } from "./reading-view";
 import { MangaReaderView } from "./manga-reader-view";
@@ -33,15 +35,13 @@ const TAB_META: Record<BookroomTab, { title: string; subtitle: string }> = {
   mine: { title: "我的", subtitle: "PROFILE" },
 };
 
-type ColorTab = "grid" | "spectrum" | "sliders";
-
 /**
  * 「书房」App 根组件 — Float 系统挂载点。
  *
  * 信息架构（Phase 2 Shell 重构）：
  *   Dock：书架 / 书城 / 书桌 / 我的（夜读、共读不再是一级入口）
- *   工具层：角色侧栏（右抽屉）、夜读/陪伴半弹窗、共读聊天半弹层、颜色调试半弹窗
- *   导航栈：Dock 各页 ↔ 书籍详情 ↔ 文字阅读器；我的 → 统计（子页）
+ *   工具层：角色侧栏（右抽屉）、夜读/陪伴半弹窗、共读聊天半弹层、外观工作室、阅读皮肤
+ *   导航栈：Dock 各页 ↔ 书籍详情 ↔ 文字阅读器；我的 → 统计 / 共读记录 / 收藏语录（子页）
  */
 export default function BookRoomApp({ onClose }: Props) {
   const [tab, setTab] = useState<BookroomTab>("shelf");
@@ -50,9 +50,10 @@ export default function BookRoomApp({ onClose }: Props) {
   const [activeBook, setActiveBook] = useState<Book | null>(null);
   const [readingBook, setReadingBook] = useState<Book | null>(null);
 
-  // 我的 → 统计 / 共读记录
+  // 我的 → 统计 / 共读记录 / 收藏语录
   const [statsOpen, setStatsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [quotesOpen, setQuotesOpen] = useState(false);
 
   // 角色与浮层（角色列表实时重读真源：改名 / 换头像 / 删除后自动同步）
   const [roles, setRoles] = useState<CompanionRole[]>(() => resolveCompanionRoles());
@@ -60,8 +61,10 @@ export default function BookRoomApp({ onClose }: Props) {
   const [roleDrawerOpen, setRoleDrawerOpen] = useState(false);
   const [nightTarget, setNightTarget] = useState<{ book: Book; mode: "night" | "companion" } | null>(null);
   const [coTarget, setCoTarget] = useState<{ book: Book; initialAsk?: string } | null>(null);
-  const [colorTab, setColorTab] = useState<ColorTab>("grid");
-  const [colorOpen, setColorOpen] = useState(false);
+
+  // 外观与皮肤
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [skinsOpen, setSkinsOpen] = useState(false);
 
   // 书桌（Phase 7A）：工作台 / 新建面板参数 / 书桌筛选排序滚动位置（进入项目后仍保持）
   const [writingProjectId, setWritingProjectId] = useState<string | null>(null);
@@ -117,6 +120,19 @@ export default function BookRoomApp({ onClose }: Props) {
     else setActiveBook(book);
   };
 
+  /** 收藏语录 → 跳回原文位置 */
+  const handleJumpToAnnotation = (bookId: string) => {
+    const book = resolveShelfBook(bookId, { withContent: true });
+    if (!book) return;
+    setQuotesOpen(false);
+    setReadingBook(book);
+  };
+
+  /** 导入内容：切到书架 tab（书架页已有导入入口） */
+  const handleOpenImport = () => {
+    setTab("shelf");
+  };
+
   const meta = TAB_META[tab];
 
   return (
@@ -151,6 +167,11 @@ export default function BookRoomApp({ onClose }: Props) {
         />
       ) : statsOpen ? (
         <StatsView onBack={() => setStatsOpen(false)} />
+      ) : quotesOpen ? (
+        <FavoriteQuotesView
+          onBack={() => setQuotesOpen(false)}
+          onJumpToBook={handleJumpToAnnotation}
+        />
       ) : writingProjectId ? (
         <WritingProjectView
           projectId={writingProjectId}
@@ -208,10 +229,12 @@ export default function BookRoomApp({ onClose }: Props) {
                 onOpenRoles={() => setRoleDrawerOpen(true)}
                 onOpenStats={() => setStatsOpen(true)}
                 onOpenHistory={() => setHistoryOpen(true)}
-                onOpenColor={tabName => {
-                  setColorTab(tabName);
-                  setColorOpen(true);
-                }}
+                onOpenQuotes={() => setQuotesOpen(true)}
+                onOpenAppearance={() => setAppearanceOpen(true)}
+                onOpenSkins={() => setSkinsOpen(true)}
+                onOpenImport={handleOpenImport}
+                onOpenDesk={() => setTab("desk")}
+                onOpenShelf={() => setTab("shelf")}
               />
             )}
           </div>
@@ -252,8 +275,12 @@ export default function BookRoomApp({ onClose }: Props) {
         />
       )}
 
-      {colorOpen && (
-        <ColorTuningSheet initialTab={colorTab} onClose={() => setColorOpen(false)} />
+      {appearanceOpen && (
+        <AppearanceStudioSheet onClose={() => setAppearanceOpen(false)} />
+      )}
+
+      {skinsOpen && (
+        <ReadingSkinSheet onClose={() => setSkinsOpen(false)} />
       )}
 
       {createOpts && (

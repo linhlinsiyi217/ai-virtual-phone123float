@@ -6,6 +6,7 @@ import type { Book } from "@/lib/bookstore-data";
 import { loadReadingProgress, saveReadingProgress } from "@/lib/reading-progress";
 import { markFinished, markReading, loadCompanionId } from "@/lib/bookroom-shelf";
 import { noteCoSessionProgress } from "@/lib/bookroom-sessions";
+import { getActiveReadingSkin, buildSkinCss } from "@/lib/bookroom-reading-skins";
 
 type Props = {
   book: Book;
@@ -52,6 +53,22 @@ export function MangaReaderView({ book, onBack }: Props) {
   // 打开漫画阅读器：标记为阅读中
   useEffect(() => {
     markReading(book.id);
+  }, [book.id]);
+
+  /* ── 阅读皮肤：注入 CSS 变量 ── */
+  useEffect(() => {
+    const skin = getActiveReadingSkin();
+    const styleId = "br-reading-skin-style";
+    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = skin ? buildSkinCss(skin) : "";
+    return () => {
+      if (styleEl) styleEl.textContent = "";
+    };
   }, [book.id]);
 
   // 离开 / 切后台时落盘一次最新进度
@@ -116,7 +133,7 @@ export function MangaReaderView({ book, onBack }: Props) {
   };
 
   return (
-    <div className="manga-view br-page">
+    <div className="manga-view br-page bookroom-reader-skin-root">
       <header className="manga-header">
         <button
           className="book-icon-btn book-pressable"

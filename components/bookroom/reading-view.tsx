@@ -24,6 +24,7 @@ import {
   type BookTtsStatus,
 } from "@/lib/bookroom-tts";
 import { BrToast } from "./bookroom-ui";
+import { getActiveReadingSkin, buildSkinCss } from "@/lib/bookroom-reading-skins";
 import {
   ReaderSelectionMenu,
   type ReaderMenuAction,
@@ -181,6 +182,22 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
   /* 打开阅读器：标记为阅读中 */
   useEffect(() => {
     markReading(book.id);
+  }, [book.id]);
+
+  /* ── 阅读皮肤：注入 CSS 变量 ── */
+  useEffect(() => {
+    const skin = getActiveReadingSkin();
+    const styleId = "br-reading-skin-style";
+    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = skin ? buildSkinCss(skin) : "";
+    return () => {
+      if (styleEl) styleEl.textContent = "";
+    };
   }, [book.id]);
 
   /* ── 进度：离开 / 切后台落盘 ── */
@@ -569,8 +586,23 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
   const canPrev = chapterIndex > 0;
   const canNext = chapterIndex < total - 1;
 
+  const activeSkin = getActiveReadingSkin();
+  const skinVars: React.CSSProperties = activeSkin
+    ? {
+        "--reader-font-family": activeSkin.typography.fontFamily,
+        "--reader-font-size": `${activeSkin.typography.fontSize}px`,
+        "--reader-font-weight": activeSkin.typography.fontWeight,
+        "--reader-letter-spacing": `${activeSkin.typography.letterSpacing}px`,
+        "--reader-line-height": activeSkin.typography.lineHeight,
+        "--reader-paragraph-spacing": `${activeSkin.typography.paragraphSpacing}em`,
+        "--reader-padding-x": `${activeSkin.typography.paddingHorizontal}px`,
+        "--reader-text-width": `${activeSkin.typography.textWidth}%`,
+        "--reader-text-align": activeSkin.typography.textAlign,
+      } as React.CSSProperties
+    : {};
+
   return (
-    <div className="reading-view br-page">
+    <div className="reading-view br-page bookroom-reader-skin-root" style={skinVars}>
       <header className="reading-header">
         <button className="book-icon-btn book-pressable" type="button" onClick={onBack} aria-label="返回书籍详情">
           <ChevronLeft size={22} strokeWidth={2} />
