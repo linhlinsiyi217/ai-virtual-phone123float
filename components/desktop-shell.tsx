@@ -9,7 +9,7 @@ import { startMomentsService, stopMomentsService } from "@/lib/moments-engine";
 import { bgTimerCleanup } from "@/lib/bg-timer";
 import { PhoneThemeApp } from "@/components/phone-theme-app";
 import { PhoneCharacterApp } from "@/components/phone-character-app";
-import { PhoneSettingsApp } from "@/components/phone-settings-app";
+import { PhoneSettingsApp } from "@/components/phone-settings-app-v2";
 import { PhoneChatApp } from "@/components/chat/phone-chat-app";
 import { PhonePlaceholderApp } from "@/components/phone-placeholder-app";
 import MusicApp from "@/components/music/music-app";
