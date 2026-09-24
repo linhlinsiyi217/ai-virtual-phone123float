@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookMarked, Check, ChevronLeft, Heart, MoonStar, Users } from "lucide-react";
+import { BookMarked, Check, ChevronLeft, ExternalLink, Heart, Loader2, MoonStar, Users } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import { getOverallPercent, loadReadingProgress } from "@/lib/reading-progress";
 import {
@@ -10,6 +10,7 @@ import {
   toggleFavoriteId,
   toggleShelfId,
 } from "@/lib/bookroom-shelf";
+import { fetchFullText } from "@/lib/bookroom/providers";
 import { BookCover } from "./book-card";
 
 type Props = {
@@ -25,16 +26,18 @@ type Props = {
 
 /**
  * 内容详情（普通书 / 漫画统一详情页）。
- * 工具入口按 IA 挂在这里：普通书「开始阅读 / 一起读 / 夜读设置」；
- * 漫画「开始看漫画 / 一起看漫画 / 陪伴设置」。本轮漫画阅读器仍占位。
+ * Phase 4A：支持在线来源结果（真实 metadata + access 状态 + 公版书全文获取）。
  */
 export function BookstoreDetail({ book, onBack, onStartReading, onCoRead, onNight }: Props) {
   const isManga = book.type === "manga";
   const hasChapters = (book.chapters?.length ?? 0) > 0;
+  const isExternal = book.source === "external" || Boolean(book.externalId);
+  const accessMode = book.access?.mode;
   const [inShelf, setInShelf] = useState(false);
   const [favorite, setFavorite] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [percent, setPercent] = useState(0);
+  const [fetchingText, setFetchingText] = useState(false);
 
   useEffect(() => {
     setPercent(getOverallPercent(book, loadReadingProgress(book.id)));
@@ -47,7 +50,7 @@ export function BookstoreDetail({ book, onBack, onStartReading, onCoRead, onNigh
     window.setTimeout(() => setHint(null), 1800);
   };
 
-  const handlePrimary = () => {
+  const handlePrimary = async () => {
     if (isManga) {
       if (book.pages?.length) {
         onStartReading(book);
@@ -56,11 +59,50 @@ export function BookstoreDetail({ book, onBack, onStartReading, onCoRead, onNigh
       showHint("漫画内容准备中");
       return;
     }
+
+    // 有本地章节 → 直接阅读
     if (hasChapters) {
       onStartReading(book);
       return;
     }
-    showHint("正文内容准备中");
+
+    // 在线公版书：尝试获取全文
+    if (isExternal && accessMode === "full" && book.externalId?.fullTextId) {
+      setFetchingText(true);
+      try {
+        const chapters = await fetchFullText(
+          book.externalId.provider,
+          book.externalId.fullTextId,
+        );
+        if (chapters && chapters.length > 0) {
+          // 将获取到的章节注入 book 对象
+          const bookWithChapters: Book = {
+            ...book,
+            chapters: chapters.map((ch, i) => ({
+              id: `ch-${i}`,
+              title: ch.title,
+              content: ch.content,
+            })),
+          };
+          onStartReading(bookWithChapters);
+          return;
+        }
+        showHint("未能获取到正文内容");
+      } catch {
+        showHint("正文加载失败，请稍后重试");
+      } finally {
+        setFetchingText(false);
+      }
+      return;
+    }
+
+    // 在线 preview / external → 打开外链
+    if (isExternal && (accessMode === "preview" || accessMode === "external") && book.access?.url) {
+      window.open(book.access.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    showHint("当前来源仅提供书籍资料");
   };
 
   const handleShelfToggle = () => {
@@ -77,13 +119,26 @@ export function BookstoreDetail({ book, onBack, onStartReading, onCoRead, onNigh
     showHint(next ? "已加入收藏" : "已取消收藏");
   };
 
-  const primaryLabel = isManga
-    ? percent > 0
-      ? "继续看"
-      : "开始看漫画"
-    : hasChapters && percent > 0
-      ? "继续阅读"
-      : "开始阅读";
+  // 按钮文案
+  let primaryLabel: string;
+  if (isManga) {
+    primaryLabel = percent > 0 ? "继续看" : "开始看漫画";
+  } else if (hasChapters) {
+    primaryLabel = percent > 0 ? "继续阅读" : "开始阅读";
+  } else if (fetchingText) {
+    primaryLabel = "正在获取正文…";
+  } else if (accessMode === "full" && book.externalId?.fullTextId) {
+    primaryLabel = "开始阅读";
+  } else if (accessMode === "preview") {
+    primaryLabel = "可预览";
+  } else if (accessMode === "external" && book.access?.url) {
+    primaryLabel = "前往来源";
+  } else {
+    primaryLabel = "仅提供书籍资料";
+  }
+
+  const canStartReading = hasChapters || (accessMode === "full" && Boolean(book.externalId?.fullTextId)) || (isManga && Boolean(book.pages?.length));
+  const canOpenExternal = (accessMode === "preview" || accessMode === "external") && Boolean(book.access?.url);
 
   return (
     <div className="br-page">
@@ -106,17 +161,48 @@ export function BookstoreDetail({ book, onBack, onStartReading, onCoRead, onNigh
               {!(isManga && book.category === "漫画") && (
                 <span className="book-card-tag">{book.category}</span>
               )}
+              {isExternal && book.externalId && (
+                <span className="book-card-source">{book.externalId.provider}</span>
+              )}
             </span>
+            {/* 在线出版信息 */}
+            {isExternal && (book.publisher || book.publishedDate || book.isbn) && (
+              <div className="br-detail-pubinfo">
+                {book.publisher && <span>{book.publisher}</span>}
+                {book.publishedDate && <span>{book.publishedDate}</span>}
+                {book.language && <span>{book.language.toUpperCase()}</span>}
+                {book.isbn && book.isbn[0] && <span>ISBN {book.isbn[0]}</span>}
+              </div>
+            )}
           </div>
         </div>
 
         <section className="book-section">
           <h2 className="book-section-title">简介</h2>
-          <p className="book-detail-desc">{book.description}</p>
+          <p className="book-detail-desc">
+            {book.description || "当前来源未提供简介。"}
+          </p>
         </section>
 
+        {/* access 状态提示 */}
+        {isExternal && !hasChapters && (
+          <div className="br-detail-access">
+            {accessMode === "full" && <span className="br-access-badge br-access-full">合法全文可读</span>}
+            {accessMode === "preview" && <span className="br-access-badge br-access-preview">可预览</span>}
+            {accessMode === "metadata-only" && <span className="br-access-badge br-access-meta">当前来源仅提供书籍资料</span>}
+            {accessMode === "external" && !canStartReading && <span className="br-access-badge br-access-external">可前往来源借阅</span>}
+          </div>
+        )}
+
         <div className="br-detail-actions">
-          <button type="button" className="book-cta br-detail-primary book-pressable" onClick={handlePrimary}>
+          <button
+            type="button"
+            className="book-cta br-detail-primary book-pressable"
+            onClick={handlePrimary}
+            disabled={fetchingText || (!canStartReading && !canOpenExternal)}
+          >
+            {fetchingText && <Loader2 size={15} strokeWidth={2} className="br-spin" />}
+            {canOpenExternal && !canStartReading && <ExternalLink size={15} strokeWidth={2} />}
             {primaryLabel}
           </button>
           <div className="br-detail-tool-row">

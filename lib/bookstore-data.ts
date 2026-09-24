@@ -25,8 +25,11 @@ export type MangaPage = {
 /** 内容类型：普通书 → 未来文字阅读器（自己读 / 一起读）；漫画 → 未来漫画阅读器（自己看 / 一起看漫画） */
 export type BookContentType = "book" | "manga";
 
-/** 内容来源：本地 / 内置 / 外部 Provider。Phase 1.2 仅字段预留，不建立 Provider 系统、不接 API。 */
+/** 内容来源：本地 / 内置 / 外部 Provider。Phase 1.2 仅字段预留，不接 API。 */
 export type BookContentSource = "local" | "builtin" | "external";
+
+/** 可读状态（Phase 4A）：决定详情页按钮文案与是否可进入 ReadingView */
+export type BookAccessMode = "full" | "preview" | "metadata-only" | "external";
 
 export type BookCoverTone =
   | "paper" // 奶白纸张
@@ -65,6 +68,17 @@ export type Book = {
   chapters?: BookChapter[];
   /** 漫画的本地 mock 分镜页（Phase 2B：纵向连续滚动阅读） */
   pages?: MangaPage[];
+  /** Phase 4A：在线结果真实封面 URL（有值时优先于 coverTone 渲染） */
+  coverUrl?: string;
+  /** Phase 4A：在线来源信息（provider 名 + provider 内部 ID + 全文标识） */
+  externalId?: { provider: string; id: string; fullTextId?: string };
+  /** Phase 4A：可读状态（在线结果用，决定按钮文案） */
+  access?: { mode: BookAccessMode; url?: string };
+  /** Phase 4A：出版信息（在线详情页展示） */
+  publishedDate?: string;
+  publisher?: string;
+  language?: string;
+  isbn?: string[];
 };
 
 export const MOCK_BOOKS: Book[] = [

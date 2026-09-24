@@ -154,6 +154,7 @@
   height: 44px;
   padding: 0 16px;
   border-radius: var(--book-radius-lg);
+  position: relative;
 }
 
 .book-search-icon {
@@ -3138,4 +3139,292 @@
   background: rgba(255, 255, 255, 0.85);
   color: var(--reading-ink);
   cursor: pointer;
+}
+
+/* ════════════════════════════════════════════════════════
+   Phase 4A — 真实联网搜索 + Provider 来源 + 搜索历史
+   ════════════════════════════════════════════════════════ */
+
+/* ── 搜索框清除按钮 ── */
+.bookroom-app .book-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--book-text-tertiary);
+  cursor: pointer;
+}
+
+/* ── 搜索历史下拉 ── */
+.bookroom-app .br-search-history {
+  position: relative;
+  margin: 0 0 12px;
+  padding: 6px 0;
+  border-radius: var(--book-radius-md);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px rgba(20, 20, 20, 0.06);
+}
+
+.bookroom-app .br-search-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 14px 6px;
+}
+
+.bookroom-app .br-search-history-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--book-text-tertiary);
+  letter-spacing: 0.05em;
+}
+
+.bookroom-app .br-search-history-clear {
+  border: none;
+  background: none;
+  font-size: 11px;
+  color: var(--book-text-tertiary);
+  cursor: pointer;
+}
+
+.bookroom-app .br-search-history-list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.bookroom-app .br-search-history-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.bookroom-app .br-search-history-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.bookroom-app .br-search-history-icon {
+  flex-shrink: 0;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-search-history-term {
+  flex: 1 1 0;
+  font-size: 13px;
+  color: var(--book-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookroom-app .br-search-history-del {
+  flex-shrink: 0;
+  color: var(--book-text-tertiary);
+  opacity: 0;
+  pointer-events: auto;
+}
+
+.bookroom-app .br-search-history-item:hover .br-search-history-del {
+  opacity: 0.6;
+}
+
+.bookroom-app .br-search-history-del:hover {
+  opacity: 1 !important;
+  color: #b05f57;
+}
+
+/* ── 在线结果区块 ── */
+.bookroom-app .br-online-section {
+  margin-top: 8px;
+}
+
+.bookroom-app .br-online-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--book-text-tertiary);
+  letter-spacing: 0.04em;
+}
+
+.bookroom-app .br-online-divider::before {
+  content: "";
+  flex: 0 0 12px;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.bookroom-app .br-online-divider::after {
+  content: "";
+  flex: 1 1 0;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.bookroom-app .br-online-loading {
+  font-weight: 400;
+  color: #6a92c6;
+}
+
+/* ── Provider 状态标签 ── */
+.bookroom-app .br-provider-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.bookroom-app .br-provider-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.bookroom-app .br-provider-ok {
+  background: rgba(80, 140, 100, 0.08);
+  color: #4a7a5a;
+  border-color: rgba(80, 140, 100, 0.16);
+}
+
+.bookroom-app .br-provider-error {
+  background: rgba(176, 95, 87, 0.08);
+  color: #9a554f;
+  border-color: rgba(176, 95, 87, 0.16);
+}
+
+.bookroom-app .br-provider-timeout {
+  background: rgba(180, 150, 80, 0.08);
+  color: #8a7444;
+  border-color: rgba(180, 150, 80, 0.16);
+}
+
+/* ── 搜索失败提示 ── */
+.bookroom-app .br-search-error {
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.bookroom-app .br-search-error p {
+  font-size: 13px;
+  color: var(--book-text-tertiary);
+}
+
+/* ── 真实封面 ── */
+.bookroom-app .book-cover-photo {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  border-radius: var(--book-radius-md);
+  overflow: hidden;
+  box-shadow:
+    0 10px 24px rgba(30, 28, 24, 0.13),
+    0 1px 3px rgba(30, 28, 24, 0.08);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.bookroom-app .book-cover-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ── 书卡来源标签 ── */
+.bookroom-app .book-card-source {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 500;
+  background: rgba(106, 146, 198, 0.1);
+  color: #5a7fa8;
+  letter-spacing: 0.02em;
+}
+
+/* ── 详情页出版信息 ── */
+.bookroom-app .br-detail-pubinfo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-detail-pubinfo span {
+  white-space: nowrap;
+}
+
+/* ── 详情页 access 状态 ── */
+.bookroom-app .br-detail-access {
+  margin: 0 0 16px;
+}
+
+.bookroom-app .br-access-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.bookroom-app .br-access-full {
+  background: rgba(80, 140, 100, 0.08);
+  color: #4a7a5a;
+  border-color: rgba(80, 140, 100, 0.16);
+}
+
+.bookroom-app .br-access-preview {
+  background: rgba(106, 146, 198, 0.08);
+  color: #5a7fa8;
+  border-color: rgba(106, 146, 198, 0.16);
+}
+
+.bookroom-app .br-access-meta {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--book-text-tertiary);
+}
+
+.bookroom-app .br-access-external {
+  background: rgba(180, 150, 80, 0.08);
+  color: #8a7444;
+  border-color: rgba(180, 150, 80, 0.16);
+}
+
+/* ── 加载动画 ── */
+.bookroom-app .br-spin {
+  animation: br-spin 800ms linear infinite;
+}
+
+@keyframes br-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bookroom-app .br-spin {
+    animation: none;
+  }
 }
