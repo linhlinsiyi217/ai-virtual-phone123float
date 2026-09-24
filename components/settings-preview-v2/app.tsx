@@ -10,13 +10,13 @@ export function SettingsPreviewApp() {
   const [page, setPage] = useState("main");
   const [search, setSearch] = useState("");
   
+  const [history, setHistory] = useState<string[]>([]);
+
   useEffect(() => {
     void hydrateKvDb().then(() => setReady(true));
   }, []);
 
   if (!ready) return <div className="sv2-loading">加载中...</div>;
-
-  const [history, setHistory] = useState<string[]>([]);
   const go = (next: string) => { setHistory(prev => [...prev, page]); setPage(next); };
   const back = () => { if (history.length) { setPage(history[history.length - 1]); setHistory(prev => prev.slice(0, -1)); } };
   
@@ -29,6 +29,8 @@ export function SettingsPreviewApp() {
             <IosCell label="主人设" onClick={() => go("identity")} />
             <IosCell label="外观与主题" onClick={() => go("theme")} />
             <IosCell label="资源库" onClick={() => go("resources")} />
+            <IosCell label="API 设置" onClick={() => go("api")} />
+            <IosCell label="语音 API" onClick={() => go("voice")} />
           </IosGroup>
         </>
       ) : (
