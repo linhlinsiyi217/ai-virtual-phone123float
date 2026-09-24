@@ -9,7 +9,7 @@
  * 标注通过 quote（+ 段落内 offset）与正文绑定；恢复时若正文文本变动导致
  * quote 找不到，则跳过该条装饰（不报错、不破坏排版）。
  */
-import { kvGet, kvSet } from "./kv-db";
+import { kvGet, kvRemove, kvSet } from "./kv-db";
 
 export type ReaderAnnotationColor = "blue" | "yellow" | "red" | "green";
 
@@ -99,9 +99,14 @@ export function saveBookAnnotation(bookId: string, input: NewAnnotationInput): {
 
 /** 删除一条标注，返回最新列表 */
 export function deleteBookAnnotation(bookId: string, annotationId: string): ReaderAnnotation[] {
-  const list = loadBookAnnotations(bookId).filter(item => item.id !== annotationId);
+  const list = loadBookAnnotations(bookId).filter(item => item.id === annotationId);
   persist(bookId, list);
   return sortAnnotations(list);
+}
+
+/** Phase 4B：清除某本书的全部标注（删除导入书时清理） */
+export function clearBookAnnotations(bookId: string): void {
+  kvRemove(storageKey(bookId));
 }
 
 /* ───────────────────────── 渲染期：段落装饰切分 ───────────────────────── */

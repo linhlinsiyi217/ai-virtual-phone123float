@@ -1,16 +1,39 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { BookPlus, Trash2 } from "lucide-react";
 import { MOCK_BOOKS, type Book, type BookCoverTone } from "@/lib/bookstore-data";
-import { getOverallPercent, listReadingProgress } from "@/lib/reading-progress";
+import { deleteReadingProgress, getOverallPercent, listReadingProgress } from "@/lib/reading-progress";
 import { loadFavoriteIds, loadShelfIds } from "@/lib/bookroom-shelf";
+import { clearBookAnnotations } from "@/lib/bookroom-annotations";
+import {
+  deleteImportedBook,
+  getImportedBookMeta,
+  getImportedBookWithChapters,
+  listImportedBooks,
+} from "@/lib/bookroom-import";
 import { BookCard, BookCover } from "@/components/bookstore/book-card";
 import { Segmented } from "./bookroom-ui";
+import { ImportSheet } from "./import-sheet";
 
 type Props = {
   onOpenBook: (book: Book) => void;
   onContinue: (book: Book) => void;
 };
+
+/** 由 id 查找书籍：内置 mock 优先，回退到导入书 meta */
+function findBookById(id: string, imported: Book[]): Book | undefined {
+  return MOCK_BOOKS.find(item => item.id === id) ?? imported.find(item => item.id === id);
+}
+
+/** 格式化导入时间 */
+function formatImportedAt(ts?: number): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const m = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
 
 type ShelfMode = "cover" | "spine";
 
@@ -72,6 +95,99 @@ function ShelfBoard({ books, onOpen }: { books: Book[]; onOpen: (book: Book) => 
   );
 }
 
+/** 导入书条目：封面 + 格式标签 + 导入时间 + 进度 + 删除 */
+function ImportedItem({
+  book,
+  onOpen,
+  onDelete,
+}: {
+  book: Book;
+  onOpen: (book: Book) => void;
+  onDelete: (book: Book) => void;
+}) {
+  const fmt = book.importInfo?.format?.toUpperCase();
+  const date = formatImportedAt(book.importInfo?.importedAt);
+  const progress = book.progress ?? 0;
+  return (
+    <div className="br-imported-item">
+      <button
+        type="button"
+        className="br-imported-cover book-pressable"
+        onClick={() => onOpen(book)}
+        aria-label={`打开《${book.title}》`}
+      >
+        <BookCover book={book} />
+      </button>
+      <div className="br-imported-meta">
+        <span className="br-imported-title">{book.title}</span>
+        <span className="br-imported-sub">
+          {book.author}
+        </span>
+        <div className="br-imported-tags">
+          {fmt && <span className="br-imported-fmt">{fmt}</span>}
+          {date && <span className="br-imported-date">{date}</span>}
+        </div>
+        {progress > 0 && (
+          <div className="book-progress">
+            <div className="book-progress-track">
+              <div className="book-progress-fill" style={{ width: `${progress}%` }} />
+            </div>
+            <span className="book-progress-num">{progress}%</span>
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        className="br-imported-del book-pressable"
+        onClick={() => onDelete(book)}
+        aria-label={`删除《${book.title}》`}
+      >
+        <Trash2 size={14} strokeWidth={1.8} />
+      </button>
+    </div>
+  );
+}
+
+/** 已导入区块内容（spine / cover 共用） */
+function ImportedSection({
+  books,
+  onOpen,
+  onDelete,
+  onImport,
+}: {
+  books: Book[];
+  onOpen: (book: Book) => void;
+  onDelete: (book: Book) => void;
+  onImport: () => void;
+}) {
+  return (
+    <ShelfSection title="已导入" count={books.length}>
+      {books.length > 0 ? (
+        <div className="br-imported-list">
+          {books.map(book => (
+            <ImportedItem
+              key={book.id}
+              book={book}
+              onOpen={onOpen}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="br-shelf-import book-glass book-pressable"
+          onClick={onImport}
+        >
+          <BookPlus size={18} strokeWidth={1.9} />
+          <span>导入书籍</span>
+          <span className="br-shelf-import-sub">支持 TXT / EPUB / PDF</span>
+        </button>
+      )}
+    </ShelfSection>
+  );
+}
+
 function ShelfSection({
   title,
   count,
@@ -101,31 +217,44 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
   const [mode, setMode] = useState<ShelfMode>("spine");
   const [continueInfo, setContinueInfo] = useState<ContinueInfo | null>(null);
   const [recent, setRecent] = useState<Book[]>([]);
+  const [imported, setImported] = useState<Book[]>([]);
+  const [importOpen, setImportOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Book | null>(null);
 
   const shelfIds = useMemo(loadShelfIds, []);
   const favoriteIds = useMemo(loadFavoriteIds, []);
 
+  const refreshImported = () => setImported(listImportedBooks());
+
   useEffect(() => {
+    refreshImported();
     const records = listReadingProgress();
     const recentBooks: Book[] = [];
     for (const record of records) {
-      const book = MOCK_BOOKS.find(item => item.id === record.bookId);
+      const book = findBookById(record.bookId, []);
       if (book && !recentBooks.some(item => item.id === book.id)) recentBooks.push(book);
       if (recentBooks.length >= 6) break;
     }
     setRecent(recentBooks);
 
     for (const record of records) {
-      const book = MOCK_BOOKS.find(
-        item => item.id === record.bookId && (item.chapters?.length || item.pages?.length)
-      );
-      if (book) {
+      const book = findBookById(record.bookId, imported);
+      if (book && (book.chapters?.length || book.pages?.length)) {
         setContinueInfo({ book, percent: getOverallPercent(book, record) });
+        return;
+      }
+    }
+    // 导入书虽无内置 chapters（meta 不含），但有解析数据，继续阅读仍可识别
+    for (const record of records) {
+      const meta = getImportedBookMeta(record.bookId);
+      if (meta) {
+        setContinueInfo({ book: meta, percent: getOverallPercent(meta, record) });
         return;
       }
     }
     const fallback = MOCK_BOOKS.find(book => typeof book.progress === "number") ?? null;
     setContinueInfo(fallback ? { book: fallback, percent: fallback.progress ?? 0 } : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const inShelf = (book: Book) => shelfIds.has(book.id) || Boolean(book.inShelf);
@@ -134,8 +263,42 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
   const favorites = MOCK_BOOKS.filter(book => favoriteIds.has(book.id));
 
   const handleContinueClick = (info: ContinueInfo) => {
+    // 导入书：加载章节后进入阅读
+    if (info.book.source === "imported") {
+      const full = getImportedBookWithChapters(info.book.id);
+      if (full && full.chapters?.length) {
+        onContinue(full);
+        return;
+      }
+      onOpenBook(info.book);
+      return;
+    }
     if (info.book.chapters?.length || info.book.pages?.length) onContinue(info.book);
     else onOpenBook(info.book);
+  };
+
+  /** 打开导入书：先加载章节（meta 不含正文），再进详情 */
+  const openImported = (book: Book) => {
+    const full = getImportedBookWithChapters(book.id);
+    if (full && full.chapters?.length) onOpenBook(full);
+    else onOpenBook(book);
+  };
+
+  /** 确认删除导入书：清解析数据 + 进度 + 标注；不删原文件 */
+  const handleDeleteImported = (book: Book) => {
+    deleteImportedBook(book.id);
+    deleteReadingProgress(book.id);
+    clearBookAnnotations(book.id);
+    setDeleteTarget(null);
+    refreshImported();
+  };
+
+  const handleImported = (book: Book) => {
+    refreshImported();
+    setImportOpen(false);
+    // 自动跳转到该书详情（已含章节）
+    const full = getImportedBookWithChapters(book.id);
+    onOpenBook(full ?? book);
   };
 
   return (
@@ -174,7 +337,7 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
         </section>
       )}
 
-      {/* 视图切换 */}
+      {/* 视图切换 + 导入入口 */}
       <section className="book-section br-shelf-switch-row">
         <Segmented<ShelfMode>
           ariaLabel="书架视图切换"
@@ -185,6 +348,15 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
             { value: "cover", label: "封面" },
           ]}
         />
+        <button
+          type="button"
+          className="br-shelf-import-entry book-pressable"
+          onClick={() => setImportOpen(true)}
+          aria-label="导入书籍"
+        >
+          <BookPlus size={15} strokeWidth={2} />
+          <span>导入</span>
+        </button>
       </section>
 
       {mode === "spine" ? (
@@ -215,12 +387,12 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
               <p className="book-empty">在详情页点亮爱心，喜欢的书会收在这里。</p>
             )}
           </ShelfSection>
-          <ShelfSection title="已导入">
-            <div className="br-shelf-import book-glass">
-              <span>暂无导入内容</span>
-              <span className="br-shelf-import-sub">EPUB / TXT 导入将在后续版本开放</span>
-            </div>
-          </ShelfSection>
+          <ImportedSection
+            books={imported}
+            onOpen={openImported}
+            onDelete={setDeleteTarget}
+            onImport={() => setImportOpen(true)}
+          />
         </>
       ) : (
         <>
@@ -254,7 +426,57 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
               ))}
             </div>
           </ShelfSection>
+          <ImportedSection
+            books={imported}
+            onOpen={openImported}
+            onDelete={setDeleteTarget}
+            onImport={() => setImportOpen(true)}
+          />
         </>
+      )}
+
+      {/* 导入半弹窗 */}
+      {importOpen && (
+        <ImportSheet
+          onClose={() => setImportOpen(false)}
+          onImported={handleImported}
+        />
+      )}
+
+      {/* 删除导入书确认 */}
+      {deleteTarget && (
+        <div className="br-del-confirm" role="dialog" aria-modal="true" aria-label="删除导入书">
+          <button
+            type="button"
+            className="br-sheet-scrim"
+            onClick={() => setDeleteTarget(null)}
+            tabIndex={-1}
+          />
+          <div className="br-del-confirm-panel book-glass">
+            <h3 className="br-del-confirm-title">移除《{deleteTarget.title}》</h3>
+            <p className="br-del-confirm-text">
+              将从书架移除并清除解析内容、阅读进度与标注。
+              <br />
+              这不会删除你设备上的原文件。
+            </p>
+            <div className="br-del-confirm-actions">
+              <button
+                type="button"
+                className="br-quiet-btn book-pressable"
+                onClick={() => setDeleteTarget(null)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="br-del-confirm-yes book-pressable"
+                onClick={() => handleDeleteImported(deleteTarget)}
+              >
+                移除
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <footer className="book-footer">BOOKROOM · SHELF</footer>

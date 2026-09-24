@@ -3,7 +3,7 @@
  * 复用项目现有 kv-db（localStorage 封装），不引入新数据库。
  * key 前缀与旧 ReadingApp（reading-*）隔离，互不影响。
  */
-import { kvGet, kvKeysWithPrefix, kvSet } from "./kv-db";
+import { kvGet, kvKeysWithPrefix, kvRemove, kvSet } from "./kv-db";
 import type { Book } from "./bookstore-data";
 
 export type ReadingProgress = {
@@ -84,6 +84,11 @@ export function listReadingProgress(): ReadingProgress[] {
     }
   }
   return result.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+}
+
+/** Phase 4B：删除某本书的阅读进度（删除导入书时清理） */
+export function deleteReadingProgress(bookId: string): void {
+  kvRemove(storageKey(bookId));
 }
 
 /**

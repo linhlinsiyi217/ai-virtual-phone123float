@@ -3026,6 +3026,213 @@
 .bookroom-app .reader-ann-item[data-color="red"] { border-left-color: rgba(192, 102, 96, 0.7); }
 .bookroom-app .reader-ann-item[data-color="green"] { border-left-color: rgba(104, 150, 112, 0.72); }
 
+/* ───────────────────────── Phase 4B：导入书籍 ───────────────────────── */
+
+/* 书架顶部「导入」入口按钮 */
+.bookroom-app .br-shelf-import-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  color: #151515;
+  font-size: 13px;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+.bookroom-app .br-shelf-import-entry:active { transform: scale(0.96); }
+
+/* 已导入区块空态按钮 */
+.bookroom-app .br-shelf-import {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 16px;
+  border-radius: 18px;
+  border: 1px dashed rgba(0, 0, 0, 0.14);
+  color: #6e6e73;
+  font-size: 14px;
+}
+.bookroom-app .br-shelf-import span:first-of-type { color: #151515; font-weight: 600; }
+.bookroom-app .br-shelf-import-sub { font-size: 12px; color: #9a9a9f; }
+
+/* 导入列表与条目 */
+.bookroom-app .br-imported-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bookroom-app .br-imported-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  background: rgba(255, 255, 255, 0.62);
+}
+.bookroom-app .br-imported-cover {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 58px;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.bookroom-app .br-imported-cover .book-cover,
+.bookroom-app .br-imported-cover .book-cover-photo { width: 100%; height: 100%; }
+.bookroom-app .br-imported-meta {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.bookroom-app .br-imported-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #151515;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bookroom-app .br-imported-sub { font-size: 12px; color: #6e6e73; }
+.bookroom-app .br-imported-tags { display: flex; gap: 8px; align-items: center; margin-top: 2px; }
+.bookroom-app .br-imported-fmt {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(86, 128, 186, 0.12);
+  color: #3d5a80;
+}
+.bookroom-app .br-imported-date { font-size: 11px; color: #9a9a9f; }
+.bookroom-app .br-imported-del {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #6e6e73;
+  border: 1px solid transparent;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.bookroom-app .br-imported-del:hover { background: rgba(192, 102, 96, 0.1); color: #c06660; }
+
+/* 导入半弹窗 */
+.bookroom-app .br-import-input { display: none; }
+.bookroom-app .br-import-section { display: flex; flex-direction: column; gap: 14px; }
+.bookroom-app .br-import-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 16px;
+  border-radius: 18px;
+  border: 1px dashed rgba(0, 0, 0, 0.16);
+  background: rgba(255, 255, 255, 0.5);
+  color: #151515;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+.bookroom-app .br-import-pick:active { transform: scale(0.98); background: rgba(255, 255, 255, 0.75); }
+.bookroom-app .br-import-pick-title { font-size: 15px; font-weight: 600; }
+.bookroom-app .br-import-pick-sub { font-size: 12px; color: #9a9a9f; }
+.bookroom-app .br-import-warn,
+.bookroom-app .br-import-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+.bookroom-app .br-import-warn { color: #8a6d3b; background: rgba(196, 162, 72, 0.1); }
+.bookroom-app .br-import-error { color: #b04a44; background: rgba(192, 102, 96, 0.1); }
+.bookroom-app .br-import-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.bookroom-app .br-import-progress-text { font-size: 14px; color: #151515; }
+.bookroom-app .br-import-progress-fmt {
+  margin-left: auto;
+  font-size: 11px;
+  color: #9a9a9f;
+  letter-spacing: 0.04em;
+}
+.bookroom-app .br-import-done {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(104, 150, 112, 0.1);
+}
+.bookroom-app .br-import-done-title { font-size: 14px; font-weight: 600; color: #151515; }
+.bookroom-app .br-import-done-sub { font-size: 12px; color: #6e6e73; }
+.bookroom-app .br-import-done-icon { color: #689670; }
+.bookroom-app .br-import-dup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 14px;
+  border-radius: 14px;
+  background: rgba(196, 162, 72, 0.1);
+}
+.bookroom-app .br-import-dup-icon { color: #c0a248; }
+.bookroom-app .br-import-dup-text { font-size: 14px; color: #151515; }
+.bookroom-app .br-import-dup-actions { display: flex; gap: 10px; }
+.bookroom-app .br-import-dup-actions .br-sheet-primary { flex: 1; }
+.bookroom-app .br-import-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #9a9a9f;
+}
+
+/* 删除导入书确认弹窗 */
+.bookroom-app .br-del-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.bookroom-app .br-del-confirm-panel {
+  width: min(320px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+.bookroom-app .br-del-confirm-title { font-size: 16px; font-weight: 600; color: #151515; }
+.bookroom-app .br-del-confirm-text { font-size: 13px; line-height: 1.6; color: #6e6e73; }
+.bookroom-app .br-del-confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.bookroom-app .br-del-confirm-yes {
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(192, 102, 96, 0.12);
+  color: #b04a44;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .bookroom-app .reader-ann-main {
   flex: 1 1 auto;
   min-width: 0;

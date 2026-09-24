@@ -58,6 +58,7 @@ export function BookCard({ book, onOpen, showCategory = true }: BookCardProps) {
     // 漫画的分类通常也叫「漫画」，此时只保留内容类型标签，避免重复
     const showCategoryTag = showCategory && !(isManga && book.category === "漫画");
     const isExternal = book.source === "external" || Boolean(book.externalId);
+    const isImported = book.source === "imported" && Boolean(book.importInfo);
     return (
         <button
             type="button"
@@ -68,12 +69,17 @@ export function BookCard({ book, onOpen, showCategory = true }: BookCardProps) {
             <BookCover book={book} />
             <span className="book-card-title">{book.title}</span>
             <span className="book-card-author">{book.author}</span>
-            {(isManga || showCategoryTag || isExternal) && (
+            {(isManga || showCategoryTag || isExternal || isImported) && (
                 <span className="book-card-tags">
                     {isManga && <span className="book-card-kind">漫画</span>}
                     {showCategoryTag && <span className="book-card-tag">{book.category}</span>}
                     {isExternal && book.externalId && (
                         <span className="book-card-source">{book.externalId.provider}</span>
+                    )}
+                    {isImported && book.importInfo && (
+                        <span className="book-card-source">
+                            {book.importInfo.format.toUpperCase()}
+                        </span>
                     )}
                 </span>
             )}

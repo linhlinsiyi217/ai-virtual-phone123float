@@ -32,6 +32,7 @@ export function BookstoreDetail({ book, onBack, onStartReading, onCoRead, onNigh
   const isManga = book.type === "manga";
   const hasChapters = (book.chapters?.length ?? 0) > 0;
   const isExternal = book.source === "external" || Boolean(book.externalId);
+  const isImported = book.source === "imported" && Boolean(book.importInfo);
   const accessMode = book.access?.mode;
   const [inShelf, setInShelf] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -172,6 +173,20 @@ export function BookstoreDetail({ book, onBack, onStartReading, onCoRead, onNigh
                 {book.publishedDate && <span>{book.publishedDate}</span>}
                 {book.language && <span>{book.language.toUpperCase()}</span>}
                 {book.isbn && book.isbn[0] && <span>ISBN {book.isbn[0]}</span>}
+              </div>
+            )}
+            {/* 导入书信息 */}
+            {isImported && book.importInfo && (
+              <div className="br-detail-pubinfo">
+                <span>{book.importInfo.format.toUpperCase()}</span>
+                <span>
+                  {new Date(book.importInfo.importedAt).toLocaleDateString("zh-CN")}
+                </span>
+                {typeof book.importInfo.fileSize === "number" && (
+                  <span>
+                    {(book.importInfo.fileSize / 1024 / 1024).toFixed(1)} MB
+                  </span>
+                )}
               </div>
             )}
           </div>

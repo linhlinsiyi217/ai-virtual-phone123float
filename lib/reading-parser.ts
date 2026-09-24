@@ -41,6 +41,8 @@ export type ParsedBook = {
     title: string;
     author?: string;
     chapters: ParsedChapter[];
+    /** Phase 4B：EPUB 内嵌封面（data URL），无则 undefined */
+    coverDataUrl?: string;
 };
 
 export type TxtDecodeResult = {
@@ -357,6 +359,57 @@ function splitParagraphs(lines: string[], mode: TxtParagraphMode = "auto"): stri
 
 // ── EPUB Parsing ──
 
+/** Phase 4B：从 OPF/manifest 提取 EPUB 内嵌封面为 data URL。
+ *  优先级：EPUB3 properties="cover-image" → EPUB2 <meta name="cover"> → manifest 中 id 含 cover 的图片项。
+ *  找不到返回 undefined（调用方回退到占位封面）。 */
+async function extractEpubCover(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    zip: any,
+    opfXml: string,
+    rootDir: string,
+    idToHref: Map<string, string>,
+): Promise<string | undefined> {
+    const MIME_BY_EXT: Record<string, string> = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+        ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
+    };
+
+    const findCoverId = (): string | null => {
+        // EPUB3: <item ... properties="cover-image" .../>
+        const propsMatch = opfXml.match(/<item\b[^>]*\bproperties="[^"]*cover-image[^"]*"[^>]*\bid="([^"]+)"/i)
+            || opfXml.match(/<item\b[^>]*\bid="([^"]+)"[^>]*\bproperties="[^"]*cover-image[^"]*"/i);
+        if (propsMatch) return propsMatch[1];
+        // EPUB2: <meta name="cover" content="coverImageId"/>
+        const metaMatch = opfXml.match(/<meta\b[^>]*\bname="cover"[^>]*\bcontent="([^"]+)"/i);
+        if (metaMatch) return metaMatch[1];
+        // 兜底：manifest 中 id 含 cover 且为图片
+        const itemPattern = /<item\b[^>]*\bid="([^"]+)"[^>]*\bmedia-type="image\/[^"]+"[^>]*>/gi;
+        let m;
+        while ((m = itemPattern.exec(opfXml)) !== null) {
+            if (/cover/i.test(m[1])) return m[1];
+        }
+        return null;
+    };
+
+    const coverId = findCoverId();
+    if (!coverId) return undefined;
+    const href = idToHref.get(coverId);
+    if (!href) return undefined;
+
+    const filePath = rootDir + decodeURIComponent(href);
+    const file = zip.file(filePath);
+    if (!file) return undefined;
+
+    const ext = (filePath.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+    const mime = MIME_BY_EXT[ext] || "image/jpeg";
+    try {
+        const b64 = await file.async("base64");
+        return `data:${mime};base64,${b64}`;
+    } catch {
+        return undefined;
+    }
+}
+
 /**
  * Parse EPUB file into chapters and paragraphs.
  * EPUB is a ZIP containing XHTML files.
@@ -424,7 +477,8 @@ export async function parseEpubFile(arrayBuffer: ArrayBuffer, fileName?: string)
         return { title: bookTitle, author, chapters: [{ title: "全文", paragraphs: ["（EPUB 解析失败，未找到文本内容）"] }] };
     }
 
-    return { title: bookTitle, author, chapters };
+    const coverDataUrl = await extractEpubCover(zip, opfXml, rootDir, idToHref);
+    return { title: bookTitle, author, chapters, coverDataUrl };
 }
 
 /** Extract readable text from HTML/XHTML content. */

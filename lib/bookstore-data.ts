@@ -25,8 +25,16 @@ export type MangaPage = {
 /** 内容类型：普通书 → 未来文字阅读器（自己读 / 一起读）；漫画 → 未来漫画阅读器（自己看 / 一起看漫画） */
 export type BookContentType = "book" | "manga";
 
-/** 内容来源：本地 / 内置 / 外部 Provider。Phase 1.2 仅字段预留，不接 API。 */
-export type BookContentSource = "local" | "builtin" | "external";
+/** 内容来源：本地 / 内置 / 外部 Provider / 用户导入。Phase 1.2 仅字段预留，不接 API。 */
+export type BookContentSource = "local" | "builtin" | "external" | "imported";
+
+/** Phase 4B：导入书籍来源信息（TXT/EPUB/PDF） */
+export type BookImportInfo = {
+  format: "txt" | "epub" | "pdf";
+  fileName: string;
+  fileSize?: number;
+  importedAt: number;
+};
 
 /** 可读状态（Phase 4A）：决定详情页按钮文案与是否可进入 ReadingView */
 export type BookAccessMode = "full" | "preview" | "metadata-only" | "external";
@@ -79,6 +87,8 @@ export type Book = {
   publisher?: string;
   language?: string;
   isbn?: string[];
+  /** Phase 4B：导入书籍来源信息（格式 / 文件名 / 大小 / 导入时间） */
+  importInfo?: BookImportInfo;
 };
 
 export const MOCK_BOOKS: Book[] = [
