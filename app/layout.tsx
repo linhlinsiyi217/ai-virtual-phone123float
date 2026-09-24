@@ -46,6 +46,13 @@ export default function RootLayout({
         <ChatPluginBootstrap />
         <ChatReasoningVisibilityController />
         {children}
+        <script dangerouslySetInnerHTML={{ __html: `
+  window.addEventListener('ai-message', function(e) {
+    if (window.MyApp && window.MyApp.showIsland) {
+      window.MyApp.showIsland(e.detail);
+    }
+  });
+`}} />
       </body>
     </html>
   );
