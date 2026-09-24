@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo } from "react";
-import { ChevronRight, Search, X } from "lucide-react";
+import { useState, useCallback, useMemo, type ReactNode } from "react";
+import { ChevronRight, Search } from "lucide-react";
 import { SettingsNavigationContext, GLASS_STYLES } from "./nav-shell";
 
 export function SettingsShellV2({ 

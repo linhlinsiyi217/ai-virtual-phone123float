@@ -2,6 +2,8 @@ import { useContext } from "react";
 import { SettingsNavigationContext, GLASS_STYLES } from "./nav-shell";
 import { ChevronRight } from "lucide-react";
 
+import { type ReactNode } from "react";
+
 export function SettingsListGroup({ title, children }: { title?: string, children: ReactNode }) {
     return (
         <div className="mb-6">
