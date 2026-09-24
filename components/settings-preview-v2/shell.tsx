@@ -4,53 +4,35 @@ import { SettingsNavigationContext, GLASS_STYLES } from "./nav-shell";
 
 export function SettingsShellV2({ 
     children, 
-    initialTitle = "设置" 
+    title,
+    rightAction,
+    onBack,
 }: { 
     children: ReactNode; 
-    initialTitle?: string 
+    title: string;
+    rightAction?: ReactNode;
+    onBack?: () => void;
 }) {
-    const [stack, setStack] = useState([{ page: "main", title: initialTitle }]);
-    const [rightActions, setRightActions] = useState<Record<string, ReactNode>>({});
-
-    const push = useCallback((page: string, title?: string) => {
-        setStack(prev => [...prev, { page, title: title || "" }]);
-        window.dispatchEvent(new CustomEvent("settings-nav-v2", { detail: { page } }));
-    }, []);
-
-    const pop = useCallback(() => {
-        if (stack.length > 1) {
-            setStack(prev => {
-                const next = prev.slice(0, -1);
-                window.dispatchEvent(new CustomEvent("settings-nav-v2", { detail: { page: null } }));
-                return next;
-            });
-        }
-    }, [stack]);
-
-    const active = stack[stack.length - 1];
-    const isMain = active.page === "main";
+    // 简化逻辑：状态下移至由 SettingsContext 统一管理
+    const isMain = !onBack;
 
     return (
-        <SettingsNavigationContext.Provider value={{ 
-            push, pop, 
-            setRightAction: (action) => setRightActions(p => ({ ...p, [active.page]: action })) 
-        }}>
-            <div className="flex flex-col h-full bg-[var(--c-page-body-bg)] font-sans">
-                {/* 顶部大标题栏 */}
-                <header className={GLASS_STYLES.nav + " px-4 py-4"}>
-                    <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold tracking-tight text-[var(--c-text-title)]">
-                            {active.title}
-                        </h1>
-                        {rightActions[active.page]}
-                    </div>
-                    {!isMain && (
-                        <button onClick={pop} className="mt-2 flex items-center text-[var(--c-icon)] active:opacity-70">
-                            <ChevronRight className="rotate-180 mr-1" size={16} />
-                            返回
-                        </button>
-                    )}
-                </header>
+        <div className="flex flex-col h-full bg-[var(--c-page-body-bg)] font-sans">
+            {/* 顶部大标题栏 */}
+            <header className={GLASS_STYLES.nav + " px-4 py-4"}>
+                <div className="flex items-center justify-between">
+                    <h1 className="text-2xl font-bold tracking-tight text-[var(--c-text-title)]">
+                        {title}
+                    </h1>
+                    {rightAction}
+                </div>
+                {!isMain && (
+                    <button onClick={onBack} className="mt-2 flex items-center text-[var(--c-icon)] active:opacity-70">
+                        <ChevronRight className="rotate-180 mr-1" size={16} />
+                        返回
+                    </button>
+                )}
+            </header>
 
                 {/* 搜索栏 */}
                 {isMain && (

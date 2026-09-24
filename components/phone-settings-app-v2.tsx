@@ -35,15 +35,35 @@ export function PhoneSettingsApp({ onClose, onNotice }: { onClose: () => void, o
     const [title, setTitle] = useState<string | null>(null);
     const [overrideBack, setOverrideBack] = useState<(() => void) | null>(null);
     const [rightActions, setRightActions] = useState<Record<string, ReactNode>>({});
+    const [currentPageId, setCurrentPageId] = useState<string | null>(null);
 
     const setSubpageRightAction = useCallback((page: string, action: ReactNode | null) => {
         setRightActions(prev => ({ ...prev, [page]: action }));
     }, []);
 
+    const handleBack = useCallback(() => {
+        if (overrideBack) {
+            overrideBack();
+        } else {
+            setCurrentPageId(null);
+            setTitle(null);
+            setOverrideBack(null);
+        }
+    }, [overrideBack]);
+
     return (
         <SettingsContext.Provider value={{ setSubpageTitle: setTitle, setOverrideBack, setSubpageRightAction }}>
-            <SettingsShellV2 initialTitle={title || "设置"}>
-                <PhoneSettingsContent onClose={onClose} onNotice={onNotice} rightActions={rightActions} />
+            <SettingsShellV2
+                title={title || "设置"}
+                rightAction={currentPageId ? rightActions[currentPageId] : undefined}
+                onBack={currentPageId ? handleBack : undefined}
+            >
+                <PhoneSettingsContent 
+                    onClose={onClose} 
+                    onNotice={onNotice} 
+                    currentPageId={currentPageId}
+                    setCurrentPageId={setCurrentPageId}
+                />
             </SettingsShellV2>
         </SettingsContext.Provider>
     );
@@ -74,15 +94,8 @@ function SubpageRenderer({ pageId, onNotice }: { pageId: string, onNotice: (msg:
     return renderSubPage(pageId);
 }
 
-function PhoneSettingsContent({ onClose, onNotice, rightActions }: { onClose: () => void, onNotice: (msg: string) => void, rightActions: Record<string, ReactNode> }) {
+function PhoneSettingsContent({ onClose, onNotice, currentPageId, setCurrentPageId }: { onClose: () => void, onNotice: (msg: string) => void, currentPageId: string | null, setCurrentPageId: (id: string | null) => void }) {
     const { push } = useContext(SettingsNavigationContext);
-    const [currentPageId, setCurrentPageId] = useState<string | null>(null);
-
-    useEffect(() => {
-        const handleNav = (e: any) => setCurrentPageId(e.detail?.page || null);
-        window.addEventListener("settings-nav-v2", handleNav);
-        return () => window.removeEventListener("settings-nav-v2", handleNav);
-    }, []);
 
     if (currentPageId) return <SubpageRenderer pageId={currentPageId} onNotice={onNotice} />;
 
