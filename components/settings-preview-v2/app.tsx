@@ -16,13 +16,24 @@ export function SettingsPreviewApp() {
 
   if (!ready) return <div className="sv2-loading">加载中...</div>;
 
+  const [history, setHistory] = useState<string[]>([]);
+  const go = (next: string) => { setHistory(prev => [...prev, page]); setPage(next); };
+  const back = () => { if (history.length) { setPage(history[history.length - 1]); setHistory(prev => prev.slice(0, -1)); } };
+  
   return (
-    <PageShell title={page === "main" ? "设置" : "预览"}>
-      <SearchBox value={search} onChange={e => setSearch(e.target.value)} onClear={() => setSearch("")} />
-      <IosGroup>
-        <IosCell label="主人设" onClick={() => setPage("identity")} />
-      </IosGroup>
-      <div className="sv2-empty"><strong>{page}</strong><span>页面接入中</span></div>
+    <PageShell title={page === "main" ? "设置" : page} onBack={page !== "main" ? back : undefined}>
+      {page === "main" ? (
+        <>
+          <SearchBox value={search} onChange={e => setSearch(e.target.value)} onClear={() => setSearch("")} />
+          <IosGroup>
+            <IosCell label="主人设" onClick={() => go("identity")} />
+            <IosCell label="外观与主题" onClick={() => go("theme")} />
+            <IosCell label="资源库" onClick={() => go("resources")} />
+          </IosGroup>
+        </>
+      ) : (
+        <div className="sv2-empty"><strong>{page}</strong><span>接入中</span></div>
+      )}
     </PageShell>
   );
 }
