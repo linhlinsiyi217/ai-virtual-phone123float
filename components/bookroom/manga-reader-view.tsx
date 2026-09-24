@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, SlidersHorizontal } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import { loadReadingProgress, saveReadingProgress } from "@/lib/reading-progress";
-import { markFinished, markReading } from "@/lib/bookroom-shelf";
+import { markFinished, markReading, loadCompanionId } from "@/lib/bookroom-shelf";
+import { noteCoSessionProgress } from "@/lib/bookroom-sessions";
 
 type Props = {
   book: Book;
@@ -41,6 +42,11 @@ export function MangaReaderView({ book, onBack }: Props) {
     });
     // 完成判定：整卷滚动接近底部 → 标记已读
     if (fraction >= 0.98) markFinished(book.id);
+    // 共读会话联动：页变化 / 进度推进同步到当前陪读角色的进行中会话（内部节流）
+    noteCoSessionProgress(loadCompanionId() ?? "", book.id, {
+      pageIndex: stateRef.current.pageIndex,
+      progress: Math.round(fraction * 100),
+    });
   };
 
   // 打开漫画阅读器：标记为阅读中

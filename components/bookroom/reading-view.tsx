@@ -5,6 +5,7 @@ import { Bookmark, ChevronLeft, ChevronRight, MoonStar } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import { loadReadingProgress, saveReadingProgress, getOverallPercent } from "@/lib/reading-progress";
 import { markFinished, markReading } from "@/lib/bookroom-shelf";
+import { noteCoSessionProgress } from "@/lib/bookroom-sessions";
 import {
   loadBookAnnotations,
   saveBookAnnotation,
@@ -165,10 +166,16 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
   const persist = useCallback((index: number, fraction: number) => {
     const clamped = Math.min(1, Math.max(0, fraction));
     saveReadingProgress({ bookId: book.id, chapterIndex: index, scrollProgress: clamped });
+    const overall = getOverallPercent(book, { bookId: book.id, chapterIndex: index, scrollProgress: clamped });
     // 完成判定：最后一章且滚动接近底部 → 标记已读
-    if (getOverallPercent(book, { bookId: book.id, chapterIndex: index, scrollProgress: clamped }) >= 100) {
+    if (overall >= 100) {
       markFinished(book.id);
     }
+    // 共读会话联动：章节变化 / 进度推进同步到当前陪读角色的进行中会话（内部节流）
+    noteCoSessionProgress(loadCompanionId() ?? "", book.id, {
+      chapterIndex: index,
+      progress: overall,
+    });
   }, [book]);
 
   /* 打开阅读器：标记为阅读中 */

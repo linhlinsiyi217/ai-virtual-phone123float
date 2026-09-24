@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import { BookstoreHome } from "@/components/bookstore/bookstore-app";
 import { BookstoreDetail } from "@/components/bookstore/bookstore-detail";
-import { loadCompanionId, saveCompanionId } from "@/lib/bookroom-shelf";
+import { loadCompanionId, resolveShelfBook, saveCompanionId } from "@/lib/bookroom-shelf";
 import { resolveCompanionRoles, type CompanionRole } from "@/lib/bookroom-mock";
+import type { CoReadingSession } from "@/lib/bookroom-sessions";
 import { BookroomDock, type BookroomTab } from "./bookroom-dock";
 import { BookshelfView } from "./bookshelf-view";
 import { WritingDeskView } from "./writing-desk-view";
 import { MineView } from "./mine-view";
 import { StatsView } from "./stats-view";
+import { CoReadingHistoryView } from "./co-reading-history-view";
 import { RoleSwitcherDrawer } from "./role-switcher-drawer";
 import { NightReadingSheet } from "./night-reading-sheet";
 import { CoReadingChatSheet } from "./co-reading-chat-sheet";
@@ -46,17 +48,23 @@ export default function BookRoomApp({ onClose }: Props) {
   const [activeBook, setActiveBook] = useState<Book | null>(null);
   const [readingBook, setReadingBook] = useState<Book | null>(null);
 
-  // 我的 → 统计
+  // 我的 → 统计 / 共读记录
   const [statsOpen, setStatsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
-  // 角色与浮层
-  const roles = useMemo<CompanionRole[]>(resolveCompanionRoles, []);
+  // 角色与浮层（角色列表实时重读真源：改名 / 换头像 / 删除后自动同步）
+  const [roles, setRoles] = useState<CompanionRole[]>(() => resolveCompanionRoles());
   const [companionId, setCompanionId] = useState<string>(() => loadCompanionId() ?? "");
   const [roleDrawerOpen, setRoleDrawerOpen] = useState(false);
   const [nightTarget, setNightTarget] = useState<{ book: Book; mode: "night" | "companion" } | null>(null);
   const [coTarget, setCoTarget] = useState<{ book: Book; initialAsk?: string } | null>(null);
   const [colorTab, setColorTab] = useState<ColorTab>("grid");
   const [colorOpen, setColorOpen] = useState(false);
+
+  // 角色相关界面打开时重新解析 canonical 角色卡，保证显示为最新版本
+  useEffect(() => {
+    setRoles(resolveCompanionRoles());
+  }, [roleDrawerOpen, coTarget !== null, historyOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 启动画面（静态结构 + 轻柔进出）
   const [splashFading, setSplashFading] = useState(false);
@@ -80,6 +88,26 @@ export default function BookRoomApp({ onClose }: Props) {
 
   const openNight = (book: Book) => {
     setNightTarget({ book, mode: book.type === "manga" ? "companion" : "night" });
+  };
+
+  /** 共读记录 → 继续共读：切到该角色并打开共读聊天层（聊天层会自动继续未结束会话） */
+  const handleResumeCoRead = (session: CoReadingSession) => {
+    const book = resolveShelfBook(session.bookId, { withContent: true });
+    if (!book) return;
+    setCompanionId(session.roleId);
+    saveCompanionId(session.roleId);
+    setHistoryOpen(false);
+    setCoTarget({ book });
+  };
+
+  /** 共读记录 → 回到阅读位置：有正文进阅读器；仅 metadata 快照（在线书）回详情页 */
+  const handleBackToReading = (session: CoReadingSession) => {
+    const book = resolveShelfBook(session.bookId, { withContent: true });
+    if (!book) return;
+    setHistoryOpen(false);
+    const hasContent = (book.chapters?.length ?? 0) > 0 || (book.pages?.length ?? 0) > 0;
+    if (hasContent) setReadingBook(book);
+    else setActiveBook(book);
   };
 
   const meta = TAB_META[tab];
@@ -107,6 +135,12 @@ export default function BookRoomApp({ onClose }: Props) {
           onStartReading={book => setReadingBook(book)}
           onCoRead={book => setCoTarget({ book })}
           onNight={openNight}
+        />
+      ) : historyOpen ? (
+        <CoReadingHistoryView
+          onBack={() => setHistoryOpen(false)}
+          onResumeCoRead={handleResumeCoRead}
+          onBackToReading={handleBackToReading}
         />
       ) : statsOpen ? (
         <StatsView onBack={() => setStatsOpen(false)} />
@@ -154,6 +188,7 @@ export default function BookRoomApp({ onClose }: Props) {
                 role={companion}
                 onOpenRoles={() => setRoleDrawerOpen(true)}
                 onOpenStats={() => setStatsOpen(true)}
+                onOpenHistory={() => setHistoryOpen(true)}
                 onOpenColor={tabName => {
                   setColorTab(tabName);
                   setColorOpen(true);

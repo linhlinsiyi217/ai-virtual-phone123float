@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Heart,
   Layers,
+  MessageCircleHeart,
   Palette,
   Quote,
 } from "lucide-react";
@@ -20,9 +21,11 @@ type Props = {
   onOpenRoles: () => void;
   onOpenStats: () => void;
   onOpenColor: (tab: "grid" | "spectrum" | "sliders") => void;
+  onOpenHistory: () => void;
 };
 
 const MENU_ITEMS = [
+  { id: "cohist", label: "共读记录", desc: "与 TA 一起读过的书与漫画", icon: MessageCircleHeart, action: "cohist" as const },
   { id: "stats", label: "统计", desc: "阅读时长、文档、翻页与字数", icon: ChartColumn, action: "stats" as const },
   { id: "appearance", label: "外观调试", desc: "卡片、玻璃质感与明暗", icon: Palette, action: "sliders" as const },
   { id: "color", label: "颜色调试", desc: "格线 / 光谱 / 滑杆", icon: Layers, action: "grid" as const },
@@ -30,11 +33,12 @@ const MENU_ITEMS = [
 
 /**
  * 我的页：个人主页化（非设置页）——头像 / 昵称 / @id / 简介 / 标签 /
- * 当前陪读角色 / 收藏语录 / 统计与外观入口。
+ * 当前陪读角色 / 收藏语录 / 共读记录与统计与外观入口。
  */
-export function MineView({ role, onOpenRoles, onOpenStats, onOpenColor }: Props) {
-  const handleMenu = (action: "stats" | "grid" | "spectrum" | "sliders") => {
-    if (action === "stats") onOpenStats();
+export function MineView({ role, onOpenRoles, onOpenStats, onOpenColor, onOpenHistory }: Props) {
+  const handleMenu = (action: "cohist" | "stats" | "grid" | "spectrum" | "sliders") => {
+    if (action === "cohist") onOpenHistory();
+    else if (action === "stats") onOpenStats();
     else onOpenColor(action);
   };
 

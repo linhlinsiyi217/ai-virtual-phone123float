@@ -3900,3 +3900,214 @@
   height: 4px;
 }
 .bookroom-app .book-progress-sm .book-progress-num { display: none; }
+
+/* ═══════════════ Phase 5B：共读记录 ═══════════════ */
+
+.bookroom-app .br-cohist-appbar-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--book-text-primary);
+  text-align: center;
+}
+.bookroom-app .br-cohist-count {
+  font-size: 11px;
+  color: var(--book-text-tertiary);
+}
+
+/* 状态徽章 */
+.bookroom-app .br-cohist-status {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--book-text-tertiary);
+}
+.bookroom-app .br-cohist-status.is-active {
+  background: rgba(90, 120, 160, 0.14);
+  color: #4a648a;
+}
+.bookroom-app .br-cohist-status.is-finished {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--book-text-tertiary);
+}
+
+/* 列表 */
+.bookroom-app .br-cohist-avatar {
+  width: 38px;
+  height: 38px;
+  font-size: 14px;
+}
+.bookroom-app .br-cohist-kind {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 10px;
+  color: var(--book-text-tertiary);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  padding: 1px 4px;
+  vertical-align: 1px;
+}
+.bookroom-app .br-cohist-removed {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 10px;
+  color: #b04a44;
+}
+
+/* 空状态 */
+.bookroom-app .br-cohist-empty {
+  margin-top: 80px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--book-text-secondary);
+}
+.bookroom-app .br-cohist-empty-sub {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--book-text-tertiary);
+}
+
+/* 详情卡 */
+.bookroom-app .br-cohist-hero {
+  padding: 16px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bookroom-app .br-cohist-hero-role {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.bookroom-app .br-cohist-hero-book {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bookroom-app .br-cohist-book-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--book-text-primary);
+}
+.bookroom-app .br-cohist-book-sub {
+  font-size: 11px;
+  color: var(--book-text-tertiary);
+}
+.bookroom-app .br-cohist-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bookroom-app .br-cohist-progress-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+.bookroom-app .br-cohist-progress-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(90, 120, 160, 0.55);
+}
+.bookroom-app .br-cohist-progress-num {
+  font-size: 11px;
+  color: var(--book-text-secondary);
+  min-width: 32px;
+  text-align: right;
+}
+.bookroom-app .br-cohist-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  margin: 0;
+}
+.bookroom-app .br-cohist-facts > div {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+}
+.bookroom-app .br-cohist-facts dt {
+  color: var(--book-text-tertiary);
+}
+.bookroom-app .br-cohist-facts dd {
+  margin: 0;
+  color: var(--book-text-secondary);
+}
+.bookroom-app .br-cohist-summary {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.03);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--book-text-secondary);
+}
+
+/* 最近互动 / 记忆 */
+.bookroom-app .br-cohist-msgs {
+  padding: 12px 14px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bookroom-app .br-cohist-msg {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--book-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.bookroom-app .br-cohist-msg b {
+  color: var(--book-text-primary);
+  font-weight: 600;
+  margin-right: 6px;
+}
+.bookroom-app .br-cohist-msg.is-mine b { color: #4a648a; }
+.bookroom-app .br-cohist-none {
+  margin: 0;
+  font-size: 12px;
+  color: var(--book-text-tertiary);
+  text-align: center;
+  padding: 8px 0;
+}
+
+/* 详情操作 */
+.bookroom-app .br-cohist-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bookroom-app .br-cohist-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+  font-size: 13px;
+  color: var(--book-text-primary);
+  cursor: pointer;
+}
+.bookroom-app .br-cohist-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.bookroom-app .br-cohist-action.is-danger {
+  color: #b04a44;
+}

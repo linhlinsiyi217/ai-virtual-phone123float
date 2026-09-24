@@ -17,7 +17,8 @@
  *   bookroom-companion:v1              → 当前陪读角色 id
  */
 import { kvGet, kvKeysWithPrefix, kvRemove, kvSet } from "./kv-db";
-import type { Book } from "./bookstore-data";
+import { MOCK_BOOKS, type Book } from "./bookstore-data";
+import { getImportedBookMeta, getImportedBookWithChapters } from "./bookroom-import";
 
 const ENTRY_PREFIX = "bookroom-shelf-entry:v1:";
 const COLLECTIONS_KEY = "bookroom-shelf-collections:v1";
@@ -364,4 +365,20 @@ export function loadFavoriteIds(): Set<string> {
 export function toggleFavoriteId(bookId: string, favorite: boolean): Set<string> {
   toggleFavorite(bookId, favorite);
   return loadFavoriteIds();
+}
+
+/* ───────────────────────── 统一书籍解析（书架 / 共读记录共用） ───────────────────────── */
+
+/**
+ * 由 bookId 解析 Book：builtin → MOCK_BOOKS；imported → kv-db；online → metadata 快照。
+ * 默认不加载导入书正文（列表性能）；withContent=true 时才读取完整章节（进入阅读器前）。
+ */
+export function resolveShelfBook(bookId: string, opts?: { withContent?: boolean }): Book | null {
+  const builtin = MOCK_BOOKS.find(b => b.id === bookId);
+  if (builtin) return builtin;
+  const imported = opts?.withContent
+    ? getImportedBookWithChapters(bookId) ?? getImportedBookMeta(bookId)
+    : getImportedBookMeta(bookId);
+  if (imported) return imported;
+  return getOnlineSnapshot(bookId);
 }

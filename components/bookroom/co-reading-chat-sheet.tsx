@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, MessageCircleHeart, Send, Sparkles } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
-import { isRealCompanionRole, type CompanionRole } from "@/lib/bookroom-mock";
+import { isRealCompanionRole, resolveRoleDisplayById, type CompanionRole } from "@/lib/bookroom-mock";
 import {
   buildBookRoomContentRef,
   buildBookRoomGreeting,
@@ -17,6 +17,12 @@ import {
   loadCoSession,
   type CoSessionMessage,
 } from "@/lib/bookroom-co-session";
+import {
+  startOrResumeCoSession,
+  syncCoSessionMessageCount,
+  pauseCoSession,
+  type CoReadingSession,
+} from "@/lib/bookroom-sessions";
 import { BottomSheet } from "./bookroom-ui";
 
 type Props = {
@@ -55,14 +61,21 @@ function friendlyError(error: unknown): string {
 }
 
 /**
- * 共读 / 共看半弹层（Phase 3A）：接入 Float 真实角色 AI。
- * - 角色 / 人设 / 世界书 / 记忆 / Provider 全部复用 Float 现有系统；
- * - 会话历史走 kv-db（短期），值得保留的事件才写长期记忆；
+ * 共读 / 共看半弹层（Phase 3A 接入真实 AI，Phase 5B 接入共读会话记录）。
+ * - 角色显示实时解析 canonical 角色卡：改名 / 换头像后自动反映最新；
+ * - 打开（真实角色）即开始 / 继续 CoReadingSession，关闭即暂停；
+ * - 会话历史走 kv-db（短期），值得保留的事件才写长期记忆（带 sessionId 关联）；
  * - 仅在用户主动发送 / 问 TA / 陪伴反馈时请求 AI，不做每页自动发言。
  */
 export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk, onClose }: Props) {
   const contentRef = useMemo(() => buildBookRoomContentRef(book), [book]);
   const roleReady = isRealCompanionRole(role.id);
+  // 角色显示永远实时读真源；role prop 仅作为 id 入口
+  const display = resolveRoleDisplayById(role.id);
+
+  const [session, setSession] = useState<CoReadingSession | null>(null);
+  const sessionRef = useRef<CoReadingSession | null>(null);
+  sessionRef.current = session;
 
   const [messages, setMessages] = useState<UiMessage[]>(() => {
     const existing = loadCoSession(role.id, book.id);
@@ -70,7 +83,7 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
     // 本地开场白（非 AI 请求），落盘以保持上下文连续
     return appendCoSessionMessage(role.id, book.id, {
       role: "assistant",
-      content: buildBookRoomGreeting(role.name, contentRef),
+      content: buildBookRoomGreeting(display.name, contentRef),
     });
   });
   const [draft, setDraft] = useState("");
@@ -83,6 +96,35 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
   const sendingRef = useRef(false);
   const timerRef = useRef<number | null>(null);
   const initialAskFiredRef = useRef(false);
+
+  // 打开共读层：真实角色才开始 / 继续共读会话；关闭层 = 暂停会话（下次优先继续）
+  useEffect(() => {
+    if (!isRealCompanionRole(role.id)) return;
+    const { session: started, resumed } = startOrResumeCoSession(role.id, book, {
+      chapterIndex: contentRef.chapterIndex,
+      pageIndex: contentRef.pageIndex,
+      progress: contentRef.progressPercent,
+    });
+    setSession(started);
+    if (resumed) flashHint("已继续上次的共读");
+    return () => {
+      pauseCoSession(started.id);
+    };
+    // 仅在挂载时执行一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role.id, book.id]);
+
+  // 会话消息数同步到 CoReadingSession（消息本体仍在 bookroom-co-session）
+  useEffect(() => {
+    const current = sessionRef.current;
+    if (!current) return;
+    syncCoSessionMessageCount(
+      current.id,
+      messages.length,
+      contentRef.currentExcerpt || contentRef.pageCaption || undefined,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -150,6 +192,7 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
           kind: notable.kind,
           summary: notable.summary,
           importance: notable.importance,
+          sessionId: sessionRef.current?.id,
         }).catch(() => undefined);
       }
     } catch (requestError) {
@@ -214,11 +257,11 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
     >
       <div className="br-chat-head">
         <span className="br-chat-avatar">
-          {role.avatar ? <img src={role.avatar} alt="" /> : role.name.slice(0, 1)}
+          {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
         </span>
         <span className="br-chat-who">
-          <span className="br-chat-name">{role.name}</span>
-          <span className="br-chat-sub">{role.subtitle}</span>
+          <span className="br-chat-name">{display.name}</span>
+          <span className="br-chat-sub">{display.subtitle}</span>
         </span>
         <span className="br-chat-state">
           <span className={`br-role-dot ${sending ? "br-role-dot-online" : "br-role-dot-reading"}`} />
@@ -236,7 +279,7 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
             <div key={message.id} className={`br-chat-row ${mine ? "is-mine" : ""}`}>
               {!mine && (
                 <span className="br-chat-bubble-avatar">
-                  {role.avatar ? <img src={role.avatar} alt="" /> : role.name.slice(0, 1)}
+                  {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
                 </span>
               )}
               <span className="br-chat-bubble">{message.content}</span>
@@ -247,7 +290,7 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
         {sending && (
           <div className="br-chat-row">
             <span className="br-chat-bubble-avatar">
-              {role.avatar ? <img src={role.avatar} alt="" /> : role.name.slice(0, 1)}
+              {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
             </span>
             <span className="br-chat-bubble br-chat-bubble-typing" aria-label="对方正在输入">
               <i />
@@ -260,7 +303,7 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
         {error && (
           <div className="br-chat-row">
             <span className="br-chat-bubble-avatar">
-              {role.avatar ? <img src={role.avatar} alt="" /> : role.name.slice(0, 1)}
+              {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
             </span>
             <span className="br-chat-error">
               <span className="br-chat-error-text">{error.message}</span>

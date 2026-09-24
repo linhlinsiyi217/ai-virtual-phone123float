@@ -439,6 +439,8 @@ export type RecordBookroomMemoryInput = {
   kind: BookRoomMemoryKind;
   summary: string;
   importance: number;
+  /** 关联的共读会话，便于日后按会话恢复上下文 */
+  sessionId?: string;
 };
 
 /**
@@ -464,6 +466,8 @@ export async function recordBookroomMemoryEvent(input: RecordBookroomMemoryInput
       title: input.content.title,
       chapterIndex: input.content.chapterIndex,
       pageIndex: input.content.pageIndex,
+      roleId: input.roleId,
+      sessionId: input.sessionId,
     },
   };
   await saveMemoryEntry(entry);
