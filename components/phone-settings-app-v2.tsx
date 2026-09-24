@@ -1,7 +1,11 @@
 "use client";
 
-import { useContext, useState, useEffect, useLayoutEffect, useCallback, useRef, type ReactNode } from "react";
-import { HardDrive, Mic, Image, Fingerprint, Globe, Database, Layers, Link2, CloudUpload, MessageSquare, Wrench, Laptop, UserCircle, Info, SlidersHorizontal, ChevronRight, Search } from "lucide-react";
+import { useState, useContext, useEffect, useLayoutEffect, useCallback, useRef, createContext, type CSSProperties, type ReactNode } from "react";
+import { ChevronRight, Search, X, HardDrive, Mic, Image, Fingerprint, Globe, Database, Layers, Link2, CloudUpload, MessageSquare, Wrench, Laptop, UserCircle, Info, SlidersHorizontal, Check, Loader2, LogOut, KeyRound } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/modal";
+import { useAccount } from "@/lib/account-context";
+import { isSelfHostedModeEnabled } from "@/lib/self-hosting";
+import { changeAccountPassword } from "@/lib/account-client";
 import { ApiSettings } from "./settings/api-settings";
 import { VoiceSettings } from "./settings/voice-settings";
 import { ImageGenerationSettings } from "./settings/image-generation-settings";
@@ -15,10 +19,22 @@ import { BindingManager } from "./settings/binding-manager";
 import { WeixinSettings } from "./settings/weixin-settings";
 import { CloudServicesPage } from "./settings/cloud-services-setup";
 import { ToolboxSettings } from "./settings/toolbox-settings";
+import { ModerationCenter } from "./settings/moderation-center";
 import { AgentComputerSettings } from "./settings/agent-computer-settings";
+import { fetchIsAdmin } from "@/lib/moderation-client";
+import { loadChatAppSettings, saveChatAppSettings } from "@/lib/chat-storage";
+import { loadKeepAlive, saveKeepAlive } from "@/lib/weixin-storage";
+import { BINDING_ACCENTS, CONTENT_APP_ACCENTS } from "@/lib/ui-accent-colors";
+import { Toggle } from "./ui/form";
 import { SettingsShellV2 } from "./settings-preview-v2/shell";
 import { SettingsListGroup, SettingsListItem } from "./settings-preview-v2/controls";
 import { SettingsNavigationContext } from "./settings-preview-v2/nav-shell";
+
+export const SettingsContext = createContext<{
+    setSubpageTitle: (title: string | null) => void;
+    setOverrideBack: (action: (() => void) | null) => void;
+    setSubpageRightAction: (page: string, action: ReactNode | null) => void;
+}>({ setSubpageTitle: () => { }, setOverrideBack: () => { }, setSubpageRightAction: () => { } });
 
 export function PhoneSettingsApp({ onClose, onNotice }: { onClose: () => void, onNotice: (msg: string) => void }) {
     return (
@@ -26,6 +42,31 @@ export function PhoneSettingsApp({ onClose, onNotice }: { onClose: () => void, o
             <PhoneSettingsContent onClose={onClose} onNotice={onNotice} />
         </SettingsShellV2>
     );
+}
+
+// 实际需要一个包装器来渲染当前子页
+function SubpageRenderer({ pageId, onNotice }: { pageId: string, onNotice: (msg: string) => void }) {
+    const renderSubPage = (pageId: string) => {
+        switch (pageId) {
+            case "api": return <ApiSettings />;
+            case "voice": return <VoiceSettings />;
+            case "imageGeneration": return <ImageGenerationSettings />;
+            case "presets": return <PresetManager isActive />;
+            case "worldbook": return <WorldBookManager isActive />;
+            case "regex": return <RegexManager isActive />;
+            case "data": return <DataManagement onNotice={onNotice} />;
+            case "binding": return <BindingManager />;
+            case "cloud": return <CloudServicesPage />;
+            case "weixin": return <WeixinSettings onOpenCloudServices={() => {}} />;
+            case "toolbox": return <ToolboxSettings />;
+            case "agentComputer": return <AgentComputerSettings onNotice={onNotice} />;
+            case "moderation": return <ModerationCenter onNotice={onNotice} />;
+            case "identity": return <UserIdentitySettings />;
+            case "about": return <AboutDeclaration />;
+            default: return null;
+        }
+    };
+    return renderSubPage(pageId);
 }
 
 function PhoneSettingsContent({ onClose, onNotice }: { onClose: () => void, onNotice: (msg: string) => void }) {
@@ -39,30 +80,25 @@ function PhoneSettingsContent({ onClose, onNotice }: { onClose: () => void, onNo
         return () => window.removeEventListener("settings-nav-v2", handleNav);
     }, []);
 
-    const renderSubPage = (pageId: string) => {
-        switch (pageId) {
-            case "api": return <ApiSettings />;
-            case "voice": return <VoiceSettings />;
-            case "imageGeneration": return <ImageGenerationSettings />;
-            case "presets": return <PresetManager isActive />;
-            case "worldbook": return <WorldBookManager isActive />;
-            case "regex": return <RegexManager isActive />;
-            case "data": return <DataManagement onNotice={onNotice} />;
-            case "binding": return <BindingManager />;
-            case "cloud": return <CloudServicesPage />;
-            case "weixin": return <WeixinSettings onOpenCloudServices={() => push("cloud", "云服务部署")} />;
-            case "toolbox": return <ToolboxSettings />;
-            case "agentComputer": return <AgentComputerSettings onNotice={onNotice} />;
-            case "identity": return <UserIdentitySettings />;
-            case "about": return <AboutDeclaration />;
-            default: return null;
-        }
-    };
-
-    if (currentPageId) return renderSubPage(currentPageId);
+    if (currentPageId) return <SubpageRenderer pageId={currentPageId} onNotice={onNotice} />;
 
     return (
         <>
+            {!isSelfHostedModeEnabled() && (
+                <div className="mb-6 bg-[var(--c-card)]/70 backdrop-blur-md rounded-2xl border border-[var(--c-card-border)] overflow-hidden shadow-sm">
+                    <button className="flex items-center w-full px-4 py-4 active:bg-black/5" onClick={() => {}}>
+                        <div className="w-12 h-12 rounded-full bg-[var(--c-card-border)] flex items-center justify-center mr-4">
+                            <UserCircle size={24} />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <div className="text-[17px] font-semibold">账号管理</div>
+                            <div className="text-sm text-[var(--c-icon)]">点击查看账号设置</div>
+                        </div>
+                        <ChevronRight size={20} className="text-[var(--c-icon)]" />
+                    </button>
+                </div>
+            )}
+
             <SettingsListGroup title="AI 与生成">
                 <SettingsListItem icon={HardDrive} label="API 设置" onClick={() => { setCurrentPageId("api"); push("api", "API 设置"); }} />
                 <SettingsListItem icon={Mic} label="语音 API" onClick={() => { setCurrentPageId("voice"); push("voice", "语音 API"); }} />
