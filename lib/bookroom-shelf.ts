@@ -19,6 +19,7 @@
 import { kvGet, kvKeysWithPrefix, kvRemove, kvSet } from "./kv-db";
 import { MOCK_BOOKS, type Book } from "./bookstore-data";
 import { getImportedBookMeta, getImportedBookWithChapters } from "./bookroom-import";
+import { getGeneratedBook } from "./bookroom-writing";
 
 const ENTRY_PREFIX = "bookroom-shelf-entry:v1:";
 const COLLECTIONS_KEY = "bookroom-shelf-collections:v1";
@@ -32,7 +33,7 @@ const COMPANION_KEY = "bookroom-companion:v1";
 
 export type ShelfStatus = "unread" | "reading" | "finished" | "paused";
 
-export type ShelfSource = "builtin" | "imported" | "online";
+export type ShelfSource = "builtin" | "imported" | "online" | "generated";
 
 export type BookshelfEntry = {
   bookId: string;
@@ -380,5 +381,7 @@ export function resolveShelfBook(bookId: string, opts?: { withContent?: boolean 
     ? getImportedBookWithChapters(bookId) ?? getImportedBookMeta(bookId)
     : getImportedBookMeta(bookId);
   if (imported) return imported;
+  const generated = getGeneratedBook(bookId, opts?.withContent);
+  if (generated) return generated;
   return getOnlineSnapshot(bookId);
 }

@@ -11,6 +11,8 @@ import type { CoReadingSession } from "@/lib/bookroom-sessions";
 import { BookroomDock, type BookroomTab } from "./bookroom-dock";
 import { BookshelfView } from "./bookshelf-view";
 import { WritingDeskView } from "./writing-desk-view";
+import { WritingCreateSheet } from "./writing-create-sheet";
+import { WritingProjectView } from "./writing-project-view";
 import { MineView } from "./mine-view";
 import { StatsView } from "./stats-view";
 import { CoReadingHistoryView } from "./co-reading-history-view";
@@ -60,6 +62,9 @@ export default function BookRoomApp({ onClose }: Props) {
   const [coTarget, setCoTarget] = useState<{ book: Book; initialAsk?: string } | null>(null);
   const [colorTab, setColorTab] = useState<ColorTab>("grid");
   const [colorOpen, setColorOpen] = useState(false);
+
+  // 书桌（Phase 6A）
+  const [writingProjectId, setWritingProjectId] = useState<string | null>(null);
 
   // 角色相关界面打开时重新解析 canonical 角色卡，保证显示为最新版本
   useEffect(() => {
@@ -144,6 +149,11 @@ export default function BookRoomApp({ onClose }: Props) {
         />
       ) : statsOpen ? (
         <StatsView onBack={() => setStatsOpen(false)} />
+      ) : writingProjectId ? (
+        <WritingProjectView
+          projectId={writingProjectId}
+          onBack={() => setWritingProjectId(null)}
+        />
       ) : (
         <div className="br-page">
           <header className="book-header br-header">
@@ -182,7 +192,11 @@ export default function BookRoomApp({ onClose }: Props) {
               />
             )}
             {tab === "store" && <BookstoreHome onOpenBook={setActiveBook} />}
-            {tab === "desk" && <WritingDeskView />}
+            {tab === "desk" && (
+              <WritingDeskView
+                onOpenProject={id => setWritingProjectId(id)}
+              />
+            )}
             {tab === "mine" && (
               <MineView
                 role={companion}
@@ -235,6 +249,13 @@ export default function BookRoomApp({ onClose }: Props) {
 
       {colorOpen && (
         <ColorTuningSheet initialTab={colorTab} onClose={() => setColorOpen(false)} />
+      )}
+
+      {writingProjectId === "new" && (
+        <WritingCreateSheet
+          onClose={() => setWritingProjectId(null)}
+          onCreated={id => setWritingProjectId(id)}
+        />
       )}
 
       {/* 启动画面：最后渲染，覆盖一切 */}

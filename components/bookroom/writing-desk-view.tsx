@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronRight,
   Feather,
   FolderOpen,
   Layers,
   PenLine,
+  Plus,
   Sparkles,
   Users,
 } from "lucide-react";
-import { MOCK_DRAFTS } from "@/lib/bookroom-mock";
+import { listWritingProjects, type WritingProject } from "@/lib/bookroom-writing";
 import { BrToast } from "./bookroom-ui";
 
 const TOOLS = [
@@ -20,16 +21,31 @@ const TOOLS = [
   { id: "archive", label: "故事档案", desc: "人设、记忆与素材归档", icon: FolderOpen },
 ] as const;
 
+type Props = {
+  onOpenProject: (projectId: string) => void;
+};
+
 /**
- * 书桌页：自己写书 / AI 灵感 / 角色写书 / 章节管理 / 故事档案。
- * 本轮只完成视觉壳层与本地草稿 mock，不接 AI 写作逻辑。
+ * 书桌首页：新建作品 / 最近作品 / 草稿 / 已完成。
+ * Phase 6A：接入真实 WritingProject 数据，替换 mock 草稿。
  */
-export function WritingDeskView() {
+export function WritingDeskView({ onOpenProject }: Props) {
+  const [projects, setProjects] = useState<WritingProject[]>([]);
   const [hint, setHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    setProjects(listWritingProjects());
+  }, []);
+
   const flash = (text: string) => {
     setHint(text);
     window.setTimeout(() => setHint(null), 1800);
   };
+
+  const drafts = projects.filter(p => p.status === "draft");
+  const writing = projects.filter(p => p.status === "writing");
+  const finished = projects.filter(p => p.status === "finished");
+  const recent = [...projects].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 3);
 
   return (
     <>
@@ -37,7 +53,7 @@ export function WritingDeskView() {
         <button
           type="button"
           className="br-write-hero book-glass book-pressable"
-          onClick={() => flash("写作功能将在下一阶段开放")}
+          onClick={() => onOpenProject("new")}
         >
           <span className="br-write-hero-icon" aria-hidden>
             <Feather size={22} strokeWidth={1.8} />
@@ -60,7 +76,7 @@ export function WritingDeskView() {
                 key={tool.id}
                 type="button"
                 className="br-list-row book-pressable"
-                onClick={() => flash(`${tool.label}将在下一阶段接入`)}
+                onClick={() => flash(`${tool.label}将在后续阶段接入`)}
               >
                 <span className="br-list-icon" aria-hidden>
                   <Icon size={17} strokeWidth={1.9} />
@@ -76,32 +92,56 @@ export function WritingDeskView() {
         </div>
       </section>
 
-      <section className="book-section">
-        <div className="book-section-head">
-          <h2 className="book-section-title">草稿与档案</h2>
-          <span className="book-section-more">{MOCK_DRAFTS.length} 篇</span>
-        </div>
-        <div className="br-draft-list">
-          {MOCK_DRAFTS.map(draft => (
+      {recent.length > 0 && (
+        <section className="book-section">
+          <div className="book-section-head">
+            <h2 className="book-section-title">最近作品</h2>
+            <span className="book-section-more">{projects.length} 部</span>
+          </div>
+          <div className="br-draft-list">
+            {recent.map(project => (
+              <button
+                key={project.id}
+                type="button"
+                className="br-draft book-glass book-pressable"
+                onClick={() => onOpenProject(project.id)}
+              >
+                <span className="br-draft-head">
+                  <span className="br-draft-title">{project.title}</span>
+                  <span className={`br-draft-kind is-${project.status}`}>
+                    {project.status === "draft" ? "草稿" : project.status === "writing" ? "写作中" : "已完成"}
+                  </span>
+                </span>
+                <span className="br-draft-excerpt">
+                  {project.synopsis || "暂无简介"}
+                </span>
+                <span className="br-draft-meta">
+                  <PenLine size={11} strokeWidth={2} />
+                  {project.chapters.length} 章 · 更新于 {new Date(project.updatedAt).toLocaleDateString("zh-CN")}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {recent.length === 0 && (
+        <section className="book-section">
+          <div className="br-writing-empty book-glass">
+            <Feather size={28} strokeWidth={1.6} />
+            <p>还没有作品</p>
+            <p className="br-writing-empty-desc">从一句话开始，创建你的第一部 AI 写作工程</p>
             <button
-              key={draft.id}
               type="button"
-              className="br-draft book-glass book-pressable"
-              onClick={() => flash("章节编辑器将在下一阶段开放")}
+              className="br-writing-empty-btn book-pressable"
+              onClick={() => onOpenProject("new")}
             >
-              <span className="br-draft-head">
-                <span className="br-draft-title">{draft.title}</span>
-                <span className="br-draft-kind">{draft.kind}</span>
-              </span>
-              <span className="br-draft-excerpt">{draft.excerpt}</span>
-              <span className="br-draft-meta">
-                <PenLine size={11} strokeWidth={2} />
-                {draft.words.toLocaleString()} 字 · {draft.updated}
-              </span>
+              <Plus size={16} strokeWidth={2} />
+              新建作品
             </button>
-          ))}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       <footer className="book-footer">BOOKROOM · DESK</footer>
       <BrToast text={hint} />
