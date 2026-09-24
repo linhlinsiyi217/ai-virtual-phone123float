@@ -1,50 +1,65 @@
-"use client";
+import { useState, useCallback, useMemo } from "react";
+import { ChevronRight, Search, X } from "lucide-react";
+import { SettingsNavigationContext, GLASS_STYLES } from "./nav-shell";
 
-import { ChevronLeft, X } from "lucide-react";
-import type { ReactNode } from "react";
-
-export function PageShell({
-  title,
-  large = false,
-  onBack,
-  onClose,
-  rightAction,
-  search,
-  children,
-}: {
-  title: string;
-  large?: boolean;
-  onBack?: () => void;
-  onClose?: () => void;
-  rightAction?: ReactNode;
-  search?: ReactNode;
-  children: ReactNode;
+export function SettingsShellV2({ 
+    children, 
+    initialTitle = "设置" 
+}: { 
+    children: ReactNode; 
+    initialTitle?: string 
 }) {
-  return (
-    <div className="sv2-page">
-      <style>{`
-        .sv2-page{height:100%;display:flex;flex-direction:column;min-height:0;background:var(--sv-bg)}
-        .sv2-header{flex:0 0 auto;padding:0 16px;background:color-mix(in srgb,var(--sv-bg) 86%,transparent);backdrop-filter:blur(22px) saturate(145%);-webkit-backdrop-filter:blur(22px) saturate(145%);z-index:2;border-bottom:1px solid var(--sv-line)}
-        .sv2-safe-top{height:env(safe-area-inset-top,0px)}
-        .sv2-nav{height:50px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
-        .sv2-nav-side{display:flex;align-items:center}
-        .sv2-nav-right{justify-content:flex-end}
-        .sv2-nav-btn{border:0;background:transparent;color:var(--sv-blue);display:inline-flex;align-items:center;padding:7px 0;font:inherit;cursor:pointer}
-        .sv2-title{font-size:17px;font-weight:650;margin:0;white-space:nowrap}
-        .sv2-body{flex:1;overflow-y:auto;padding:0 16px calc(32px + env(safe-area-inset-bottom,0px))}
-      `}</style>
-      <header className="sv2-header">
-        <div className="sv2-safe-top" />
-        <div className="sv2-nav">
-          <div className="sv2-nav-side">
-            {onBack ? <button className="sv2-nav-btn" type="button" onClick={onBack} aria-label="返回"><ChevronLeft size={21} /><span>设置</span></button> : <span aria-hidden="true" />}
-          </div>
-          <h1 className={large ? "sv2-title sv2-title-large" : "sv2-title"}>{title}</h1>
-          <div className="sv2-nav-side sv2-nav-right">{rightAction}{onClose ? <button className="sv2-nav-btn sv2-icon-btn" type="button" onClick={onClose} aria-label="关闭"><X size={19} /></button> : null}</div>
-        </div>
-        {search}
-      </header>
-      <main className="sv2-body">{children}</main>
-    </div>
-  );
+    const [stack, setStack] = useState([{ page: "main", title: initialTitle }]);
+    const [rightActions, setRightActions] = useState<Record<string, ReactNode>>({});
+
+    const push = useCallback((page: string, title?: string) => {
+        setStack(prev => [...prev, { page, title: title || "" }]);
+    }, []);
+
+    const pop = useCallback(() => {
+        if (stack.length > 1) setStack(prev => prev.slice(0, -1));
+    }, [stack]);
+
+    const active = stack[stack.length - 1];
+    const isMain = active.page === "main";
+
+    return (
+        <SettingsNavigationContext.Provider value={{ 
+            push, pop, 
+            setRightAction: (action) => setRightActions(p => ({ ...p, [active.page]: action })) 
+        }}>
+            <div className="flex flex-col h-full bg-[var(--c-page-body-bg)] font-sans">
+                {/* 顶部大标题栏 */}
+                <header className={GLASS_STYLES.nav + " px-4 py-4"}>
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-2xl font-bold tracking-tight text-[var(--c-text-title)]">
+                            {active.title}
+                        </h1>
+                        {rightActions[active.page]}
+                    </div>
+                    {!isMain && (
+                        <button onClick={pop} className="mt-2 flex items-center text-[var(--c-icon)] active:opacity-70">
+                            <ChevronRight className="rotate-180 mr-1" size={16} />
+                            返回
+                        </button>
+                    )}
+                </header>
+
+                {/* 搜索栏 */}
+                {isMain && (
+                    <div className="px-4 pb-4">
+                        <div className="flex items-center bg-[var(--c-input)] rounded-lg px-3 py-2 text-[var(--c-icon)]">
+                            <Search size={18} className="mr-2" />
+                            <input type="text" placeholder="搜索设置" className="bg-transparent border-none outline-none w-full text-[var(--c-text)]" />
+                        </div>
+                    </div>
+                )}
+
+                {/* 内容容器 */}
+                <main className="flex-1 overflow-y-auto p-4">
+                    {children}
+                </main>
+            </div>
+        </SettingsNavigationContext.Provider>
+    );
 }
