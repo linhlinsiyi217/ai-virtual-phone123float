@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({
-  children
+  children,
 }: Readonly<{
   children: ReactNode;
 }>) {
@@ -46,21 +46,17 @@ export default function RootLayout({
         <ChatPluginBootstrap />
         <ChatReasoningVisibilityController />
         {children}
-        <button 
-  onClick={() => {
-    window.dispatchEvent(new CustomEvent('ai-message', { detail: "灵动岛自动测试成功！" }));
-  }} 
-  style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999, padding: '10px 20px', background: '#007bff', color: 'white', borderRadius: '10px', border: 'none', fontSize: '16px' }}
->
-  点我测试灵动岛
-</button>
+        
         <script dangerouslySetInnerHTML={{ __html: `
-  window.addEventListener('ai-message', function(e) {
-    if (window.MyApp && window.MyApp.showIsland) {
-      window.MyApp.showIsland(e.detail);
-    }
-  });
-`}} />
+          setTimeout(function() {
+            window.dispatchEvent(new CustomEvent('ai-message', { detail: "自动测试成功！" }));
+          }, 3000);
+          window.addEventListener('ai-message', function(e) {
+            if (window.MyApp && window.MyApp.showIsland) {
+              window.MyApp.showIsland(e.detail);
+            }
+          });
+        `}} />
       </body>
     </html>
   );
