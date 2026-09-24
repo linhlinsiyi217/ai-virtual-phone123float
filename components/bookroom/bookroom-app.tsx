@@ -10,7 +10,7 @@ import { resolveCompanionRoles, type CompanionRole } from "@/lib/bookroom-mock";
 import type { CoReadingSession } from "@/lib/bookroom-sessions";
 import { BookroomDock, type BookroomTab } from "./bookroom-dock";
 import { BookshelfView } from "./bookshelf-view";
-import { WritingDeskView } from "./writing-desk-view";
+import { WritingDeskView, type DeskUiState } from "./writing-desk-view";
 import { WritingCreateSheet } from "./writing-create-sheet";
 import { WritingProjectView } from "./writing-project-view";
 import { MineView } from "./mine-view";
@@ -63,8 +63,10 @@ export default function BookRoomApp({ onClose }: Props) {
   const [colorTab, setColorTab] = useState<ColorTab>("grid");
   const [colorOpen, setColorOpen] = useState(false);
 
-  // 书桌（Phase 6A）
+  // 书桌（Phase 7A）：工作台 / 新建面板参数 / 书桌筛选排序滚动位置（进入项目后仍保持）
   const [writingProjectId, setWritingProjectId] = useState<string | null>(null);
+  const [createOpts, setCreateOpts] = useState<{ mode?: "quick"; idea?: string } | null>(null);
+  const [deskUiState, setDeskUiState] = useState<DeskUiState>({ filter: "all", sort: "updated", scrollTop: 0 });
 
   // 角色相关界面打开时重新解析 canonical 角色卡，保证显示为最新版本
   useEffect(() => {
@@ -195,6 +197,9 @@ export default function BookRoomApp({ onClose }: Props) {
             {tab === "desk" && (
               <WritingDeskView
                 onOpenProject={id => setWritingProjectId(id)}
+                onCreate={opts => setCreateOpts(opts ?? {})}
+                uiState={deskUiState}
+                onUiStateChange={patch => setDeskUiState(prev => ({ ...prev, ...patch }))}
               />
             )}
             {tab === "mine" && (
@@ -251,10 +256,15 @@ export default function BookRoomApp({ onClose }: Props) {
         <ColorTuningSheet initialTab={colorTab} onClose={() => setColorOpen(false)} />
       )}
 
-      {writingProjectId === "new" && (
+      {createOpts && (
         <WritingCreateSheet
-          onClose={() => setWritingProjectId(null)}
-          onCreated={id => setWritingProjectId(id)}
+          initialMode={createOpts.mode}
+          initialIdea={createOpts.idea}
+          onClose={() => setCreateOpts(null)}
+          onCreated={id => {
+            setCreateOpts(null);
+            setWritingProjectId(id);
+          }}
         />
       )}
 

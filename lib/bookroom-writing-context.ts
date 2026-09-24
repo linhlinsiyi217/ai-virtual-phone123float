@@ -26,12 +26,12 @@ import { sendLLMRequest } from "./chat-engine";
 import type { LLMMessage } from "./llm-prompt-assembler";
 import { prepareShortTermContext } from "./short-term-assembler";
 import type { MemoryEntry } from "./memory-types";
-import { loadCharacterWorldGroups, type CharacterWorldGroup } from "./character-world-storage";
+import { loadCharacterWorldGroups } from "./character-world-storage";
 import {
   getWritingProject,
   loadChapterDoc,
+  WRITING_MATERIAL_TYPE_LABELS,
   type WritingProject,
-  type WritingChapterMeta,
   type WritingOutlineItem,
 } from "./bookroom-writing";
 
@@ -94,21 +94,6 @@ function clip(text: string, maxChars: number): string {
   return t.length > maxChars ? t.slice(0, maxChars) + "…" : t;
 }
 
-function clipLines(lines: string[], maxChars: number): string {
-  let acc = 0;
-  const out: string[] = [];
-  for (const line of lines) {
-    if (acc + line.length > maxChars) {
-      const remain = maxChars - acc;
-      if (remain > 10) out.push(line.slice(0, remain) + "…");
-      break;
-    }
-    out.push(line);
-    acc += line.length + 1;
-  }
-  return out.join("\n");
-}
-
 function resolveRoleAiSlot(roleId?: string) {
   const config = loadBindingConfig();
   const slot = resolveBinding(config, roleId || undefined, BOOKROOM_APP_ID);
@@ -166,7 +151,7 @@ function buildSynopsisBlock(project: WritingProject): string {
   return `<故事简介>\n${clip(project.synopsis.trim(), BUDGET.synopsis)}\n</故事简介>`;
 }
 
-function buildOutlineBlock(project: WritingProject, currentChapterId?: string): string {
+function buildOutlineBlock(project: WritingProject): string {
   if (project.outline.length === 0) return "";
   const lines: string[] = [];
   let acc = 0;
@@ -290,8 +275,13 @@ function buildWorldArchiveBlock(project: WritingProject): string {
 }
 
 function buildMaterialsBlock(project: WritingProject): string {
-  if (project.materials.length === 0) return "";
-  const lines = project.materials.map(m => `- ${m.text.trim()}`);
+  // Phase 7A：只注入用户显式允许进入上下文的素材，禁止默认全部塞入
+  const injectable = project.materials.filter(m => m.injectIntoContext && m.text.trim());
+  if (injectable.length === 0) return "";
+  const lines = injectable.map(m => {
+    const typeLabel = m.type ? `[${WRITING_MATERIAL_TYPE_LABELS[m.type] ?? "素材"}] ` : "";
+    return `- ${typeLabel}${m.text.trim()}`;
+  });
   return `<故事素材 / 共同经历>\n${clip(lines.join("\n"), BUDGET.materials)}\n</故事素材 / 共同经历>`;
 }
 
@@ -396,7 +386,7 @@ export async function buildWritingContext(
   const sections = [
     buildProjectHeader(project),
     buildSynopsisBlock(project),
-    buildOutlineBlock(project, chapterId),
+    buildOutlineBlock(project),
     buildCompletedChaptersSummary(project, chapterId),
     buildPreviousChapterTail(project, chapterId),
     buildCurrentChapterBlock(project, chapterId),

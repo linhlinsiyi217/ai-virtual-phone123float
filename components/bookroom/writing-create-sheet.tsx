@@ -1,45 +1,43 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   Feather,
   Plus,
   Sparkles,
-  X,
 } from "lucide-react";
 import {
   createWritingProject,
-  type CreateWritingProjectInput,
-  type WritingOutlineItem,
-  type WritingProject,
 } from "@/lib/bookroom-writing";
 import { quickstartWriting, WritingAiError } from "@/lib/bookroom-writing-context";
 import { loadCharacters } from "@/lib/character-storage";
-import { loadCharacterWorldGroups, type CharacterWorldGroup } from "@/lib/character-world-storage";
+import { loadCharacterWorldGroups } from "@/lib/character-world-storage";
 import { loadWorldBooks } from "@/lib/settings-storage";
-import type { WorldBookConfig } from "@/lib/settings-types";
 import { BottomSheet, BrToast } from "./bookroom-ui";
+
+type Mode = "quick" | "advanced";
 
 type Props = {
   onClose: () => void;
   onCreated: (projectId: string) => void;
+  /** 书桌快速开始入口可直接打开快速模式并预填灵感 */
+  initialMode?: Mode;
+  initialIdea?: string;
 };
-
-type Mode = "quick" | "advanced";
 
 const GENRE_OPTIONS = ["小说", "短篇", "散文", "诗歌", "剧本", "随笔"];
 const TONE_OPTIONS = ["清冷", "温柔", "克制", "高情绪浓度", "轻小说", "文艺", "日常", "悬疑", "电影感"];
 
-export function WritingCreateSheet({ onClose, onCreated }: Props) {
-  const [mode, setMode] = useState<Mode>("quick");
+export function WritingCreateSheet({ onClose, onCreated, initialMode, initialIdea }: Props) {
+  const [mode, setMode] = useState<Mode>(initialMode ?? "quick");
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState("");
-  const [idea, setIdea] = useState("");
+  const [idea, setIdea] = useState(initialIdea ?? "");
   const [genre, setGenre] = useState<string[]>([]);
   const [tone, setTone] = useState<string[]>([]);
-  const [pov, setPov] = useState("第三人称");
+  const pov = "第三人称";
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [userAsCharacter, setUserAsCharacter] = useState(false);
   const [worldArchiveId, setWorldArchiveId] = useState<string>("");

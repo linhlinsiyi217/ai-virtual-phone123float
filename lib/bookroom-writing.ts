@@ -14,7 +14,7 @@ import type { Book, BookChapter } from "./bookstore-data";
 
 /* ───────────────────────── 类型 ───────────────────────── */
 
-export type WritingStatus = "draft" | "writing" | "paused" | "finished";
+export type WritingStatus = "draft" | "writing" | "paused" | "finished" | "archived";
 
 export type WritingChapterStatus = "planned" | "draft" | "revised" | "finished";
 
@@ -57,11 +57,36 @@ export type WritingChapterDoc = {
   versions: WritingChapterVersion[];
 };
 
+/** 素材类型（Phase 7A 素材箱） */
+export type WritingMaterialType =
+  | "character"   // 人物笔记
+  | "scene"       // 场景
+  | "world"       // 世界设定
+  | "plot"        // 情节碎片
+  | "dialogue"    // 台词
+  | "inspiration" // 灵感
+  | "custom";     // 自定义
+
+export const WRITING_MATERIAL_TYPE_LABELS: Record<WritingMaterialType, string> = {
+  character: "人物笔记",
+  scene: "场景",
+  world: "世界设定",
+  plot: "情节碎片",
+  dialogue: "台词",
+  inspiration: "灵感",
+  custom: "自定义",
+};
+
 /** 用户手动为作品补充的故事素材 / 共同经历（不进入长期记忆） */
 export type WritingMaterial = {
   id: string;
   text: string;
   createdAt: number;
+  updatedAt?: number;
+  type?: WritingMaterialType;
+  tags?: string[];
+  /** 是否允许注入 AI 写作上下文；默认 false，禁止默认全部塞入 */
+  injectIntoContext?: boolean;
 };
 
 export type WritingSourceContext = {
@@ -101,6 +126,12 @@ export type WritingProject = {
   materials: WritingMaterial[];
   /** 最近编辑章节（草稿恢复用） */
   lastChapterId?: string;
+  /** 书桌组织：收藏 / 置顶 / 自定义排序权重 */
+  favorite?: boolean;
+  pinned?: boolean;
+  deskOrder?: number;
+  /** 已发布到书架的 bookId（generated-<projectId>），书架与书桌共用同一关联 */
+  publishedBookId?: string;
 };
 
 const INDEX_KEY = "bookroom-writing-projects:v1";
@@ -341,11 +372,44 @@ export function restoreChapterVersion(projectId: string, chapterId: string, vers
 
 /* ───────────────────────── 素材（故事素材 / 共同经历，非长期记忆） ───────────────────────── */
 
-export function addWritingMaterial(projectId: string, text: string): void {
+export type AddWritingMaterialOptions = {
+  type?: WritingMaterialType;
+  tags?: string[];
+  injectIntoContext?: boolean;
+};
+
+export function addWritingMaterial(
+  projectId: string,
+  text: string,
+  opts?: AddWritingMaterialOptions,
+): void {
   const project = getWritingProject(projectId);
   if (!project || !text.trim()) return;
   updateWritingProject(projectId, {
-    materials: [...project.materials, { id: uid("wm"), text: text.trim(), createdAt: Date.now() }],
+    materials: [
+      ...project.materials,
+      {
+        id: uid("wm"),
+        text: text.trim(),
+        createdAt: Date.now(),
+        type: opts?.type,
+        tags: opts?.tags,
+        injectIntoContext: opts?.injectIntoContext,
+      },
+    ],
+  });
+}
+
+export function updateWritingMaterial(
+  projectId: string,
+  materialId: string,
+  patch: Partial<Omit<WritingMaterial, "id" | "createdAt">>,
+): void {
+  const project = getWritingProject(projectId);
+  if (!project) return;
+  updateWritingProject(projectId, {
+    materials: project.materials.map(m =>
+      m.id === materialId ? { ...m, ...patch, id: materialId, updatedAt: Date.now() } : m),
   });
 }
 
@@ -401,6 +465,11 @@ export function publishProjectAsBook(projectId: string): Book | null {
   };
   kvSet(generatedMetaKey(bookId), JSON.stringify(book));
   kvSet(generatedContentKey(bookId), JSON.stringify(chapters));
+  // 记录书架关联；项目本身保留在书桌（书架负责阅读，书桌负责创作）
+  const current = getWritingProject(projectId);
+  if (current && current.publishedBookId !== bookId) {
+    kvSet(PROJECT_PREFIX + projectId, JSON.stringify({ ...current, publishedBookId: bookId, updatedAt: current.updatedAt }));
+  }
   return { ...book, chapters };
 }
 
@@ -416,4 +485,165 @@ export function getGeneratedBook(bookId: string, withContent?: boolean): Book | 
 export function deleteGeneratedBook(bookId: string): void {
   kvRemove(generatedMetaKey(bookId));
   kvRemove(generatedContentKey(bookId));
+}
+
+/* ═════════════════════ Phase 7A：书桌组织 / 章节管理 / 版本快照 ═════════════════════ */
+
+/** 项目总字数（由章节 meta 汇总） */
+export function getWritingTotalWords(project: WritingProject): number {
+  return project.chapters.reduce((sum, c) => sum + (c.wordCount || 0), 0);
+}
+
+/** 直接写 meta，不改变 updatedAt（排序权重等纯组织字段用） */
+function writeProjectMetaQuiet(project: WritingProject): void {
+  kvSet(PROJECT_PREFIX + project.id, JSON.stringify(project));
+}
+
+export function renameWritingProject(projectId: string, title: string): void {
+  const trimmed = title.trim();
+  if (!trimmed) return;
+  updateWritingProject(projectId, { title: trimmed });
+}
+
+export function setWritingFavorite(projectId: string, favorite: boolean): void {
+  const project = getWritingProject(projectId);
+  if (!project) return;
+  updateWritingProject(projectId, { favorite });
+}
+
+export function setWritingPinned(projectId: string, pinned: boolean): void {
+  const project = getWritingProject(projectId);
+  if (!project) return;
+  // 置顶不扰动 updatedAt（它是组织操作，不是内容编辑）
+  writeProjectMetaQuiet({ ...project, pinned });
+}
+
+export function setWritingStatus(projectId: string, status: WritingStatus): WritingProject | null {
+  const project = getWritingProject(projectId);
+  if (!project) return null;
+  const next: WritingProject = { ...project, status, updatedAt: Date.now() };
+  writeProjectMetaQuiet(next);
+  return next;
+}
+
+/** 自定义排序：orderedIds 中的项目按位置写入 deskOrder；其余保持在后 */
+export function saveWritingDeskOrder(orderedIds: string[]): void {
+  const projects = listWritingProjects();
+  const byId = new Map(projects.map(p => [p.id, p]));
+  orderedIds.forEach((id, index) => {
+    const p = byId.get(id);
+    if (p && p.deskOrder !== index) {
+      writeProjectMetaQuiet({ ...p, deskOrder: index });
+    }
+    byId.delete(id);
+  });
+  // 未参与排序的项目清理 deskOrder，避免陈旧权重干扰
+  for (const rest of byId.values()) {
+    if (rest.deskOrder !== undefined) {
+      const { deskOrder: _omit, ...clean } = rest;
+      void _omit;
+      writeProjectMetaQuiet(clean);
+    }
+  }
+}
+
+/** 复制整个项目（含全部章节正文，版本历史不复制），副本为草稿、未发布 */
+export function duplicateWritingProject(projectId: string): WritingProject | null {
+  const source = getWritingProject(projectId);
+  if (!source) return null;
+  const now = Date.now();
+  const newId = uid("wp");
+  const idMap = new Map<string, string>(source.chapters.map(c => [c.id, uid("wc")]));
+
+  const chapters: WritingChapterMeta[] = source.chapters
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map(c => {
+      const doc = loadChapterDoc(projectId, c.id);
+      const newChapterId = idMap.get(c.id)!;
+      writeChapterDoc(newId, newChapterId, { content: doc.content, versions: [] });
+      return {
+        ...c,
+        id: newChapterId,
+        status: c.status === "finished" ? "draft" : c.status,
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
+
+  const copy: WritingProject = {
+    ...source,
+    id: newId,
+    title: `${source.title} 副本`,
+    createdAt: now,
+    updatedAt: now,
+    status: "draft",
+    chapters,
+    materials: source.materials.map(m => ({ ...m, id: uid("wm") })),
+    outline: source.outline.map(o => ({ ...o, id: uid("wo"), beats: o.beats?.map(b => ({ ...b, id: uid("wb") })) })),
+    lastChapterId: chapters[0]?.id,
+    favorite: false,
+    pinned: false,
+    deskOrder: undefined,
+    publishedBookId: undefined,
+  };
+  writeProjectMetaQuiet(copy);
+  saveIndex([...loadIndex(), newId]);
+  return copy;
+}
+
+/** 复制章节（正文一并复制，版本历史不复制），追加到章末 */
+export function duplicateWritingChapter(projectId: string, chapterId: string): WritingChapterMeta | null {
+  const project = getWritingProject(projectId);
+  if (!project) return null;
+  const source = project.chapters.find(c => c.id === chapterId);
+  if (!source) return null;
+  const doc = loadChapterDoc(projectId, chapterId);
+  const now = Date.now();
+  const meta: WritingChapterMeta = {
+    ...source,
+    id: uid("wc"),
+    title: `${source.title} 副本`,
+    order: project.chapters.length,
+    status: source.status === "planned" ? "planned" : "draft",
+    createdAt: now,
+    updatedAt: now,
+  };
+  writeChapterDoc(projectId, meta.id, { content: doc.content, versions: [] });
+  updateWritingProject(projectId, {
+    chapters: [...project.chapters, meta],
+    lastChapterId: meta.id,
+  });
+  return meta;
+}
+
+/**
+ * 把当前正文压入版本历史（不改变正文）。
+ * 用于：AI 操作应用前 / 用户手动保存版本。恢复前数据层会再自动备份当前版。
+ */
+export function snapshotChapterVersion(
+  projectId: string,
+  chapterId: string,
+  label: string,
+): void {
+  const doc = loadChapterDoc(projectId, chapterId);
+  if (!doc.content.trim()) return;
+  const versions = [
+    ...doc.versions,
+    { content: doc.content, savedAt: Date.now(), label },
+  ].slice(-MAX_VERSIONS);
+  writeChapterDoc(projectId, chapterId, { content: doc.content, versions });
+}
+
+/** 章节上移 / 下移一位（稳定排序交互） */
+export function moveWritingChapter(projectId: string, chapterId: string, direction: -1 | 1): void {
+  const project = getWritingProject(projectId);
+  if (!project) return;
+  const sorted = project.chapters.slice().sort((a, b) => a.order - b.order);
+  const index = sorted.findIndex(c => c.id === chapterId);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= sorted.length) return;
+  const next = sorted.slice();
+  [next[index], next[target]] = [next[target], next[index]];
+  reorderWritingChapters(projectId, next.map(c => c.id));
 }
