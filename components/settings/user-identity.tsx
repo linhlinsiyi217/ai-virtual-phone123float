@@ -16,6 +16,9 @@ export type UserIdentity = {
     age: string;
     occupation: string;
     customSettings: string;
+    appearanceDesc?: string;
+    lockFace?: boolean;
+    refImageUrl?: string;
 };
 
 const DEFAULT_IDENTITIES: UserIdentity[] = [
@@ -263,6 +266,16 @@ export function UserIdentitySettings() {
                                                     className="flex-1 ts-12 px-[10px] py-[6px]"
                                                 />
                                             </div>
+                                            <div className="flex items-center gap-[6px] w-full max-w-[280px] mt-2">
+                                                <Camera size={14} className="shrink-0 text-[var(--c-text)]" />
+                                                <Input
+                                                    type="text"
+                                                    value={identity.refImageUrl || ""}
+                                                    onChange={(e) => updateIdentity(identity.id, { refImageUrl: e.target.value })}
+                                                    placeholder="参考图 URL (待接入生图)..."
+                                                    className="flex-1 ts-12 px-[10px] py-[6px]"
+                                                />
+                                            </div>
                                         </div>
 
                                         <div className="flex gap-3">
@@ -334,6 +347,30 @@ export function UserIdentitySettings() {
                                                 rows={4}
                                                 className="ui-textarea"
                                             />
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            <label className="menu-desc ml-1">外貌描述 (Appearance)</label>
+                                            <textarea
+                                                value={identity.appearanceDesc || ""}
+                                                onChange={(e) => updateIdentity(identity.id, { appearanceDesc: e.target.value })}
+                                                placeholder="描述希望生成的外貌特征..."
+                                                rows={2}
+                                                className="ui-textarea"
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-4">
+                                            <label className="menu-desc ml-1">锁定面容</label>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!identity.lockFace}
+                                                    onChange={(e) => updateIdentity(identity.id, { lockFace: e.target.checked })}
+                                                    className="ui-checkbox"
+                                                />
+                                                <span className="ts-12 text-[var(--c-text-muted)]">开启后优先保持特征</span>
+                                            </div>
                                         </div>
                                     </>
                                 )
