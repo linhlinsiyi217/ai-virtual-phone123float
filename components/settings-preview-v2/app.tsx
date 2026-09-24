@@ -49,8 +49,11 @@ export function SettingsPreviewApp() {
   const [ready, setReady] = useState(false);
   const [page, setPage] = useState<Page>("main");
   const [search, setSearch] = useState("");
-  
+  const [identities, setIdentities] = useState<UserIdentity[]>([]);
+
   useEffect(() => {
+    setIdentities(loadUserIdentities());
+  }, []);
     void hydrateKvDb().then(() => setReady(true));
   }, []);
 
@@ -58,17 +61,25 @@ export function SettingsPreviewApp() {
 
   const visibleMenu = [...MENU, ...PREVIEW_EXTRA_MENU].filter(i => `${i.label} ${i.group}`.includes(search));
 
+  const [history, setHistory] = useState<Page[]>([]);
+  const go = (next: Page) => { setHistory(prev => [...prev, page]); setPage(next); };
+  const back = () => { if (history.length) { setPage(history[history.length - 1]); setHistory(prev => prev.slice(0, -1)); } };
+
   return (
-    <PageShell title="设置">
-      <SearchBox value={search} onChange={e => setSearch(e.target.value)} onClear={() => setSearch("")} />
-      <IosGroup>
-        <IosCell label="主人设" onClick={() => setPage("identity")} />
-      </IosGroup>
-      {Array.from(new Set(visibleMenu.map(i => i.group))).map(group => (
-        <IosGroup key={group} title={group}>
-          {visibleMenu.filter(i => i.group === group).map(item => <IosCell key={item.id} label={item.label} icon={iconFor(item.id)} onClick={() => setPage(item.id as Page)} />)}
-        </IosGroup>
-      ))}
+    <PageShell title={page === "main" ? "设置" : "预览"} onBack={page !== "main" ? back : undefined}>
+      {page === "main" ? (
+        <>
+          <SearchBox value={search} onChange={e => setSearch(e.target.value)} onClear={() => setSearch("")} />
+          <IosGroup><IosCell label="主人设" onClick={() => go("identity")} /></IosGroup>
+          {Array.from(new Set(visibleMenu.map(i => i.group))).map(group => (
+            <IosGroup key={group} title={group}>
+              {visibleMenu.filter(i => i.group === group).map(item => <IosCell key={item.id} label={item.label} icon={iconFor(item.id)} onClick={() => go(item.id as Page)} />)}
+            </IosGroup>
+          ))}
+        </>
+      ) : (
+        <div className="sv2-empty"><strong>{page}</strong><span>页面接入中</span></div>
+      )}
     </PageShell>
   );
 }
