@@ -14,10 +14,17 @@ export function SettingsShellV2({
 
     const push = useCallback((page: string, title?: string) => {
         setStack(prev => [...prev, { page, title: title || "" }]);
+        window.dispatchEvent(new CustomEvent("settings-nav-v2", { detail: { page } }));
     }, []);
 
     const pop = useCallback(() => {
-        if (stack.length > 1) setStack(prev => prev.slice(0, -1));
+        if (stack.length > 1) {
+            setStack(prev => {
+                const next = prev.slice(0, -1);
+                window.dispatchEvent(new CustomEvent("settings-nav-v2", { detail: { page: null } }));
+                return next;
+            });
+        }
     }, [stack]);
 
     const active = stack[stack.length - 1];

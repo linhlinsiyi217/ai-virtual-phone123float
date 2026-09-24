@@ -30,8 +30,15 @@ export function PhoneSettingsApp({ onClose, onNotice }: { onClose: () => void, o
 
 function PhoneSettingsContent({ onClose, onNotice }: { onClose: () => void, onNotice: (msg: string) => void }) {
     const { push } = useContext(SettingsNavigationContext);
-    
-    // 渲染各子页面映射
+    const [currentPageId, setCurrentPageId] = useState<string | null>(null);
+
+    // 监听导航变化
+    useEffect(() => {
+        const handleNav = (e: any) => setCurrentPageId(e.detail?.page || null);
+        window.addEventListener("settings-nav-v2", handleNav);
+        return () => window.removeEventListener("settings-nav-v2", handleNav);
+    }, []);
+
     const renderSubPage = (pageId: string) => {
         switch (pageId) {
             case "api": return <ApiSettings />;
@@ -43,40 +50,42 @@ function PhoneSettingsContent({ onClose, onNotice }: { onClose: () => void, onNo
             case "data": return <DataManagement onNotice={onNotice} />;
             case "binding": return <BindingManager />;
             case "cloud": return <CloudServicesPage />;
-            case "weixin": return <WeixinSettings onOpenCloudServices={() => {}} />;
+            case "weixin": return <WeixinSettings onOpenCloudServices={() => push("cloud", "云服务部署")} />;
             case "toolbox": return <ToolboxSettings />;
             case "agentComputer": return <AgentComputerSettings onNotice={onNotice} />;
             case "identity": return <UserIdentitySettings />;
             case "about": return <AboutDeclaration />;
-            default: return <div>页面开发中...</div>;
+            default: return null;
         }
     };
+
+    if (currentPageId) return renderSubPage(currentPageId);
 
     return (
         <>
             <SettingsListGroup title="AI 与生成">
-                <SettingsListItem icon={HardDrive} label="API 设置" onClick={() => push("api", "API 设置")} />
-                <SettingsListItem icon={Mic} label="语音 API" onClick={() => push("voice", "语音 API")} />
-                <SettingsListItem icon={Image} label="图像生成 API" onClick={() => push("imageGeneration", "图像生成 API")} />
-                <SettingsListItem icon={Fingerprint} label="预设" onClick={() => push("presets", "预设")} />
+                <SettingsListItem icon={HardDrive} label="API 设置" onClick={() => { setCurrentPageId("api"); push("api", "API 设置"); }} />
+                <SettingsListItem icon={Mic} label="语音 API" onClick={() => { setCurrentPageId("voice"); push("voice", "语音 API"); }} />
+                <SettingsListItem icon={Image} label="图像生成 API" onClick={() => { setCurrentPageId("imageGeneration"); push("imageGeneration", "图像生成 API"); }} />
+                <SettingsListItem icon={Fingerprint} label="预设" onClick={() => { setCurrentPageId("presets"); push("presets", "预设"); }} />
             </SettingsListGroup>
             
             <SettingsListGroup title="角色与世界">
-                <SettingsListItem icon={Globe} label="世界书" onClick={() => push("worldbook", "世界书")} />
-                <SettingsListItem icon={Database} label="正则规则" onClick={() => push("regex", "正则规则")} />
-                <SettingsListItem icon={UserCircle} label="用户身份" onClick={() => push("identity", "用户身份")} />
+                <SettingsListItem icon={Globe} label="世界书" onClick={() => { setCurrentPageId("worldbook"); push("worldbook", "世界书"); }} />
+                <SettingsListItem icon={Database} label="正则规则" onClick={() => { setCurrentPageId("regex"); push("regex", "正则规则"); }} />
+                <SettingsListItem icon={UserCircle} label="用户身份" onClick={() => { setCurrentPageId("identity"); push("identity", "用户身份"); }} />
             </SettingsListGroup>
 
             <SettingsListGroup title="连接与工具">
-                <SettingsListItem icon={Link2} label="配置绑定" onClick={() => push("binding", "配置绑定")} />
-                <SettingsListItem icon={CloudUpload} label="云服务部署" onClick={() => push("cloud", "云服务部署")} />
-                <SettingsListItem icon={MessageSquare} label="微信接入" onClick={() => push("weixin", "微信接入")} />
-                <SettingsListItem icon={Wrench} label="聊天工具箱" onClick={() => push("toolbox", "聊天工具箱")} />
-                <SettingsListItem icon={Laptop} label="角色电脑" onClick={() => push("agentComputer", "角色电脑")} />
+                <SettingsListItem icon={Link2} label="配置绑定" onClick={() => { setCurrentPageId("binding"); push("binding", "配置绑定"); }} />
+                <SettingsListItem icon={CloudUpload} label="云服务部署" onClick={() => { setCurrentPageId("cloud"); push("cloud", "云服务部署"); }} />
+                <SettingsListItem icon={MessageSquare} label="微信接入" onClick={() => { setCurrentPageId("weixin"); push("weixin", "微信接入"); }} />
+                <SettingsListItem icon={Wrench} label="聊天工具箱" onClick={() => { setCurrentPageId("toolbox"); push("toolbox", "聊天工具箱"); }} />
+                <SettingsListItem icon={Laptop} label="角色电脑" onClick={() => { setCurrentPageId("agentComputer"); push("agentComputer", "角色电脑"); }} />
             </SettingsListGroup>
             
             <SettingsListGroup title="关于">
-                 <SettingsListItem icon={Info} label="关于与声明" onClick={() => push("about", "关于与声明")} />
+                 <SettingsListItem icon={Info} label="关于与声明" onClick={() => { setCurrentPageId("about"); push("about", "关于与声明"); }} />
             </SettingsListGroup>
         </>
     );
