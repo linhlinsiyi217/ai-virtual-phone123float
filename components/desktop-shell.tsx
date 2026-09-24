@@ -1171,6 +1171,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
 
   // ── Edit mode (long-press drag) ──
   const [editMode, setEditMode] = useState(false);
+  const [uninstallQueue, setUninstallQueue] = useState<string | null>(null);
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [diyTemplates, setDiyTemplates] = useState<DIYWidgetTemplate[]>([]);
 
@@ -4691,6 +4692,9 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
                                         {badgeCount > 99 ? "99+" : badgeCount}
                                       </span>
                                     ) : null}
+                                    {editMode && customApp && (
+                                      <span className="icon-uninstall-x" onClick={(e) => { e.stopPropagation(); setUninstallQueue(customApp.id); }}>×</span>
+                                    )}
                                   </span>
                                   <span className="icon-label">{icon.label}</span>
                                 </button>
