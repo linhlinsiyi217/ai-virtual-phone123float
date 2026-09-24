@@ -95,8 +95,7 @@ function SubpageRenderer({ pageId, onNotice }: { pageId: string, onNotice: (msg:
 }
 
 function PhoneSettingsContent({ onClose, onNotice, currentPageId, setCurrentPageId }: { onClose: () => void, onNotice: (msg: string) => void, currentPageId: string | null, setCurrentPageId: (id: string | null) => void }) {
-    const { push } = useContext(SettingsNavigationContext);
-
+    
     if (currentPageId) return <SubpageRenderer pageId={currentPageId} onNotice={onNotice} />;
 
     return (

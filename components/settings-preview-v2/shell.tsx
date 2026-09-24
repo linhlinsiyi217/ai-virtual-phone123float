@@ -13,7 +13,6 @@ export function SettingsShellV2({
     rightAction?: ReactNode;
     onBack?: () => void;
 }) {
-    // 简化逻辑：状态下移至由 SettingsContext 统一管理
     const isMain = !onBack;
 
     return (
