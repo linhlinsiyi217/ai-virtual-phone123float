@@ -372,6 +372,68 @@ export function UserIdentitySettings() {
                                                 <span className="ts-12 text-[var(--c-text-muted)]">开启后优先保持特征</span>
                                             </div>
                                         </div>
+
+                                        <div className="flex flex-col gap-2 p-3 bg-[var(--c-page-body-bg,#f4f5f8)] rounded-xl border border-[var(--c-border,rgba(0,0,0,0.08))] mt-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-[var(--c-text-title,#111)]">AI 双人合影参考图</span>
+                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium">
+                                                    {identity.refImageUrl ? "已保存在本地" : "待上传"}
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] text-[var(--c-text-subtitle,#666)] leading-tight m-0">
+                                                上传您的近照作为生成“您与角色合影/互动”时的面部参考素材。
+                                            </p>
+                                            
+                                            <div className="flex items-center gap-3 mt-1">
+                                                {identity.refImageUrl ? (
+                                                    <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-[var(--c-border)] shrink-0">
+                                                        <img src={identity.refImageUrl} alt="参考图" className="w-full h-full object-cover" />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => updateIdentity(identity.id, { refImageUrl: "" })}
+                                                            className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full hover:bg-black/80"
+                                                            title="删除参考图"
+                                                        >
+                                                            <X size={10} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const input = document.createElement("input");
+                                                            input.type = "file";
+                                                            input.accept = "image/*";
+                                                            input.onchange = async () => {
+                                                                const file = input.files?.[0];
+                                                                if (!file) return;
+                                                                try {
+                                                                    const dataUrl = await fileToDataUrl(file, 800, 0.85);
+                                                                    updateIdentity(identity.id, { refImageUrl: dataUrl });
+                                                                } catch {
+                                                                    /* ignore */
+                                                                }
+                                                            };
+                                                            input.click();
+                                                        }}
+                                                        className="w-16 h-16 rounded-lg border-2 border-dashed border-[var(--c-border,#ccc)] flex flex-col items-center justify-center text-[var(--c-text-subtitle,#666)] hover:border-blue-500 transition-colors shrink-0"
+                                                    >
+                                                        <Camera size={16} />
+                                                        <span className="text-[9px] mt-1 font-medium">上传照片</span>
+                                                    </button>
+                                                )}
+                                                
+                                                <div className="flex-1 text-[11px] text-[var(--c-text-subtitle,#666)]">
+                                                    {identity.refImageUrl ? (
+                                                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                                            ✓ 参考图数据已保存。后端双人生成接口发布后将自动调用。
+                                                        </span>
+                                                    ) : (
+                                                        <span>未设置参考图。暂不影响其他正常聊天功能。</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </>
                                 )
                             })()}

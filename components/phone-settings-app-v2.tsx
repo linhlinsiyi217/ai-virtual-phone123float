@@ -23,6 +23,7 @@ import { ModerationCenter } from "./settings/moderation-center";
 import { AgentComputerSettings } from "./settings/agent-computer-settings";
 import { fetchIsAdmin } from "@/lib/moderation-client";
 import { loadChatAppSettings, saveChatAppSettings } from "@/lib/chat-storage";
+import { loadUserIdentities } from "@/lib/settings-storage";
 import { loadKeepAlive, saveKeepAlive } from "@/lib/weixin-storage";
 import { BINDING_ACCENTS, CONTENT_APP_ACCENTS } from "@/lib/ui-accent-colors";
 import { Toggle } from "./ui/form";
@@ -365,24 +366,32 @@ function PhoneSettingsContent({
 
     return (
         <>
-            {(!searchQuery || "账号 用户信息 密码 安全".includes(searchQuery.toLowerCase())) && (
-                <div className="mb-6 bg-[#ffffff] border-y border-[#e5e7eb] -mx-4 px-4">
-                    <button type="button" className="flex items-center w-full py-3" onClick={onOpenAccount}>
-                        <div className="w-14 h-14 rounded-full bg-[#f3f4f6] flex items-center justify-center mr-4">
-                            <UserCircle size={32} className="text-[#9ca3af]" />
-                        </div>
-                        <div className="flex-1 text-left">
-                            <div className="text-[19px] font-semibold text-[#111827]">
-                                {!isSelfHostedModeEnabled() && account ? (account.displayName || account.username) : "本地用户"}
-                            </div>
-                            <div className="text-sm text-[#6b7280]">
-                                {!isSelfHostedModeEnabled() && account ? "账号设置、密码与安全" : "自托管模式"}
-                            </div>
-                        </div>
-                        <ChevronRight size={20} className="text-[#c7c7cc]" />
-                    </button>
+            {(!searchQuery || "账号 用户信息 密码 安全 我的人设".includes(searchQuery.toLowerCase())) && (
+    <div className="mb-6 bg-[var(--settings-surface,#fff)] border-y border-[var(--settings-line)] -mx-4 px-4">
+        <button type="button" className="flex items-center w-full py-3" onClick={onOpenAccount}>
+            <div className="w-14 h-14 rounded-full bg-[#f0f2f5] dark:bg-[#222228] flex items-center justify-center mr-4 overflow-hidden shrink-0">
+                {(() => {
+                    const identities = typeof window !== "undefined" ? loadUserIdentities() : [];
+                    const activeAvatar = identities.length > 0 ? identities[0].avatarUrl : null;
+                    return activeAvatar ? (
+                        <img src={activeAvatar} alt="用户头像" className="w-full h-full object-cover" />
+                    ) : (
+                        <UserCircle size={32} className="text-[var(--settings-secondary)]" />
+                    );
+                })()}
+            </div>
+            <div className="flex-1 text-left min-w-0">
+                <div className="text-[19px] font-semibold text-[var(--settings-text)] truncate">
+                    {!isSelfHostedModeEnabled() && account ? (account.displayName || account.username) : "本地用户"}
                 </div>
-            )}
+                <div className="text-sm text-[var(--settings-secondary)] truncate">
+                    {!isSelfHostedModeEnabled() && account ? "账号设置、密码与安全" : "已同步我的人设资料"}
+                </div>
+            </div>
+            <ChevronRight size={20} className="text-[var(--settings-secondary)] shrink-0 ml-2" />
+        </button>
+    </div>
+)}
 
             {/* 在 PhoneSettingsContent 顶部定义菜单以供筛选 */}
             {(() => {
