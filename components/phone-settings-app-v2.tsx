@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useContext, useEffect, useLayoutEffect, useCallback, useRef, createContext, type CSSProperties, type ReactNode } from "react";
+import { useState, useContext, useEffect, useLayoutEffect, useCallback, useRef, useMemo, createContext, type CSSProperties, type ReactNode } from "react";
 import { ChevronRight, Search, X, HardDrive, Mic, Image, Fingerprint, Globe, Database, Layers, Link2, CloudUpload, MessageSquare, Wrench, Laptop, UserCircle, Info, SlidersHorizontal, Check, Loader2, LogOut, KeyRound } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { useAccount } from "@/lib/account-context";
@@ -188,7 +188,8 @@ function SubpageRenderer({
 
 function PhoneSettingsContent({ 
     onClose, onNotice, currentPageId, setCurrentPageId, handleBack,
-    draftTheme, onDraftChange, onApplyTheme, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle
+    draftTheme, onDraftChange, onApplyTheme, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle,
+    searchQuery
 }: any) {
     const { push } = useContext(SettingsNavigationContext);
     
@@ -245,7 +246,7 @@ function PhoneSettingsContent({
                     { id: "agentComputer", label: "角色电脑", group: "连接与工具", icon: Laptop },
                     { id: "about", label: "关于与声明", group: "关于", icon: Info },
                 ];
-                const q = searchQuery.toLowerCase();
+                const q = String(searchQuery ?? "").trim().toLowerCase();
                 const filtered = q ? menu.filter(i => i.label.toLowerCase().includes(q) || i.group.toLowerCase().includes(q)) : menu;
                 
                 if (filtered.length === 0) return <div className="text-center py-10 text-[var(--settings-secondary)] text-sm">没有找到设置</div>;
