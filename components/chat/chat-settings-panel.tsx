@@ -1221,6 +1221,92 @@ export function ChatSettingsPanel({
                     </label>
                 </div>
 
+                {/* 角色独立 API 设置 */}
+                <div className="chat-info-section mb-2">
+                    <div className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-2">
+                            <Code size={18} className="text-blue-500" />
+                            <span className="text-sm font-semibold text-[var(--c-text)]">独立 API 配置</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-[var(--c-icon)]">
+                                {session.customApiConfig?.enabled ? "独立配置" : "使用全局"}
+                            </span>
+                            <Toggle
+                                checked={Boolean(session.customApiConfig?.enabled)}
+                                onChange={(checked) => {
+                                    const nextConfig = {
+                                        enabled: checked,
+                                        provider: session.customApiConfig?.provider || "OpenAI",
+                                        baseUrl: session.customApiConfig?.baseUrl || "",
+                                        apiKey: session.customApiConfig?.apiKey || "",
+                                        model: session.customApiConfig?.model || "",
+                                        temperature: session.customApiConfig?.temperature ?? 0.85,
+                                    };
+                                    updateSession({ customApiConfig: nextConfig } as any);
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {session.customApiConfig?.enabled && (
+                        <div className="px-4 pb-3 space-y-3">
+                            <div>
+                                <label className="text-xs text-[var(--c-icon)] mb-1 block">代理地址 (Base URL)</label>
+                                <Input
+                                    type="text"
+                                    value={session.customApiConfig.baseUrl}
+                                    onChange={(e) => {
+                                        updateSession({ customApiConfig: { ...session.customApiConfig!, baseUrl: e.target.value } } as any);
+                                    }}
+                                    placeholder="https://api.openai.com/v1"
+                                    className="text-xs"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs text-[var(--c-icon)] mb-1 block">API Key</label>
+                                <Input
+                                    type="password"
+                                    value={session.customApiConfig.apiKey}
+                                    onChange={(e) => {
+                                        updateSession({ customApiConfig: { ...session.customApiConfig!, apiKey: e.target.value } } as any);
+                                    }}
+                                    placeholder="sk-..."
+                                    className="text-xs"
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <div className="flex-1">
+                                    <label className="text-xs text-[var(--c-icon)] mb-1 block">模型名称</label>
+                                    <Input
+                                        type="text"
+                                        value={session.customApiConfig.model}
+                                        onChange={(e) => {
+                                            updateSession({ customApiConfig: { ...session.customApiConfig!, model: e.target.value } } as any);
+                                        }}
+                                        placeholder="gpt-4o"
+                                        className="text-xs"
+                                    />
+                                </div>
+                                <div className="w-24">
+                                    <label className="text-xs text-[var(--c-icon)] mb-1 block">温度 (Temp)</label>
+                                    <Input
+                                        type="number"
+                                        step="0.05"
+                                        min="0"
+                                        max="2"
+                                        value={String(session.customApiConfig.temperature ?? 0.85)}
+                                        onChange={(e) => {
+                                            updateSession({ customApiConfig: { ...session.customApiConfig!, temperature: parseFloat(e.target.value) || 0.85 } } as any);
+                                        }}
+                                        className="text-xs"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 {/* Advanced */}
                 <div className="menu-group">
                     <KeyboardAutoSendDebounceItem sessionId={session.id} />

@@ -51,6 +51,7 @@ import {
   type CharacterVersion,
 } from "@/lib/character-version-storage";
 import { notifyMascotPageContext } from "@/lib/mascot-events";
+import { CharacterGovernancePanel } from "@/components/character/governance-panel";
 import { kvGet, kvSet } from "@/lib/kv-db";
 import { normalizeTimeZone } from "@/lib/character-time";
 import { removeCharacterChatReferences } from "@/lib/character-chat-cleanup";
@@ -2541,6 +2542,22 @@ function CharArchiveView({
           )}
 
         </div>
+
+        {/* 人格治理系统 */}
+        {isEditing && (
+          <div className="char-archive-text-section border-b-0">
+            <div className="char-log-entry">
+              <div className="char-log-entry-header"><span>GOVERNANCE / 人格治理</span></div>
+              <CharacterGovernancePanel
+                character={char}
+                onChange={(updates) => {
+                  if (onSave) onSave(updates, false);
+                }}
+                onNotice={onNotice}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="char-archive-actions">
           {!dummy && confirmDelete ? (

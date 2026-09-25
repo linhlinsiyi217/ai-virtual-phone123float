@@ -1,3 +1,20 @@
+export type CharacterGovernancePreset = {
+  id: string;
+  name: string;
+  oocPatchPrompt: string;
+  riskReportPrompt: string;
+  updatedAt: string;
+};
+
+export type CharacterCustomApiConfig = {
+  enabled: boolean;
+  provider: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  temperature?: number;
+};
+
 export type Character = {
   id: string;
   name: string;
@@ -11,6 +28,19 @@ export type Character = {
   tags?: string[];
   createdAt: string;
   updatedAt: string;
+
+  // 人格治理系统字段
+  bannedWordsEnabled?: boolean;
+  bannedWords?: string[];
+  governancePresets?: CharacterGovernancePreset[];
+  activePresetId?: string;
+  oocRawComplaint?: string;
+  oocPatchPrompt?: string;
+  riskReportPrompt?: string;
+  riskReportCollapsed?: boolean;
+
+  // 角色独立 API 绑定
+  customApiConfig?: CharacterCustomApiConfig;
 
   // 画布坐标与渲染属性
   canvasX?: number;
