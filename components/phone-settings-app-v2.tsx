@@ -190,6 +190,8 @@ export function PhoneSettingsApp({
                         iconSkins={iconSkins}
                         wallpaperStyle={wallpaperStyle}
                         searchQuery={searchQuery}
+                        account={account}
+                        onOpenAccount={() => setAccountSheetOpen(true)}
                         onBeforeNavigate={() => {
                             // 确保在离开首页前最后记录一次
                             const scroller = document.querySelector(".settings-v2__scroller");
@@ -249,7 +251,7 @@ function SubpageRenderer({
 function PhoneSettingsContent({ 
     onClose, onNotice, currentPageId, setCurrentPageId, handleBack,
     draftTheme, onDraftChange, onApplyTheme, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle,
-    searchQuery, setSubpageTitle, onBeforeNavigate
+    searchQuery, setSubpageTitle, onBeforeNavigate, account, onOpenAccount
 }: any) {
     if (currentPageId) return <SubpageRenderer 
         pageId={currentPageId} 
@@ -270,7 +272,7 @@ function PhoneSettingsContent({
         <>
             {!isSelfHostedModeEnabled() && account && (
                 <div className="mb-6 bg-[#ffffff] border-y border-[#e5e7eb] -mx-4 px-4">
-                    <button className="flex items-center w-full py-3" onClick={() => setAccountSheetOpen(true)}>
+                    <button className="flex items-center w-full py-3" onClick={onOpenAccount}>
                         <div className="w-14 h-14 rounded-full bg-[#f3f4f6] flex items-center justify-center mr-4">
                             <UserCircle size={32} className="text-[#9ca3af]" />
                         </div>
