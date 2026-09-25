@@ -648,32 +648,9 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
     }, [persist, presets]);
 
     useEffect(() => {
-        if (viewMode !== "list") {
-            setSubpageRightAction("presets", null);
-            return;
-        }
-        setSubpageRightAction("presets",
-            <div className="flex items-center gap-2">
-                <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[20px] border border-black/10 bg-white px-4 text-xs font-bold text-gray-800 shadow-sm transition-all hover:bg-gray-50 hover:shadow-md active:scale-95 focus:outline-none"
-                >
-                    <Upload size={15} strokeWidth={1.8} />
-                    <span>导入预设</span>
-                </button>
-                <button
-                    type="button"
-                    onClick={addPreset}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[20px] bg-black px-4 text-xs font-bold text-white shadow-sm transition-all hover:bg-gray-800 hover:shadow-md active:scale-95 focus:outline-none"
-                >
-                    <Plus size={15} strokeWidth={1.8} />
-                    <span>新建预设</span>
-                </button>
-            </div>
-        );
+        setSubpageRightAction("presets", null);
         return () => setSubpageRightAction("presets", null);
-    }, [addPreset, setSubpageRightAction, viewMode]);
+    }, [setSubpageRightAction]);
 
     const updatePreset = (id: string, updates: Partial<PresetConfig>) => {
         persist(presets.map(p => p.id === id ? { ...p, ...updates, updatedAt: Date.now() } : p));
@@ -1076,8 +1053,26 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
             <input type="file" accept=".json" className="hidden" ref={entryFileInputRef} onChange={handleEntryImportFile} />
             {viewMode === "list" ? (
                 <>
-                    <div className="flex items-center">
-                        <h2 className="m-0 mx-2 ts-28 font-bold italic leading-none text-black">Presets</h2>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                        <h2 className="m-0 text-base font-semibold text-[var(--s-text,#111)]">预设列表</h2>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-gray-700 shadow-sm active:scale-95 transition-all"
+                            >
+                                <Upload size={14} strokeWidth={2} />
+                                <span>导入</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={addPreset}
+                                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#007aff] px-3 text-xs font-semibold text-white shadow-sm active:scale-95 transition-all"
+                            >
+                                <Plus size={14} strokeWidth={2} />
+                                <span>新建</span>
+                            </button>
+                        </div>
                     </div>
 
                     {presets.length === 0 ? (

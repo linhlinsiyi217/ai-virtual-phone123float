@@ -73,11 +73,16 @@ export function UserIdentitySettings() {
 
     useEffect(() => {
         const saved = loadUserIdentities();
+        let list: UserIdentity[];
         if (saved.length > 0) {
-            setIdentitiesRaw(saved);
+            list = saved;
         } else {
-            setIdentitiesRaw(DEFAULT_IDENTITIES);
+            list = DEFAULT_IDENTITIES;
             saveUserIdentities(DEFAULT_IDENTITIES);
+        }
+        setIdentitiesRaw(list);
+        // 直接打开第一条身份进行编辑，不显示网格选择
+        if (list.length > 0) setEditingId(list[0].id);
         }
     }, []);
 
@@ -103,17 +108,9 @@ export function UserIdentitySettings() {
     }, [identities, setIdentities]);
 
     useEffect(() => {
-        setSubpageRightAction("identity",
-            <button
-                onClick={addIdentity}
-                className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[20px] bg-black px-4 text-xs font-bold text-white shadow-sm transition-all hover:bg-gray-800 hover:shadow-md active:scale-95 focus:outline-none"
-            >
-                <Plus size={15} strokeWidth={1.8} />
-                <span>新增身份</span>
-            </button>
-        );
+        setSubpageRightAction("identity", null);
         return () => setSubpageRightAction("identity", null);
-    }, [addIdentity, setSubpageRightAction]);
+    }, [setSubpageRightAction]);
 
     const updateIdentity = (id: string, updates: Partial<UserIdentity>) => {
         setIdentities(identities.map(i => i.id === id ? { ...i, ...updates } : i));
@@ -130,9 +127,6 @@ export function UserIdentitySettings() {
 
     return (
         <div className="flex flex-col gap-6">
-            <div className="flex items-center">
-                <h2 className="m-0 mx-2 ts-28 font-bold italic leading-none text-black">User Identity</h2>
-            </div>
 
             {identities.length === 0 ? (
                 <div className="ui-empty">
@@ -148,7 +142,18 @@ export function UserIdentitySettings() {
                     </button>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                <h2 className="m-0 text-base font-semibold text-[var(--s-text,#111)]">我的人设</h2>
+                <button
+                    type="button"
+                    onClick={addIdentity}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#007aff] px-3 text-xs font-semibold text-white shadow-sm active:scale-95 transition-all"
+                >
+                    <Plus size={14} strokeWidth={2} />
+                    <span>新增</span>
+                </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
                     {identities.map(identity => (
                         <div
                             key={identity.id}

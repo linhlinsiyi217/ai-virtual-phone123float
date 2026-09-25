@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useContext, useEffect, useLayoutEffect, useCallback, useRef, useMemo, createContext, type CSSProperties, type ReactNode } from "react";
-import { ChevronRight, Search, X, HardDrive, Mic, Image, Fingerprint, Globe, Database, Layers, Link2, CloudUpload, MessageSquare, Wrench, Laptop, UserCircle, Info, SlidersHorizontal, Check, Loader2, LogOut, KeyRound, User } from "lucide-react";
+import { useState, useContext, useEffect, useCallback, useRef, useMemo, type ReactNode } from "react";
+import { ChevronRight, X, HardDrive, Mic, Image, Fingerprint, Globe, Database, Layers, Link2, CloudUpload, MessageSquare, Wrench, Laptop, UserCircle, Info, LogOut, KeyRound, User, ShieldCheck } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { useAccount } from "@/lib/account-context";
 import { isSelfHostedModeEnabled } from "@/lib/self-hosting";
+import { changeAccountPassword } from "@/lib/account-client";
 import { loadUserIdentities } from "@/lib/settings-storage";
 import { ApiSettings } from "./settings/api-settings";
 import { VoiceSettings } from "./settings/voice-settings";
@@ -192,6 +193,7 @@ function SubpageRenderer({
         case "agentComputer": return <AgentComputerSettings onNotice={onNotice} />;
         case "moderation": return <ModerationCenter onNotice={onNotice} />;
         case "identity": return <UserIdentitySettings />;
+        case "accountSecurity": return <AccountSecurityPage onNotice={onNotice} />;
         case "about": return <AboutDeclaration />;
         case "character": return <PhoneCharacterApp onClose={onBack} onNotice={onNotice} />;
         case "theme": return (
@@ -278,6 +280,7 @@ function PhoneSettingsContent({
                     { id: "weixin", label: "微信接入", group: "连接与工具", icon: MessageSquare },
                     { id: "toolbox", label: "聊天工具箱", group: "连接与工具", icon: Wrench },
                     { id: "agentComputer", label: "角色电脑", group: "连接与工具", icon: Laptop },
+                    { id: "accountSecurity", label: "账号与安全", group: "关于", icon: KeyRound },
                     { id: "about", label: "关于与声明", group: "关于", icon: Info },
                 ];
                 const q = String(searchQuery ?? "").trim().toLowerCase();
@@ -299,5 +302,111 @@ function PhoneSettingsContent({
                 ));
             })()}
         </>
+    );
+}
+
+function AccountSecurityPage({ onNotice }: { onNotice: (msg: string) => void }) {
+    const { account, logout } = useAccount();
+    const [oldPwd, setOldPwd] = useState("");
+    const [newPwd, setNewPwd] = useState("");
+    const [confirmPwd, setConfirmPwd] = useState("");
+    const [pwdBusy, setPwdBusy] = useState(false);
+    const [pwdError, setPwdError] = useState("");
+    const [pwdSuccess, setPwdSuccess] = useState(false);
+    const [confirmLogout, setConfirmLogout] = useState(false);
+
+    const handleChangePassword = async () => {
+        if (pwdBusy) return;
+        setPwdError("");
+        setPwdSuccess(false);
+        if (!oldPwd || !newPwd) { setPwdError("请填写当前密码和新密码"); return; }
+        if (newPwd.length < 6) { setPwdError("新密码至少需要 6 位"); return; }
+        if (newPwd !== confirmPwd) { setPwdError("两次输入的新密码不一致"); return; }
+        setPwdBusy(true);
+        try {
+            const result = await changeAccountPassword({ oldPassword: oldPwd, newPassword: newPwd });
+            if (!result.ok) { setPwdError(result.error || "修改密码失败"); return; }
+            setOldPwd(""); setNewPwd(""); setConfirmPwd("");
+            setPwdSuccess(true);
+            onNotice("密码修改成功");
+        } finally {
+            setPwdBusy(false);
+        }
+    };
+
+    const inputCls = "w-full h-11 px-3 rounded-xl bg-[var(--s-surface,#f2f3f7)] text-sm border-0 focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 text-[var(--s-text,#111)]";
+
+    return (
+        <div className="flex flex-col gap-6 pb-10">
+            {/* 账号信息 */}
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-[var(--s-surface,#f2f3f7)]">
+                <div className="w-14 h-14 rounded-full bg-gray-200 shrink-0 flex items-center justify-center">
+                    <UserCircle size={36} className="text-gray-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="text-base font-semibold text-[var(--s-text,#111)] truncate">
+                        {account?.displayName || account?.username || "本地用户"}
+                    </div>
+                    <div className="text-xs text-[var(--s-muted,#6b7280)] truncate">
+                        {account ? `@${account.username}` : "自托管 / 本地离线模式"}
+                    </div>
+                </div>
+            </div>
+
+            {account ? (
+                <>
+                    {/* 修改密码 */}
+                    <div className="flex flex-col gap-3">
+                        <h3 className="text-xs font-semibold text-[var(--s-muted,#6b7280)] uppercase tracking-wider ml-1">修改密码</h3>
+                        <div className="flex flex-col gap-2">
+                            <input className={inputCls} type="password" autoComplete="current-password"
+                                placeholder="当前密码" value={oldPwd} onChange={e => setOldPwd(e.target.value)} />
+                            <input className={inputCls} type="password" autoComplete="new-password"
+                                placeholder="新密码（至少 6 位）" value={newPwd} onChange={e => setNewPwd(e.target.value)} />
+                            <input className={inputCls} type="password" autoComplete="new-password"
+                                placeholder="再次输入新密码" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} />
+                        </div>
+                        {pwdError && <p role="alert" className="text-xs text-red-500 ml-1">{pwdError}</p>}
+                        {pwdSuccess && <p className="text-xs text-emerald-600 ml-1">密码已更新</p>}
+                        <button
+                            type="button"
+                            disabled={pwdBusy}
+                            onClick={() => void handleChangePassword()}
+                            className="h-11 rounded-xl bg-[#007aff] text-white text-sm font-semibold disabled:opacity-50 active:scale-[0.98] transition-all"
+                        >
+                            {pwdBusy ? "保存中…" : "保存新密码"}
+                        </button>
+                    </div>
+
+                    {/* 退出登录 */}
+                    <div className="flex flex-col gap-2">
+                        <h3 className="text-xs font-semibold text-[var(--s-muted,#6b7280)] uppercase tracking-wider ml-1">账号操作</h3>
+                        <button
+                            type="button"
+                            onClick={() => setConfirmLogout(true)}
+                            className="h-11 rounded-xl bg-red-50 text-red-500 text-sm font-semibold border border-red-100 active:scale-[0.98] transition-all"
+                        >
+                            退出登录
+                        </button>
+                    </div>
+                </>
+            ) : (
+                <div className="p-4 rounded-xl bg-[var(--s-surface,#f2f3f7)] text-center">
+                    <p className="text-sm text-[var(--s-muted,#6b7280)] m-0">当前为本地离线模式，无账号密码管理。</p>
+                </div>
+            )}
+
+            {confirmLogout && account && (
+                <ConfirmDialog
+                    title="退出登录"
+                    message={`当前账号 @${account.username}，退出后需要重新登录。`}
+                    icon={LogOut}
+                    variant="danger"
+                    confirmLabel="退出登录"
+                    onConfirm={() => { setConfirmLogout(false); void logout(); }}
+                    onCancel={() => setConfirmLogout(false)}
+                />
+            )}
+        </div>
     );
 }

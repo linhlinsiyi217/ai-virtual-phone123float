@@ -37,10 +37,30 @@
 }
 
 .settings-v2__navigation {
-  display: grid;
-  grid-template-columns: minmax(44px, 1fr) auto minmax(44px, 1fr);
+  position: relative;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   min-height: 48px;
+}
+
+.settings-v2__page-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 128px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.settings-v2__trailing {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-width: 44px;
+  flex-shrink: 0;
 }
 
 .settings-v2__home-title {
@@ -70,15 +90,7 @@
   opacity: 0.55;
 }
 
-.settings-v2__page-title {
-  grid-column: 2;
-  grid-row: 1;
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-  text-align: center;
-  color: var(--s-text);
-}
+/* .settings-v2__page-title is now defined inside __navigation block above */
 
 .settings-v2__nav-button {
   display: grid;

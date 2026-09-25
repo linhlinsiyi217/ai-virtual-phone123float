@@ -728,6 +728,7 @@ function CharListView({
   const [pendingBgType, setPendingBgType] = useState<CanvasBgItem['type'] | null>(null);
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number }>({ x: -9999, y: -9999 });
   const [importError, setImportError] = useState<string | null>(null);
+  const [showAddMenu, setShowAddMenu] = useState(false);
   const placementActive = !!(pendingPlacementChar || pendingBgType);
 
   useEffect(() => {
@@ -1099,51 +1100,72 @@ function CharListView({
           </div>
         }
         footer={
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
-            <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-black/75 dark:bg-black/85 backdrop-blur-xl border border-white/20 shadow-2xl">
-              <button
-                type="button"
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/15 text-white text-xs font-semibold hover:bg-white/25 active:scale-95 transition-all"
-                onClick={() => { pendingActionRef.current = 'import'; setShowStylePicker(true); }}
-              >
-                <IconImport />
-                <span>导入</span>
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/15 text-white text-xs font-semibold hover:bg-white/25 active:scale-95 transition-all"
-                onClick={() => { pendingActionRef.current = 'create'; setShowStylePicker(true); }}
-              >
-                <IconPlus />
-                <span>添加</span>
-              </button>
-              {isEditing && (
+          <div className="flex justify-center pb-[max(20px,env(safe-area-inset-bottom))] pt-2 pointer-events-none">
+            <div className="relative pointer-events-auto">
+              {/* 添加菜单 */}
+              {showAddMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowAddMenu(false)} />
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-1 min-w-[140px] bg-white/90 dark:bg-[#1c1c1e]/95 backdrop-blur-xl rounded-2xl border border-black/8 shadow-xl overflow-hidden">
+                    <button
+                      type="button"
+                      className="flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-[#111] dark:text-white hover:bg-black/5 active:bg-black/10 transition-colors text-left w-full"
+                      onClick={() => { setShowAddMenu(false); pendingActionRef.current = 'create'; setShowStylePicker(true); }}
+                    >
+                      <IconPlus /><span>新建角色</span>
+                    </button>
+                    <div className="h-px bg-black/6 mx-3" />
+                    <button
+                      type="button"
+                      className="flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-[#111] dark:text-white hover:bg-black/5 active:bg-black/10 transition-colors text-left w-full"
+                      onClick={() => { setShowAddMenu(false); pendingActionRef.current = 'import'; setShowStylePicker(true); }}
+                    >
+                      <IconImport /><span>导入角色</span>
+                    </button>
+                    {isEditing && (
+                      <>
+                        <div className="h-px bg-black/6 mx-3" />
+                        <button
+                          type="button"
+                          className="flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-[#111] dark:text-white hover:bg-black/5 active:bg-black/10 transition-colors text-left w-full"
+                          onClick={() => { setShowAddMenu(false); setIsPropsMenuOpen(true); }}
+                        >
+                          <IconPlus /><span>添加道具</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+              {/* 主胶囊 */}
+              <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-full bg-white/80 dark:bg-[#1c1c1e]/85 backdrop-blur-xl border border-black/10 shadow-lg">
                 <button
                   type="button"
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/15 text-white text-xs font-semibold hover:bg-white/25 active:scale-95 transition-all"
-                  onClick={() => setIsPropsMenuOpen(true)}
+                  className="flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[13px] font-semibold text-[#111] dark:text-white hover:bg-black/6 active:scale-95 transition-all"
+                  onClick={() => setShowAddMenu(v => !v)}
                 >
                   <IconPlus />
-                  <span>道具</span>
+                  <span>添加</span>
                 </button>
-              )}
-              <button
-                type="button"
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-500/35 border border-blue-400/30 text-white text-xs font-semibold hover:bg-blue-500/45 active:scale-95 transition-all"
-                onClick={() => setShowNpcGen(true)}
-              >
-                <IconPlus />
-                <span>生成配角</span>
-              </button>
+                <div className="w-px h-5 bg-black/12" />
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[13px] font-semibold text-[#007aff] hover:bg-[#007aff]/8 active:scale-95 transition-all"
+                  onClick={() => setShowNpcGen(true)}
+                >
+                  <IconPlus />
+                  <span>生成配角</span>
+                </button>
+              </div>
+              <input
+                ref={fileRef} type="file" accept=".json,.png,image/png,application/json" className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) await handleImportFile(file);
+                  e.target.value = "";
+                }}
+              />
             </div>
-            <input
-              ref={fileRef} type="file" accept=".json,.png,image/png,application/json" className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (file) await handleImportFile(file);
-                e.target.value = "";
-              }}
-            />
           </div>
         }
       >
