@@ -89,7 +89,7 @@ export function PhoneSettingsApp({
             setCurrentPageId(null);
             setTitle(null);
             setOverrideBack(null);
-            setSearchQuery("");
+            // 这里不清除 searchQuery，保留上一级的搜索状态
         } else {
             onClose();
         }
@@ -189,7 +189,7 @@ function SubpageRenderer({
 }: any) {
     const renderSubPage = (pageId: string) => {
         switch (pageId) {
-            case "api": return <ApiSettings />;
+            case "api": return <ApiSettings hideHeading />;
             case "voice": return <VoiceSettings />;
             case "imageGeneration": return <ImageGenerationSettings />;
             case "presets": return <PresetManager isActive />;
