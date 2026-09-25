@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useContext } from "react";
-import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Trash2, X, Check } from "lucide-react";
+import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Trash2, X, Check, Loader2 } from "lucide-react";
 import { SettingsContext } from "../phone-settings-app";
 import type { ApiConfig } from "@/lib/settings-types";
 import { loadApiConfigs, removeApiConfigReferences, saveApiConfigs } from "@/lib/settings-storage";
@@ -228,57 +228,46 @@ export function ApiSettings({ hideHeading = false }: { hideHeading?: boolean }) 
                 </div>
             ) : (
                 <div className="flex flex-col gap-4">
-                    {configs.map(config => (
-                        <button
-                            key={config.id}
-                            className="settings-v2__row"
-                            role="button"
-                            tabIndex={0}
-                            aria-label={`编辑 ${config.name || config.provider}`}
-                            onClick={() => setEditingId(config.id)}
-                            onKeyDown={(event) => {
-                                if (event.target !== event.currentTarget) return;
-                                if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault();
-                                    setEditingId(config.id);
-                                }
-                            }}
-                        >
-                            <div className="flex-1 text-left">
-                                <div className="font-semibold">{config.name || "未命名配置"}</div>
-                                <div className="text-xs text-[var(--ios-secondary)]">{config.provider || "自定义"}</div>
-                            </div>
-                            {isFetching[config.id] ? (
-                                <Loader2 size={18} className="animate-spin text-[var(--ios-secondary)]" />
-                            ) : (
-                                <div className={`w-2.5 h-2.5 rounded-full ${testResult[config.id]?.success ? "bg-[var(--ios-green)]" : "bg-[var(--ios-line)]"}`} />
-                            )}
-                        </button>
-                        <div style={{ display: 'none' }}>
-                            <button
-                                type="button"
-                                onClick={(event) => {
-                                    event.stopPropagation();
-                                        setEditingId(config.id);
-                                    }}
-                                    className="ui-link-btn"
+                    <div className="settings-v2__group">
+                        {configs.map((config, index) => (
+                            <div
+                                key={config.id}
+                                className={`flex items-center bg-white ${
+                                    index > 0 ? "border-t border-[var(--ios-line)]" : ""
+                                }`}
+                            >
+                                <button
+                                    type="button"
+                                    className="settings-v2__row min-w-0 flex-1"
+                                    aria-label={`编辑 ${config.name || config.provider}`}
+                                    onClick={() => { setEditingId(config.id); setIsNewConfig(false); }}
                                 >
-                                    <FileEdit size={18} />
+                                    <span className="min-w-0 flex-1 text-left">
+                                        <span className="block truncate font-semibold">
+                                            {config.name || config.provider || "未命名配置"}
+                                        </span>
+                                        <span className="block truncate text-xs text-[var(--ios-secondary)]">
+                                            {isTesting[config.id]
+                                                ? "测试中…"
+                                                : testResult[config.id]?.success
+                                                    ? "已连接"
+                                                    : testResult[config.id]
+                                                        ? "连接失败"
+                                                        : "未测试"}
+                                        </span>
+                                    </span>
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        setConfirmDeleteId(config.id);
-                                    }}
-                                    className="ui-link-btn"
-                                    data-variant="danger"
+                                    className="settings-v2__glass-control mx-2 shrink-0"
+                                    aria-label={`删除 ${config.name || config.provider}`}
+                                    onClick={() => setConfirmDeleteId(config.id)}
                                 >
-                                    <Trash2 size={18} />
+                                    <Trash2 size={17} className="text-[var(--ios-danger)]" />
                                 </button>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             )}
 
