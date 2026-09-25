@@ -35,7 +35,32 @@ import { PhoneThemeApp } from "./phone-theme-app";
 import { PhoneResourcesApp } from "./phone-resources-app";
 import "./settings-preview-v2/settings-v2.css";
 
-export function PhoneSettingsApp({ onClose, onNotice }: { onClose: () => void, onNotice: (msg: string) => void }) {
+export function PhoneSettingsApp({ 
+    onClose, 
+    onNotice,
+    // 从 desktop-shell 传入的主题与桌面状态
+    draftTheme,
+    onDraftChange,
+    onApplyTheme,
+    widgets,
+    onWidgetsChange,
+    onDesktopThemeChange,
+    pageIcons,
+    iconSkins,
+    wallpaperStyle
+}: { 
+    onClose: () => void, 
+    onNotice: (msg: string) => void,
+    draftTheme: any,
+    onDraftChange: (a: any) => void,
+    onApplyTheme: (a: any) => void,
+    widgets: any[],
+    onWidgetsChange: (a: any[]) => void,
+    onDesktopThemeChange: (a: any) => void,
+    pageIcons: any,
+    iconSkins: any,
+    wallpaperStyle: any
+}) {
     const [title, setTitle] = useState<string | null>(null);
     const [overrideBack, setOverrideBack] = useState<(() => void) | null>(null);
     const [rightActions, setRightActions] = useState<Record<string, ReactNode>>({});
@@ -67,6 +92,15 @@ export function PhoneSettingsApp({ onClose, onNotice }: { onClose: () => void, o
                     onNotice={onNotice} 
                     currentPageId={currentPageId}
                     setCurrentPageId={setCurrentPageId}
+                    draftTheme={draftTheme}
+                    onDraftChange={onDraftChange}
+                    onApplyTheme={onApplyTheme}
+                    widgets={widgets}
+                    onWidgetsChange={onWidgetsChange}
+                    onDesktopThemeChange={onDesktopThemeChange}
+                    pageIcons={pageIcons}
+                    iconSkins={iconSkins}
+                    wallpaperStyle={wallpaperStyle}
                 />
             </SettingsShellV2>
         </SettingsContext.Provider>
@@ -92,16 +126,48 @@ function SubpageRenderer({ pageId, onNotice }: { pageId: string, onNotice: (msg:
             case "moderation": return <ModerationCenter onNotice={onNotice} />;
             case "identity": return <UserIdentitySettings />;
             case "about": return <AboutDeclaration />;
+            case "character": return <PhoneCharacterApp onClose={() => {}} onNotice={onNotice} />;
+            case "theme": return (
+                <PhoneThemeApp 
+                    draft={draft} 
+                    onDraftChange={onDraftChange} 
+                    onApply={onApply} 
+                    onClose={() => {}} 
+                    onNotice={onNotice} 
+                    widgets={widgets}
+                    onWidgetsChange={onWidgetsChange}
+                    onDesktopThemeChange={onDesktopThemeChange}
+                    pageIcons={pageIcons}
+                    iconSkins={iconSkins}
+                    wallpaperStyle={wallpaperStyle}
+                />
+            );
+            case "resources": return <PhoneResourcesApp onClose={() => {}} onNotice={onNotice} />;
             default: return null;
         }
     };
     return renderSubPage(pageId);
 }
 
-function PhoneSettingsContent({ onClose, onNotice, currentPageId, setCurrentPageId }: { onClose: () => void, onNotice: (msg: string) => void, currentPageId: string | null, setCurrentPageId: (id: string | null) => void }) {
+function PhoneSettingsContent({ 
+    onClose, onNotice, currentPageId, setCurrentPageId,
+    draftTheme, onDraftChange, onApplyTheme, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle
+}: any) {
     const { push } = useContext(SettingsNavigationContext);
     
-    if (currentPageId) return <SubpageRenderer pageId={currentPageId} onNotice={onNotice} />;
+    if (currentPageId) return <SubpageRenderer 
+        pageId={currentPageId} 
+        onNotice={onNotice} 
+        draft={draftTheme}
+        onDraftChange={onDraftChange}
+        onApply={onApplyTheme}
+        widgets={widgets}
+        onWidgetsChange={onWidgetsChange}
+        onDesktopThemeChange={onDesktopThemeChange}
+        pageIcons={pageIcons}
+        iconSkins={iconSkins}
+        wallpaperStyle={wallpaperStyle}
+    />;
 
     return (
         <>
@@ -120,6 +186,9 @@ function PhoneSettingsContent({ onClose, onNotice, currentPageId, setCurrentPage
                 </div>
             )}
 
+            <SettingsListGroup title="外观与显示">
+                <SettingsListItem icon={Image} label="外观" onClick={() => { setCurrentPageId("theme"); push("theme", "外观"); }} />
+            </SettingsListGroup>
             <SettingsListGroup title="AI 与生成">
                 <SettingsListItem icon={HardDrive} label="API 设置" onClick={() => { setCurrentPageId("api"); push("api", "API 设置"); }} />
                 <SettingsListItem icon={Mic} label="语音 API" onClick={() => { setCurrentPageId("voice"); push("voice", "语音 API"); }} />
@@ -128,10 +197,15 @@ function PhoneSettingsContent({ onClose, onNotice, currentPageId, setCurrentPage
             </SettingsListGroup>
             
             <SettingsListGroup title="角色与世界">
-                <SettingsListItem icon={Fingerprint} label="角色卷宗" onClick={() => { /* 待接入 CharacterApp */ }} />
+                <SettingsListItem icon={UserCircle} label="角色卷宗" onClick={() => { setCurrentPageId("character"); push("character", "角色卷宗"); }} />
                 <SettingsListItem icon={Globe} label="世界书" onClick={() => { setCurrentPageId("worldbook"); push("worldbook", "世界书"); }} />
                 <SettingsListItem icon={Database} label="正则规则" onClick={() => { setCurrentPageId("regex"); push("regex", "正则规则"); }} />
                 <SettingsListItem icon={UserCircle} label="用户身份" onClick={() => { setCurrentPageId("identity"); push("identity", "用户身份"); }} />
+            </SettingsListGroup>
+
+            <SettingsListGroup title="数据与资源">
+                <SettingsListItem icon={Layers} label="资源库" onClick={() => { setCurrentPageId("resources"); push("resources", "资源库"); }} />
+                <SettingsListItem icon={Database} label="数据管理" onClick={() => { setCurrentPageId("data"); push("data", "数据管理"); }} />
             </SettingsListGroup>
 
             <SettingsListGroup title="连接与工具">
