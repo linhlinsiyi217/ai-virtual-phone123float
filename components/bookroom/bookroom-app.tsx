@@ -22,6 +22,7 @@ import { NightReadingSheet } from "./night-reading-sheet";
 import { CoReadingChatSheet } from "./co-reading-chat-sheet";
 import { AppearanceStudioSheet } from "./appearance-studio-sheet";
 import { ReadingSkinSheet } from "./reading-skin-sheet";
+import { injectBookroomAppearance } from "@/lib/bookroom-appearance";
 import { BookroomSplash } from "./bookroom-splash";
 import { ReadingView } from "./reading-view";
 import { MangaReaderView } from "./manga-reader-view";
@@ -76,12 +77,18 @@ export default function BookRoomApp({ onClose }: Props) {
     setRoles(resolveCompanionRoles());
   }, [roleDrawerOpen, coTarget !== null, historyOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 启动画面（静态结构 + 轻柔进出）
+  // Phase 8B：启动即注入已保存的外观 token（深浅模式 / Pearl Glass 全局生效）
+  useEffect(() => {
+    const dispose = injectBookroomAppearance();
+    return dispose;
+  }, []);
+
+  // 启动画面（文字分层显现 ~2.1s，整体淡出 ~0.5s，总时长 2.6s）
   const [splashFading, setSplashFading] = useState(false);
   const [splashGone, setSplashGone] = useState(false);
   useEffect(() => {
-    const fadeTimer = window.setTimeout(() => setSplashFading(true), 1350);
-    const goneTimer = window.setTimeout(() => setSplashGone(true), 1850);
+    const fadeTimer = window.setTimeout(() => setSplashFading(true), 2100);
+    const goneTimer = window.setTimeout(() => setSplashGone(true), 2620);
     return () => {
       window.clearTimeout(fadeTimer);
       window.clearTimeout(goneTimer);

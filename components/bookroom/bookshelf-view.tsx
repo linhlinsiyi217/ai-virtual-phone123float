@@ -101,13 +101,14 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 
 /* ───────────────────────── 书脊视图 ───────────────────────── */
 
+/* Phase 8B：冷灰 / 冷蓝色板书脊，不使用暖黄木色 */
 const SPINE_TONE: Record<BookCoverTone, { bg: string; ink: string }> = {
-  paper: { bg: "#e7e4dc", ink: "#4b483f" },
-  blue: { bg: "#9aa3ab", ink: "#f4f5f3" },
-  gold: { bg: "#c3b89e", ink: "#4d4530" },
-  clay: { bg: "#b08f88", ink: "#f7f0ec" },
-  ink: { bg: "#4a4946", ink: "#ecebe6" },
-  warm: { bg: "#cfc9bd", ink: "#4c473e" },
+  paper: { bg: "#e6e9ee", ink: "#4a505c" },
+  blue: { bg: "#94a0ad", ink: "#f6f8fb" },
+  gold: { bg: "#a8afb8", ink: "#333a44" },
+  clay: { bg: "#8e9aad", ink: "#f2f5fa" },
+  ink: { bg: "#46494e", ink: "#eceef2" },
+  warm: { bg: "#c9cfd6", ink: "#464c55" },
 };
 
 function variance(id: string): { width: number; height: number } {
@@ -185,7 +186,24 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("recent");
   const [search, setSearch] = useState("");
-  const [mode, setMode] = useState<"spine" | "cover">("cover");
+  // Phase 8B：默认真实书架（书脊立在层板上），封面网格为次选
+  const [mode, setMode] = useState<"spine" | "cover">("spine");
+
+  // 真实书架：按宽度把书分进每一层架板
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const [perTier, setPerTier] = useState(9);
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const calc = () => {
+      const w = el.clientWidth - 24;
+      setPerTier(Math.max(3, Math.floor((w + 7) / 39)));
+    };
+    calc();
+    const ro = new ResizeObserver(calc);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mode]);
 
   const [importOpen, setImportOpen] = useState(false);
   const [focusTarget, setFocusTarget] = useState<{ book: Book; entry: BookshelfEntry } | null>(null);
@@ -299,6 +317,16 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
     });
     return arr;
   }, [searched, sortKey, customOrder]);
+
+  /** 书架分层：按每层容量切分（仅 spine 模式） */
+  const tiers = useMemo(() => {
+    if (mode !== "spine") return [];
+    const out: typeof sorted[] = [];
+    for (let i = 0; i < sorted.length; i += perTier) {
+      out.push(sorted.slice(i, i + perTier));
+    }
+    return out;
+  }, [sorted, perTier, mode]);
 
   /* ───── Continue Reading：阅读中且有进度的最近一本 ───── */
   const continueInfo = useMemo(() => {
@@ -488,47 +516,72 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
         </section>
       )}
 
-      {/* 搜索 + 视图切换行 */}
+      {/* 紧凑工具区：搜索行 / 横滑分类 chips / 单行工具（Phase 8B 减纵向占用） */}
       <section className="br-shelf-toolbar book-section">
-        <div className="br-shelf-search">
-          <Search size={15} strokeWidth={2} />
-          <input
-            type="text"
-            placeholder="搜索我的书架…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            aria-label="书架搜索"
+        <div className="br-shelf-searchrow">
+          <div className="br-shelf-search">
+            <Search size={15} strokeWidth={2} />
+            <input
+              type="text"
+              placeholder="搜索我的书架…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              aria-label="书架搜索"
+            />
+            {search && (
+              <button
+                type="button"
+                className="br-shelf-search-clear"
+                onClick={() => setSearch("")}
+                aria-label="清除搜索"
+              >
+                <X size={13} strokeWidth={2.4} />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            className="br-shelf-import-entry br-shelf-import-icon book-pressable"
+            onClick={() => setImportOpen(true)}
+            aria-label="导入书籍"
+          >
+            <BookPlus size={16} strokeWidth={2.1} />
+          </button>
+          <Segmented<"spine" | "cover">
+            ariaLabel="书架展示模式"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "spine", label: "书脊" },
+              { value: "cover", label: "封面" },
+            ]}
           />
-          {search && (
-            <button
-              type="button"
-              className="br-shelf-search-clear"
-              onClick={() => setSearch("")}
-              aria-label="清除搜索"
-            >
-              <X size={13} strokeWidth={2.4} />
-            </button>
-          )}
         </div>
 
-        <div className="br-shelf-controls">
-          <Segmented<ShelfView>
-            ariaLabel="书架分类"
-            value={view}
-            onChange={setView}
-            options={VIEW_OPTIONS as unknown as { value: ShelfView; label: string }[]}
-          />
+        <div className="br-shelf-chips" role="tablist" aria-label="书架分类">
+          {VIEW_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              role="tab"
+              aria-selected={view === opt.value}
+              className={`br-chip book-pressable ${view === opt.value ? "is-active" : ""}`}
+              onClick={() => setView(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="br-shelf-tools">
           <Segmented<TypeFilter>
             ariaLabel="内容类型筛选"
             value={typeFilter}
             onChange={setTypeFilter}
             options={TYPE_OPTIONS as unknown as { value: TypeFilter; label: string }[]}
           />
-        </div>
-
-        <div className="br-shelf-controls">
           <div className="br-shelf-sort">
-            <SlidersHorizontal size={14} strokeWidth={2} />
+            <SlidersHorizontal size={13} strokeWidth={2} />
             <select
               value={sortKey}
               onChange={e => setSortKey(e.target.value as SortKey)}
@@ -540,28 +593,15 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
                 </option>
               ))}
             </select>
-            <ChevronDown size={13} strokeWidth={2} />
+            <ChevronDown size={12} strokeWidth={2} />
           </div>
-          <Segmented<"spine" | "cover">
-            ariaLabel="书架展示模式"
-            value={mode}
-            onChange={setMode}
-            options={[
-              { value: "cover", label: "封面" },
-              { value: "spine", label: "书脊" },
-            ]}
-          />
-        </div>
-
-        <div className="br-shelf-actions">
           <button
             type="button"
             className="br-shelf-action book-pressable"
             onClick={handleCreateCollection}
             aria-label="新建分组"
           >
-            <FolderPlus size={15} strokeWidth={2} />
-            <span>分组</span>
+            <FolderPlus size={14} strokeWidth={2} />
           </button>
           {collections.length > 0 && (
             <button
@@ -570,19 +610,9 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
               onClick={() => setCollectionsOpen(true)}
               aria-label="管理分组"
             >
-              <Pencil size={14} strokeWidth={2} />
-              <span>管理</span>
+              <Pencil size={13} strokeWidth={2} />
             </button>
           )}
-          <button
-            type="button"
-            className="br-shelf-import-entry book-pressable"
-            onClick={() => setImportOpen(true)}
-            aria-label="导入书籍"
-          >
-            <BookPlus size={15} strokeWidth={2} />
-            <span>导入</span>
-          </button>
         </div>
       </section>
 
@@ -590,12 +620,16 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
       {sorted.length === 0 ? (
         <p className="book-empty br-shelf-empty">{emptyText[view]}</p>
       ) : mode === "spine" ? (
-        <div className="br-shelf-board">
-          <div className="br-shelf-spines">
-            {sorted.map(({ book, percent }) => (
-              <BookSpine key={book.id} book={book} percent={percent} onSelect={handleSelect} />
-            ))}
-          </div>
+        <div className="br-shelf-board" ref={boardRef}>
+          {tiers.map((tier, ti) => (
+            <div className="br-shelf-tier" key={ti}>
+              <div className="br-shelf-spines">
+                {tier.map(({ book, percent }) => (
+                  <BookSpine key={book.id} book={book} percent={percent} onSelect={handleSelect} />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="book-grid br-shelf-grid">

@@ -202,30 +202,138 @@ export function updateAppearanceTokens(patch: Partial<AppearanceTokens>): Bookro
   return next;
 }
 
-/** 将外观 token 转换为 CSS 变量映射 */
+/* ───────────────────────── 颜色工具 ───────────────────────── */
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(hex.trim());
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) h = h.split("").map(c => c + c).join("");
+  const n = parseInt(h, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function rgba(hex: string, alpha: number): string {
+  const c = hexToRgb(hex);
+  if (!c) return hex;
+  return `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})`;
+}
+
+/** 判断浅色 / 深色（用于在用户主背景上推导玻璃层） */
+function isLightHex(hex: string): boolean {
+  const c = hexToRgb(hex);
+  if (!c) return true;
+  return (c.r * 299 + c.g * 587 + c.b * 114) / 1000 > 150;
+}
+
+/**
+ * 将外观 token 转换为完整 Pearl Glass CSS 变量映射（Phase 8B）。
+ * 同时覆盖旧 --book-* 基础变量（全房组件零改动即跟随）与新 --bookroom-* 语义层。
+ */
 export function appearanceToCssVars(tokens: AppearanceTokens): Record<string, string> {
-  const alpha = (tokens.cardOpacity / 100).toFixed(2);
-  const borderAlpha = (tokens.borderBrightness / 100).toFixed(2);
-  const shadowAlpha = (tokens.cardShadow / 100 * 0.15).toFixed(3);
+  const dark = tokens.mode === "dark";
+  const alpha = Math.min(0.92, Math.max(0.25, tokens.cardOpacity / 100));
+  const borderAlpha = dark
+    ? Math.min(0.22, Math.max(0.05, (100 - tokens.borderBrightness) / 380))
+    : Math.min(0.16, Math.max(0.04, tokens.borderBrightness / 1100));
+  const shadowAlpha = (tokens.cardShadow / 100 * 0.14).toFixed(3);
+  const hl = (tokens.glassHighlight / 100).toFixed(2);
+  const rLg = tokens.radius + 8;
+  const rXl = tokens.radius + 14;
+  const light = isLightHex(tokens.bgPrimary);
+
+  // 玻璃面：浅模式白玻璃，深模式冷灰玻璃
+  const glassBase = dark ? "#1C2028" : "#FFFFFF";
+  const glassSoft = dark ? "#15181E" : tokens.bgSecondary;
+  const inkTertiary = dark ? "rgba(244,246,248,0.42)" : rgba(tokens.textPrimary, 0.42);
+  const iconBtnBg = dark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.55)";
+  const iconBtnBorder = dark ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.65)";
+  const paper = dark ? "#15181E" : "#FCFCFA";
+  const shelfWood = dark
+    ? "linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)), #1A1D24"
+    : "linear-gradient(180deg, #F2F4F7, #E7EBF0)";
+
   return {
-    "--book-bg-primary": tokens.bgPrimary,
-    "--book-bg-secondary": tokens.bgSecondary,
+    /* ── 旧基础变量（保持全房组件兼容） ── */
+    "--book-bg": tokens.bgPrimary,
+    "--book-surface": rgba(glassBase, alpha * 0.82),
+    "--book-surface-strong": rgba(glassBase, alpha),
+    "--book-border": dark ? `rgba(255,255,255,${borderAlpha})` : `rgba(17,19,24,${borderAlpha})`,
     "--book-text": tokens.textPrimary,
     "--book-text-secondary": tokens.textSecondary,
-    "--book-accent": tokens.accent,
-    "--book-card-bg": `rgba(255,255,255,${alpha})`,
-    "--book-card-bg-dark": `rgba(17,19,24,${alpha})`,
-    "--book-card-blur": `${tokens.cardBlur}px`,
-    "--book-card-shadow": `0 8px 32px rgba(0,0,0,${shadowAlpha})`,
-    "--book-border": `rgba(0,0,0,${borderAlpha})`,
-    "--book-radius": `${tokens.radius}px`,
-    "--book-glass-highlight": `${tokens.glassHighlight}%`,
+    "--book-text-tertiary": inkTertiary,
+    "--book-radius-xl": `${rXl}px`,
+    "--book-radius-lg": `${rLg}px`,
+    "--book-radius-md": `${tokens.radius}px`,
+    "--book-radius-sm": `${Math.max(10, tokens.radius - 5)}px`,
+    "--book-accent-red": dark ? "#F08A82" : "#D26B61",
+    "--book-accent-blue": tokens.accent,
+    "--book-accent-gold": dark ? "#E3C988" : "#C9A85F",
+
+    /* ── Phase 8B 语义层 ── */
+    "--bookroom-bg": tokens.bgPrimary,
+    "--bookroom-bg-2": tokens.bgSecondary,
+    "--bookroom-surface": rgba(glassBase, alpha * 0.82),
+    "--bookroom-surface-strong": rgba(glassBase, alpha),
+    "--bookroom-surface-soft": rgba(glassSoft, dark ? 0.5 : 0.55),
+    "--bookroom-text": tokens.textPrimary,
+    "--bookroom-text-2": tokens.textSecondary,
+    "--bookroom-text-3": inkTertiary,
+    "--bookroom-border": dark ? `rgba(255,255,255,${borderAlpha})` : `rgba(17,19,24,${borderAlpha})`,
+    "--bookroom-highlight": tokens.accent,
+    "--bookroom-glass-alpha": String(alpha),
+    "--bookroom-glass-blur": `${tokens.cardBlur}px`,
+    "--bookroom-glass-hl": hl,
+    "--bookroom-shadow": `0 12px 32px rgba(0,0,0,${shadowAlpha})`,
+    "--bookroom-shadow-soft": `0 2px 10px rgba(0,0,0,${(tokens.cardShadow / 100 * 0.06).toFixed(3)})`,
+    "--bookroom-radius": `${tokens.radius}px`,
+    "--bookroom-radius-lg": `${rLg}px`,
+    "--bookroom-accent": tokens.accent,
+    "--bookroom-icon-btn-bg": iconBtnBg,
+    "--bookroom-icon-btn-border": iconBtnBorder,
+    "--bookroom-paper": paper,
+    "--bookroom-shelf-wood": shelfWood,
+    "--bookroom-is-light": light ? "1" : "0",
   };
 }
 
-/** 生成作用域 CSS 文本，注入到 .bookroom-app */
+/**
+ * 生成作用域 CSS 文本，注入到 .bookroom-app。
+ * Phase 8B：含基础背景雾层、Pearl Glass 衍生面与阅读纸张跟随，深浅两套均在此输出。
+ */
 export function buildAppearanceCss(tokens: AppearanceTokens): string {
   const vars = appearanceToCssVars(tokens);
   const lines = Object.entries(vars).map(([k, v]) => `  ${k}: ${v};`);
-  return `.bookroom-app {\n${lines.join("\n")}\n}`;
+  const dark = tokens.mode === "dark";
+  // 根层冷雾：浅模式极浅冷蓝，深模式冷黑微光
+  const mist = dark
+    ? "radial-gradient(120% 56% at 16% 0%, rgba(96,165,250,0.07), rgba(0,0,0,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(255,255,255,0.04), rgba(0,0,0,0) 64%)"
+    : "radial-gradient(120% 56% at 16% 0%, rgba(255,255,255,0.95), rgba(255,255,255,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(214,226,240,0.55), rgba(214,226,240,0) 64%)";
+  return [
+    `.bookroom-app {`,
+    ...lines,
+    `  --bookroom-mist: ${mist};`,
+    `}`,
+  ].join("\n");
+}
+
+/** 全局注入样式 id（app 启动时与外观工作室共用，避免重复 style 标签） */
+export const BOOKROOM_APPEARANCE_STYLE_ID = "br-appearance-style";
+
+/**
+ * 启动时把已保存的外观 token 注入 document.head（Phase 8B）。
+ * 不再依赖外观工作室是否打开；返回卸载函数。
+ */
+export function injectBookroomAppearance(): () => void {
+  const appearance = loadBookroomAppearance();
+  let styleEl = document.getElementById(BOOKROOM_APPEARANCE_STYLE_ID) as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = BOOKROOM_APPEARANCE_STYLE_ID;
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = buildAppearanceCss(appearance.tokens);
+  return () => {
+    if (styleEl) styleEl.textContent = "";
+  };
 }

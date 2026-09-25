@@ -6,7 +6,7 @@ import {
   ChartColumn,
   ChevronRight,
   FileDown,
-  Heart,
+  Highlighter,
   MessageCircleHeart,
   Music,
   Palette,
@@ -21,11 +21,14 @@ import {
 import {
   loadBookroomProfile,
   updateBookroomProfile,
+  getAvatarFrameTransform,
+  getProfileBackgroundStyle,
+  getProfileOverlayStyle,
   type BookroomProfile,
 } from "@/lib/bookroom-profile";
-import { listCoSessions, type CoReadingSession } from "@/lib/bookroom-sessions";
-import { listShelfEntries } from "@/lib/bookroom-shelf";
-import { getAvatarFrameTransform, getProfileBackgroundStyle, getProfileOverlayStyle } from "@/lib/bookroom-profile";
+import { listCoSessions } from "@/lib/bookroom-sessions";
+import { listShelfEntries, resolveShelfBook } from "@/lib/bookroom-shelf";
+import { loadBookAnnotations } from "@/lib/bookroom-annotations";
 import { ProfileEditSheet } from "./profile-edit-sheet";
 
 type Props = {
@@ -41,68 +44,37 @@ type Props = {
   onOpenShelf: () => void;
 };
 
-/** 快捷入口项 */
+/** 快捷入口项（2×4 网格） */
 const QUICK_ACTIONS = [
-  { id: "stats", label: "统计", icon: ChartColumn, desc: "阅读时长与记录" },
-  { id: "history", label: "共读记录", icon: MessageCircleHeart, desc: "与 TA 一起读过的书" },
-  { id: "quotes", label: "收藏语录", icon: Quote, desc: "划线 / 高亮 / 笔记" },
-  { id: "appearance", label: "外观工作室", icon: Palette, desc: "主题、色彩与质感" },
-  { id: "skins", label: "阅读皮肤", icon: Sparkles, desc: "阅读器美化" },
-  { id: "import", label: "导入内容", icon: FileDown, desc: "TXT / EPUB / PDF" },
-  { id: "desk", label: "书桌", icon: PenSquare, desc: "写作与项目" },
-  { id: "shelf", label: "我的书架", icon: BookOpen, desc: "已收藏的书籍" },
+  { id: "stats", label: "统计", icon: ChartColumn },
+  { id: "history", label: "共读记录", icon: MessageCircleHeart },
+  { id: "quotes", label: "收藏语录", icon: Quote },
+  { id: "appearance", label: "外观工作室", icon: Palette },
+  { id: "skins", label: "阅读皮肤", icon: Sparkles },
+  { id: "import", label: "导入内容", icon: FileDown },
+  { id: "desk", label: "书桌", icon: PenSquare },
+  { id: "shelf", label: "我的书架", icon: BookOpen },
 ] as const;
 
-/** 音乐卡片：当前项目无真实音乐源时展示连接提示 */
-function MusicCard({ visible }: { visible: boolean }) {
-  if (!visible) return null;
+/** 音乐卡片：当前项目无真实音乐源时展示连接提示，不伪造播放 */
+function MusicCard() {
   return (
-    <section className="book-section">
-      <div className="br-music-card book-glass">
-        <div className="br-music-cover">
-          <Music size={22} strokeWidth={1.8} />
-        </div>
-        <div className="br-music-info">
-          <span className="br-music-title">尚未连接音乐</span>
-          <span className="br-music-artist">连接音乐服务后，这里会显示正在播放</span>
-        </div>
+    <div className="br-music-card book-glass">
+      <div className="br-music-cover">
+        <Music size={20} strokeWidth={1.8} />
       </div>
-    </section>
-  );
-}
-
-/** 共读记录摘要 */
-function CoReadingSummary({ sessions }: { sessions: CoReadingSession[] }) {
-  if (sessions.length === 0) return null;
-  const recent = sessions.slice(0, 2);
-  return (
-    <section className="book-section">
-      <div className="book-section-head">
-        <h2 className="book-section-title">最近共读</h2>
-        <Heart size={14} strokeWidth={2} className="br-title-icon" />
+      <div className="br-music-info">
+        <span className="br-music-title">尚未连接音乐</span>
+        <span className="br-music-artist">连接音乐服务后，这里会显示正在播放</span>
       </div>
-      <div className="br-list book-glass">
-        {recent.map(s => (
-          <div key={s.id} className="br-list-row">
-            <span className="br-chat-avatar br-companion-avatar">
-              {s.roleSnapshot?.avatar ? <img src={s.roleSnapshot.avatar} alt="" /> : (s.roleSnapshot?.name ?? "?").slice(0, 1)}
-            </span>
-            <span className="br-list-main">
-              <span className="br-list-label">《{s.bookTitle}》</span>
-              <span className="br-list-desc">{s.progress}% · {s.messageCount} 条消息</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
+    </div>
   );
 }
 
 /**
- * 我的页（Phase 8A）：真实可编辑的用户主页。
- * - 资料 / 头像 / 头像框 / 背景 / 签名全部来自 bookroom-profile，可编辑；
- * - 快捷入口分层跳转，不纵向堆满；
- * - 共读记录 / 收藏语录 / 统计均为真实数据入口。
+ * 我的页（Phase 8B 最终布局）：首页只看摘要，细节点进去。
+ * Hero 资料 → 统计摘要条 → 音乐 → 快捷入口 → 收藏语录预览（1~3）→ 最近共读（1~2）。
+ * 所有数据真实：shelf / reading-progress / annotations / CoReadingSession。
  */
 export function MineView({
   role,
@@ -118,8 +90,36 @@ export function MineView({
 }: Props) {
   const [profile, setProfile] = useState<BookroomProfile>(() => loadBookroomProfile());
   const [editOpen, setEditOpen] = useState(false);
-  const sessions = useMemo(() => listCoSessions(), []);
-  const shelfCount = useMemo(() => listShelfEntries().length, []);
+
+  /** 一次性聚合主页摘要所需真实数据 */
+  const summary = useMemo(() => {
+    const entries = listShelfEntries();
+    const sessions = listCoSessions();
+    let annotationCount = 0;
+    const recentQuotes: { quote: string; bookTitle: string; id: string }[] = [];
+    for (const entry of entries) {
+      const anns = loadBookAnnotations(entry.bookId);
+      annotationCount += anns.length;
+      const title = resolveShelfBook(entry.bookId)?.title ?? "未知书名";
+      for (const ann of anns.slice(0, 3)) {
+        recentQuotes.push({
+          id: ann.id,
+          quote: ann.quote,
+          bookTitle: title,
+        });
+        if (recentQuotes.length >= 3) break;
+      }
+      if (recentQuotes.length >= 3) break;
+    }
+    const readingCount = entries.filter(e => e.status === "reading").length;
+    return {
+      shelfCount: entries.length,
+      readingCount,
+      annotationCount,
+      quotePreview: recentQuotes,
+      sessions: sessions.slice(0, 2),
+    };
+  }, []);
 
   const handleSave = (patch: Partial<BookroomProfile>) => {
     setProfile(updateBookroomProfile(patch));
@@ -152,9 +152,9 @@ export function MineView({
         </div>
       )}
 
-      {/* 顶部个人资料 */}
+      {/* Hero 资料卡 */}
       <section className="book-section">
-        <div className="br-profile book-glass br-profile-editable">
+        <div className="br-profile br-profile-hero book-glass br-profile-editable">
           <button type="button" className="br-profile-edit-btn book-pressable" onClick={() => setEditOpen(true)} aria-label="编辑资料">
             <PenSquare size={14} strokeWidth={2} />
           </button>
@@ -186,7 +186,32 @@ export function MineView({
         </div>
       </section>
 
-      {/* 当前陪读角色 */}
+      {/* 统计摘要条：点击进入完整统计页 */}
+      <section className="book-section">
+        <button type="button" className="br-stats-strip book-glass book-pressable" onClick={onOpenStats}>
+          <span className="br-stats-cell">
+            <span className="br-stats-num">{summary.shelfCount}</span>
+            <span className="br-stats-label">藏书</span>
+          </span>
+          <span className="br-stats-sep" aria-hidden />
+          <span className="br-stats-cell">
+            <span className="br-stats-num">{summary.readingCount}</span>
+            <span className="br-stats-label">阅读中</span>
+          </span>
+          <span className="br-stats-sep" aria-hidden />
+          <span className="br-stats-cell">
+            <span className="br-stats-num">{summary.annotationCount}</span>
+            <span className="br-stats-label">标注</span>
+          </span>
+          <span className="br-stats-sep" aria-hidden />
+          <span className="br-stats-cell br-stats-cell-more">
+            <ChartColumn size={15} strokeWidth={2} />
+            <span className="br-stats-label">统计</span>
+          </span>
+        </button>
+      </section>
+
+      {/* 当前陪读角色 + 音乐（同一紧凑行） */}
       <section className="book-section">
         <button type="button" className="br-companion-row book-glass book-pressable" onClick={onOpenRoles}>
           <span className="br-chat-avatar br-companion-avatar">
@@ -198,15 +223,15 @@ export function MineView({
           </span>
           <ChevronRight size={16} strokeWidth={2} className="br-list-arrow" />
         </button>
+        {profile.showMusicCard && (
+          <div className="br-music-wrap">
+            <MusicCard />
+          </div>
+        )}
       </section>
-
-      <MusicCard visible={profile.showMusicCard} />
 
       {/* 快捷入口 */}
       <section className="book-section">
-        <div className="book-section-head">
-          <h2 className="book-section-title">快捷入口</h2>
-        </div>
         <div className="br-quick-grid">
           {QUICK_ACTIONS.map(item => {
             const Icon = item.icon;
@@ -227,33 +252,74 @@ export function MineView({
         </div>
       </section>
 
-      {/* 最近共读 */}
-      <CoReadingSummary sessions={sessions} />
-
-      {/* 书架摘要 */}
-      {shelfCount > 0 && (
+      {/* 收藏语录预览：主页最多 3 条，点击进入完整页 */}
+      {summary.quotePreview.length > 0 && (
         <section className="book-section">
-          <div className="br-list book-glass">
-            <button type="button" className="br-list-row book-pressable" onClick={onOpenShelf}>
-              <span className="br-list-icon" aria-hidden>
-                <BookOpen size={17} strokeWidth={1.9} />
-              </span>
-              <span className="br-list-main">
-                <span className="br-list-label">我的书架</span>
-                <span className="br-list-desc">{shelfCount} 本书</span>
-              </span>
-              <ChevronRight size={16} strokeWidth={2} className="br-list-arrow" />
+          <div className="book-section-head">
+            <h2 className="book-section-title">收藏语录</h2>
+            <button type="button" className="br-section-more book-pressable" onClick={onOpenQuotes}>
+              全部 <ChevronRight size={13} strokeWidth={2.2} />
             </button>
+          </div>
+          <div className="br-quote-preview book-glass">
+            {summary.quotePreview.map(q => (
+              <button
+                key={q.id}
+                type="button"
+                className="br-quote-item book-pressable"
+                onClick={onOpenQuotes}
+              >
+                <Quote size={13} strokeWidth={2} className="br-quote-mark" />
+                <span className="br-quote-text">{q.quote}</span>
+                <span className="br-quote-src">《{q.bookTitle}》</span>
+              </button>
+            ))}
           </div>
         </section>
       )}
 
-      {/* 签名 */}
+      {/* 最近共读：最多 2 条摘要 */}
+      {summary.sessions.length > 0 && (
+        <section className="book-section">
+          <div className="book-section-head">
+            <h2 className="book-section-title">最近共读</h2>
+            <button type="button" className="br-section-more book-pressable" onClick={onOpenHistory}>
+              全部 <ChevronRight size={13} strokeWidth={2.2} />
+            </button>
+          </div>
+          <div className="br-list book-glass">
+            {summary.sessions.map(s => (
+              <button
+                key={s.id}
+                type="button"
+                className="br-list-row book-pressable"
+                onClick={onOpenHistory}
+              >
+                <span className="br-chat-avatar br-companion-avatar">
+                  {s.roleSnapshot?.avatar ? <img src={s.roleSnapshot.avatar} alt="" /> : (s.roleSnapshot?.name ?? "?").slice(0, 1)}
+                </span>
+                <span className="br-list-main">
+                  <span className="br-list-label">《{s.bookTitle}》</span>
+                  <span className="br-list-desc">{s.progress}% · {s.messageCount} 条消息</span>
+                </span>
+                <ChevronRight size={16} strokeWidth={2} className="br-list-arrow" />
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 无任何内容时的轻提示（真实空状态，不造数据） */}
+      {summary.annotationCount === 0 && summary.sessions.length === 0 && summary.shelfCount === 0 && (
+        <div className="br-mine-empty book-glass">
+          <Highlighter size={18} strokeWidth={1.8} />
+          <span>开始你的第一本阅读，标注与共读会慢慢出现在这里。</span>
+        </div>
+      )}
+
+      {/* 签名（用户自定义，可关闭） */}
       {profile.signature && (
-        <p className="br-mine-foot">
-          <Heart size={11} strokeWidth={2} />
-          {profile.signature}
-        </p>
+        <p className="br-mine-foot">{profile.signature}</p>
       )}
 
       {editOpen && (

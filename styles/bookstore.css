@@ -6036,3 +6036,628 @@
   padding-top: 16px;
   border-top: 1px solid var(--book-border, rgba(0,0,0,0.08));
 }
+
+/* ═══════════════════════════════════════════════════════════
+   BOOKROOM Phase 8B — 启动画面 / Pearl Glass 统一 / 真实书架 /
+   Dock 精修 / 页面层级 / 安静阅读器 / Night Pearl
+   原则：只追加覆盖，不改动既有结构；全部 scope 在 .bookroom-app。
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── 1. 根层：冷雾 + 主背景跟随外观 token（替换旧暖雾） ── */
+.bookroom-app {
+  background: var(--bookroom-mist, none), var(--bookroom-bg, #f7f6f3);
+}
+
+/* Pearl Glass 统一面：所有 .book-glass 共用同一组 token */
+.bookroom-app .book-glass {
+  background:
+    linear-gradient(145deg,
+      rgba(255, 255, 255, 0.5),
+      rgba(255, 255, 255, 0)),
+    var(--bookroom-surface-strong, rgba(255, 255, 255, 0.72));
+  border: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.08));
+  box-shadow:
+    var(--bookroom-shadow, 0 12px 32px rgba(20, 20, 20, 0.06)),
+    var(--bookroom-shadow-soft, 0 2px 8px rgba(20, 20, 20, 0.03)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(var(--bookroom-glass-blur, 20px)) saturate(118%);
+  -webkit-backdrop-filter: blur(var(--bookroom-glass-blur, 20px)) saturate(118%);
+}
+
+/* Night Pearl：玻璃面翻为冷灰透明 + 冷白内边 */
+.bookroom-app .book-icon-btn {
+  background: var(--bookroom-icon-btn-bg, rgba(255, 255, 255, 0.34));
+  border-color: var(--bookroom-icon-btn-border, rgba(255, 255, 255, 0.55));
+  color: var(--bookroom-text-2, #59616d);
+}
+
+/* 半弹窗 / 抽屉面板跟随 token（深色时不再是白底） */
+.bookroom-app .br-sheet {
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.4),
+      rgba(255, 255, 255, 0)),
+    var(--bookroom-surface-strong, rgba(255, 255, 255, 0.92));
+  border-top: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.08));
+  box-shadow: 0 -18px 50px rgba(10, 14, 22, 0.16);
+  border-radius: 28px 28px 0 0;
+}
+.bookroom-app .br-sheet-grabber { background: var(--bookroom-border, rgba(17,19,24,.14)); }
+.bookroom-app .br-sheet-scrim { background: rgba(14, 18, 26, 0.3); }
+
+/* ── 2. 启动画面 Splash v2 ── */
+.bookroom-app .br-splash-host {
+  background: transparent;
+  transition: opacity 480ms cubic-bezier(0.25, 0.8, 0.3, 1);
+}
+.bookroom-app .br-splash-v2 {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(90% 46% at 50% 26%, rgba(226, 236, 248, 0.5), rgba(226, 236, 248, 0) 70%),
+    var(--bookroom-bg, #ffffff);
+}
+
+.br-splash-mist {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.br-splash-mist-a {
+  background: radial-gradient(64% 38% at 50% 30%, rgba(206, 224, 244, 0.5), rgba(206, 224, 244, 0) 72%);
+  opacity: 0;
+  animation: br-splash-fade 1300ms 120ms ease forwards;
+}
+.br-splash-mist-b {
+  background: radial-gradient(96% 52% at 50% 104%, rgba(232, 238, 246, 0.85), rgba(232, 238, 246, 0) 70%);
+  opacity: 0;
+  animation: br-splash-fade 1500ms 260ms ease forwards;
+}
+
+.br-splash-rain {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bookroom-app .br-splash-drop {
+  position: absolute;
+  top: -48px;
+  width: 1px;
+  border-radius: 1px;
+  background: linear-gradient(180deg,
+    rgba(120, 142, 168, 0),
+    rgba(120, 142, 168, 0.85));
+  animation-name: br-splash-drop;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-play-state: running;
+}
+@keyframes br-splash-drop {
+  0% { transform: translate3d(0, -60px, 0); }
+  100% { transform: translate3d(0, 108vh, 0); }
+}
+
+.br-splash-glass {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 30px;
+  border: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.07));
+  box-shadow:
+    0 22px 48px rgba(46, 66, 96, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+}
+.br-splash-glass-a {
+  width: 128px;
+  height: 128px;
+  left: -34px;
+  top: 17%;
+  transform: rotate(-12deg);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.6), rgba(238, 244, 250, 0.22));
+  animation: br-splash-glass-a 2400ms 320ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.br-splash-glass-b {
+  width: 84px;
+  height: 84px;
+  right: -22px;
+  bottom: 21%;
+  transform: rotate(9deg);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.55), rgba(235, 241, 248, 0.18));
+  animation: br-splash-glass-b 2400ms 520ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes br-splash-glass-a {
+  from { opacity: 0; transform: translate3d(0, 16px, 0) rotate(-12deg); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) rotate(-12deg); }
+}
+@keyframes br-splash-glass-b {
+  from { opacity: 0; transform: translate3d(0, 16px, 0) rotate(9deg); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) rotate(9deg); }
+}
+
+.br-splash-linh {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 168px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  white-space: nowrap;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--bookroom-border, rgba(17, 19, 24, 0.08));
+  opacity: 0;
+  animation: br-splash-linh 1500ms 1080ms cubic-bezier(0.25, 0.8, 0.3, 1) forwards;
+  pointer-events: none;
+}
+@keyframes br-splash-linh {
+  from { opacity: 0; letter-spacing: 0.02em; }
+  to { opacity: 1; letter-spacing: -0.05em; }
+}
+
+.br-splash-stack {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+.br-splash-title {
+  display: inline-flex;
+  gap: 20px;
+  font-size: calc(44px * var(--app-text-scale, 1));
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  color: var(--bookroom-text, #111318);
+}
+.br-splash-title-char {
+  display: inline-block;
+  opacity: 0;
+  animation: br-splash-char 760ms cubic-bezier(0.2, 0.75, 0.2, 1) forwards;
+  text-shadow: 0 2px 24px rgba(60, 82, 114, 0.12);
+}
+.br-splash-title-char:nth-child(2) { animation-delay: 170ms; }
+@keyframes br-splash-char {
+  from { opacity: 0; transform: translate3d(0, 16px, 0); filter: blur(8px); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); }
+}
+.br-splash-en {
+  font-size: calc(11.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.34em;
+  text-indent: 0.34em;
+  color: var(--bookroom-text-2, #59616d);
+  opacity: 0;
+  animation: br-splash-fade-up 760ms 760ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.br-splash-credit {
+  position: absolute;
+  z-index: 2;
+  bottom: calc(36px + env(safe-area-inset-bottom, 0px));
+  font-size: calc(11px * var(--app-text-scale, 1));
+  letter-spacing: 0.2em;
+  color: var(--bookroom-text-3, rgba(17, 19, 24, 0.4));
+  opacity: 0;
+  animation: br-splash-fade-up 720ms 1560ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes br-splash-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes br-splash-fade-up {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bookroom-app .br-splash-mist-a,
+  .bookroom-app .br-splash-mist-b,
+  .bookroom-app .br-splash-glass-a,
+  .bookroom-app .br-splash-glass-b,
+  .bookroom-app .br-splash-linh,
+  .bookroom-app .br-splash-title-char,
+  .bookroom-app .br-splash-en,
+  .bookroom-app .br-splash-credit {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+  .bookroom-app .br-splash-drop { display: none; }
+}
+
+/* ── 3. Dock 最终精修：悬浮奶白玻璃条 ── */
+.bookroom-app .br-dock-inner {
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 28px;
+  background:
+    linear-gradient(145deg,
+      rgba(255, 255, 255, 0.5),
+      rgba(255, 255, 255, 0)),
+    var(--bookroom-surface-strong, rgba(255, 255, 255, 0.82));
+  border: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.08));
+  box-shadow:
+    0 14px 36px rgba(18, 28, 44, 0.1),
+    0 2px 8px rgba(18, 28, 44, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, var(--bookroom-glass-hl, 0.75));
+  backdrop-filter: blur(var(--bookroom-glass-blur, 22px)) saturate(130%);
+  -webkit-backdrop-filter: blur(var(--bookroom-glass-blur, 22px)) saturate(130%);
+}
+.bookroom-app .br-dock-item {
+  gap: 3px;
+  padding: 6px 0 5px;
+  color: var(--bookroom-text-3, rgba(17, 19, 24, 0.42));
+  transition: transform 130ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 220ms ease, color 220ms ease;
+}
+.bookroom-app .br-dock-item:active { transform: scale(0.93); }
+.bookroom-app .br-dock-item.is-active {
+  color: var(--bookroom-text, #111318);
+  background: var(--bookroom-bg, #ffffff);
+  box-shadow:
+    0 3px 10px rgba(18, 28, 44, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+.bookroom-app .br-dock-item.is-active::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: var(--bookroom-accent, #3b82f6);
+}
+
+/* ── 4. 书架：紧凑工具区（搜索行 / 横滑 chips / 单行工具） ── */
+.bookroom-app .br-shelf-searchrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bookroom-app .br-shelf-searchrow .br-shelf-search { flex: 1; min-width: 0; }
+.bookroom-app .br-shelf-import-icon {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.08));
+  background: var(--bookroom-surface, rgba(255, 255, 255, 0.6));
+  color: var(--bookroom-text, #111318);
+  backdrop-filter: blur(var(--bookroom-glass-blur, 18px));
+  -webkit-backdrop-filter: blur(var(--bookroom-glass-blur, 18px));
+}
+.bookroom-app .br-shelf-chips {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 2px;
+  scroll-snap-type: x proximity;
+}
+.bookroom-app .br-shelf-chips::-webkit-scrollbar { display: none; }
+.bookroom-app .br-shelf-chips .br-chip {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  padding: 6px 14px;
+  font-size: calc(12px * var(--app-text-scale, 1));
+  white-space: nowrap;
+}
+.bookroom-app .br-shelf-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.bookroom-app .br-shelf-tools .br-shelf-sort { flex: 0 0 auto; }
+.bookroom-app .br-shelf-tools .br-shelf-action {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.08));
+  background: var(--bookroom-surface, rgba(255, 255, 255, 0.5));
+  color: var(--bookroom-text-2, #59616d);
+}
+.bookroom-app .br-shelf-tools .br-segmented { margin-left: auto; }
+
+/* ── 5. 真实书架：多层冷灰层板 + 立书 + 接触阴影 ── */
+.bookroom-app .br-shelf-board {
+  padding: 18px 6px 0;
+}
+.bookroom-app .br-shelf-tier {
+  position: relative;
+  margin: 0 4px;
+  padding: 16px 12px 0;
+}
+.bookroom-app .br-shelf-tier + .br-shelf-tier { margin-top: 22px; }
+/* 冷白 / 浅灰木纹层板（不使用黄色木头）—— 深浅色由 --bookroom-shelf-wood 统一提供 */
+.bookroom-app .br-shelf-tier::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 13px;
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(90deg,
+      var(--bookroom-shelf-wood-stripe, rgba(80, 98, 122, 0.05)) 0 18px,
+      var(--bookroom-shelf-wood-hl, rgba(255, 255, 255, 0.12)) 18px 20px,
+      var(--bookroom-shelf-wood-stripe, rgba(80, 98, 122, 0.04)) 20px 42px),
+    var(--bookroom-shelf-wood, linear-gradient(180deg, #f3f5f8, #e4e9f0));
+  box-shadow:
+    0 12px 20px -10px rgba(52, 68, 92, 0.4),
+    inset 0 1px 0 var(--bookroom-glass-hl-strong, rgba(255, 255, 255, 0.9));
+}
+.bookroom-app .br-shelf-tier .br-shelf-spines {
+  min-height: 124px;
+  gap: 8px;
+  padding: 0 2px 2px;
+  overflow-x: visible;
+}
+.bookroom-app .br-spine {
+  border-radius: 3px 3px 1.5px 1.5px;
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 260ms ease;
+}
+/* 书脊右侧书页厚度边 */
+.bookroom-app .br-spine::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: 0;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background:
+    repeating-linear-gradient(180deg,
+      rgba(255, 255, 255, 0.5) 0 1px,
+      rgba(60, 70, 88, 0.12) 1px 2px);
+  opacity: 0.7;
+}
+.bookroom-app .br-spine::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(36, 48, 68, 0.32), rgba(36, 48, 68, 0));
+  filter: blur(1.5px);
+  z-index: -1;
+}
+.bookroom-app .br-spine:active {
+  transform: translateY(-5px);
+}
+
+/* ShelfFocusSheet 浮起 */
+.bookroom-app .br-shelf-focus { animation: br-sheet-up 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* ── 6. 安静阅读器：顶 / 底栏单击切换 ── */
+.bookroom-app .reading-header,
+.bookroom-app .manga-header {
+  transition: opacity 280ms cubic-bezier(0.25, 0.8, 0.3, 1),
+    transform 280ms cubic-bezier(0.25, 0.8, 0.3, 1);
+  will-change: opacity, transform;
+}
+.bookroom-app .reading-header.is-chrome-hidden,
+.bookroom-app .manga-header.is-chrome-hidden {
+  opacity: 0;
+  transform: translate3d(0, -110%, 0);
+  pointer-events: none;
+}
+.bookroom-app .reading-footer-row {
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+.bookroom-app .reading-footer-row.is-chrome-hidden {
+  opacity: 0;
+  transform: translate3d(0, 8px, 0);
+  pointer-events: none;
+}
+/* 阅读纸张 / 墨色跟随外观（深色自动切 Night Pearl） */
+.bookroom-app .reading-view,
+.bookroom-app .manga-view {
+  --reading-ink: var(--bookroom-text, #1b1b1b);
+  --reading-ink-secondary: var(--bookroom-text-2, rgba(27, 27, 27, 0.6));
+  --reading-ink-tertiary: var(--bookroom-text-3, rgba(27, 27, 27, 0.38));
+  --reading-paper: var(--bookroom-paper, #fcfcfa);
+  background:
+    radial-gradient(120% 40% at 50% 0%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 60%),
+    var(--reading-paper);
+}
+.bookroom-app .reading-footer {
+  background: linear-gradient(180deg, transparent, var(--reading-paper) 42%);
+}
+
+/* ── 7. 我的主页最终布局：居中 Hero / 统计摘要条 / 语录预览 ── */
+.bookroom-app .br-profile-hero {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 30px 22px 26px;
+}
+.bookroom-app .br-profile-hero .br-profile-avatar-wrap {
+  margin: 0;
+}
+.bookroom-app .br-profile-hero .br-profile-main {
+  align-items: center;
+}
+.bookroom-app .br-profile-hero .br-profile-tags {
+  justify-content: center;
+}
+.bookroom-app .br-profile-hero .br-profile-edit-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.bookroom-app .br-stats-strip {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 15px 10px;
+  border-radius: var(--bookroom-radius-lg, 24px);
+  border: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.08));
+  color: var(--bookroom-text, #111318);
+}
+.bookroom-app .br-stats-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.bookroom-app .br-stats-num {
+  font-size: calc(19px * var(--app-text-scale, 1));
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.bookroom-app .br-stats-label {
+  font-size: calc(11px * var(--app-text-scale, 1));
+  letter-spacing: 0.12em;
+  color: var(--bookroom-text-2, #59616d);
+}
+.bookroom-app .br-stats-cell-more {
+  flex-direction: row;
+  gap: 5px;
+  color: var(--bookroom-text-2, #59616d);
+}
+.bookroom-app .br-stats-sep {
+  width: 1px;
+  height: 26px;
+  background: var(--bookroom-border, rgba(17, 19, 24, 0.08));
+}
+.bookroom-app .br-music-wrap { margin-top: 10px; }
+
+.bookroom-app .br-section-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  padding: 4px 2px;
+  font-size: calc(11.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.06em;
+  color: var(--bookroom-text-2, #59616d);
+}
+.bookroom-app .br-quote-preview {
+  border-radius: var(--bookroom-radius-lg, 24px);
+  padding: 4px 16px;
+}
+.bookroom-app .br-quote-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 13px 2px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  color: var(--bookroom-text, #111318);
+}
+.bookroom-app .br-quote-item + .br-quote-item {
+  border-top: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.07));
+}
+.bookroom-app .br-quote-mark {
+  color: var(--bookroom-text-3, rgba(17, 19, 24, 0.4));
+  flex: 0 0 auto;
+}
+.bookroom-app .br-quote-text {
+  font-size: calc(13.5px * var(--app-text-scale, 1));
+  line-height: 1.65;
+  color: var(--bookroom-text, #111318);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.bookroom-app .br-quote-src {
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.08em;
+  color: var(--bookroom-text-3, rgba(17, 19, 24, 0.42));
+}
+.bookroom-app .br-mine-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 2px;
+  padding: 28px 22px;
+  border-radius: var(--bookroom-radius-lg, 24px);
+  text-align: center;
+  font-size: calc(12.5px * var(--app-text-scale, 1));
+  line-height: 1.7;
+  color: var(--bookroom-text-2, #59616d);
+}
+
+/* ── 8. Night Pearl 补充：旧硬编码暖色控件翻色（用变量跟随深浅） ── */
+.bookroom-app .br-role-entry {
+  background:
+    linear-gradient(150deg, var(--bookroom-surface-strong, rgba(255,255,255,0.85)), var(--bookroom-surface, rgba(255,255,255,0.6)));
+  border-color: var(--bookroom-border, rgba(17, 19, 24, 0.08));
+}
+.bookroom-app .br-role-entry .br-role-dot {
+  border-color: var(--bookroom-bg, #ffffff);
+}
+.bookroom-app .br-role-dot-online { background: var(--bookroom-accent-blue, #4f8cff); }
+.bookroom-app .br-role-dot-reading { background: var(--bookroom-text-2, #8a93a0); }
+.bookroom-app .br-role-dot-idle { background: var(--bookroom-text-3, rgba(17,19,24,0.3)); }
+.bookroom-app .br-chip {
+  background: var(--bookroom-surface, rgba(255, 255, 255, 0.5));
+  border-color: var(--bookroom-border, rgba(17, 19, 24, 0.08));
+  color: var(--bookroom-text-2, #59616d);
+}
+.bookroom-app .br-chip.is-active {
+  background: var(--bookroom-text, #111318);
+  border-color: var(--bookroom-text, #111318);
+  color: var(--bookroom-bg, #ffffff);
+}
+.bookroom-app .br-segmented { background: rgba(128, 142, 162, 0.14); }
+.bookroom-app .br-segmented-item { color: var(--bookroom-text-2, #59616d); }
+.bookroom-app .br-segmented-item.is-active {
+  background: var(--bookroom-bg, #ffffff);
+  color: var(--bookroom-text, #111318);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.12);
+}
+
+/* ── 9. 小屏 / safe-area 专项 ── */
+@media (max-width: 360px) {
+  .bookroom-app .br-dock-label {
+    font-size: calc(9.5px * var(--app-text-scale, 1));
+    letter-spacing: 0.04em;
+  }
+  .bookroom-app .br-dock-inner { padding: 6px 6px; }
+  .bookroom-app .br-splash-title { font-size: calc(38px * var(--app-text-scale, 1)); }
+  .bookroom-app .br-splash-linh { font-size: 132px; }
+  .bookroom-app .br-quick-grid { gap: 8px; }
+  .bookroom-app .br-shelf-tier .br-shelf-spines { gap: 6px; }
+  .bookroom-app .br-sheet { padding-left: 16px; padding-right: 16px; }
+}
+/* sheet 永不超过可视高度 */
+.bookroom-app .br-sheet {
+  max-height: min(82%, calc(100% - env(safe-area-inset-top, 0px) - 12px));
+}

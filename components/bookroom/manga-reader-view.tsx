@@ -27,6 +27,10 @@ export function MangaReaderView({ book, onBack }: Props) {
   const [pageIndex, setPageIndex] = useState(0);
   const [percent, setPercent] = useState(0);
   const [hint, setHint] = useState<string | null>(null);
+  // Phase 8B：安静阅读 —— 顶栏默认隐藏，单击正文切换
+  const [chromeVisible, setChromeVisible] = useState(false);
+
+  const handleContentTap = () => setChromeVisible(v => !v);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pageRefs = useRef<(HTMLElement | null)[]>([]);
@@ -134,7 +138,7 @@ export function MangaReaderView({ book, onBack }: Props) {
 
   return (
     <div className="manga-view br-page bookroom-reader-skin-root">
-      <header className="manga-header">
+      <header className={`manga-header${chromeVisible ? " is-chrome-visible" : " is-chrome-hidden"}`}>
         <button
           className="book-icon-btn book-pressable"
           type="button"
@@ -154,7 +158,7 @@ export function MangaReaderView({ book, onBack }: Props) {
         </button>
       </header>
 
-      <div className="manga-content" ref={containerRef} onScroll={handleScroll}>
+      <div className="manga-content" ref={containerRef} onScroll={handleScroll} onClick={handleContentTap}>
         {pages.map((page, idx) => (
           <figure
             key={page.id}

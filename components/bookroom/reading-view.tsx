@@ -141,6 +141,8 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
   const [ttsStatus, setTtsStatus] = useState<BookTtsStatus>("idle");
   const [ttsIndex, setTtsIndex] = useState(-1);
   const [ttsRate, setTtsRate] = useState(1);
+  // Phase 8B：安静阅读 —— 顶 / 底栏默认隐藏，单击正文空白处切换
+  const [chromeVisible, setChromeVisible] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const articleRef = useRef<HTMLElement | null>(null);
@@ -248,6 +250,13 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
     const timer = window.setTimeout(() => setFlash(null), 1700);
     return () => window.clearTimeout(timer);
   }, [flash]);
+
+  /** 单击正文空白：切换安静模式工具栏；正在划词 / 点标注时不切换 */
+  const handleContentTap = () => {
+    const sel = window.getSelection();
+    if (sel && sel.toString().trim().length > 0) return;
+    setChromeVisible(v => !v);
+  };
 
   const handleScroll = () => {
     setSelection(null);
@@ -558,7 +567,10 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
           key={ann.id}
           className={`ra-mark ra-${ann.type}`}
           data-color={ann.color ?? (ann.type === "underline" ? "blue" : "yellow")}
-          onClick={() => openManage(ann)}
+          onClick={event => {
+            event.stopPropagation();
+            openManage(ann);
+          }}
         >
           {text.slice(deco.start, deco.end)}
           {ann.note ? (
@@ -603,7 +615,7 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
 
   return (
     <div className="reading-view br-page bookroom-reader-skin-root" style={skinVars}>
-      <header className="reading-header">
+      <header className={`reading-header${chromeVisible ? " is-chrome-visible" : " is-chrome-hidden"}`}>
         <button className="book-icon-btn book-pressable" type="button" onClick={onBack} aria-label="返回书籍详情">
           <ChevronLeft size={22} strokeWidth={2} />
         </button>
@@ -626,7 +638,12 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
         </button>
       </header>
 
-      <div className="reading-content" ref={scrollRef} onScroll={handleScroll}>
+      <div
+        className="reading-content"
+        ref={scrollRef}
+        onScroll={handleScroll}
+        onClick={handleContentTap}
+      >
         <article className="reading-article" ref={articleRef}>
           <h2 className="reading-chapter-title">{chapter?.title ?? ""}</h2>
           {chapter?.content.map((paragraph, i) => (
@@ -648,7 +665,7 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
         <div className="reading-progress-bar">
           <div className="reading-progress-bar-fill" style={{ width: `${scrollPercent}%` }} />
         </div>
-        <div className="reading-footer-row">
+        <div className={`reading-footer-row${chromeVisible ? " is-chrome-visible" : " is-chrome-hidden"}`}>
           <button
             type="button"
             className="reading-nav-btn book-pressable"
