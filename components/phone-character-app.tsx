@@ -1062,7 +1062,7 @@ function CharListView({
   return (
     <>
       <PageShell
-        title={<strong style={{ fontWeight: 900, fontFamily: 'Impact, "Arial Black", sans-serif', fontSize: '1.15em', letterSpacing: '0.04em' }}>TARGET ARCHIVES</strong>}
+        title={<strong style={{ fontWeight: 900, fontFamily: 'Impact, "Arial Black", sans-serif', fontSize: '1.15em', letterSpacing: '0.04em' }}>角色卷宗</strong>}
         leftAction={
           <button
             className="flex items-center justify-center w-[34px] h-[34px] rounded-full bg-black/5 text-[#666] hover:bg-black/10 transition-colors"
@@ -1099,34 +1099,51 @@ function CharListView({
           </div>
         }
         footer={
-          <div className="char-bottom-bar flex justify-center pb-8">
-            <div className="wt-bottom-pill">
-              <button className="wt-bottom-pill-btn" onClick={() => { pendingActionRef.current = 'import'; setShowStylePicker(true); }}>
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+            <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-black/75 dark:bg-black/85 backdrop-blur-xl border border-white/20 shadow-2xl">
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/15 text-white text-xs font-semibold hover:bg-white/25 active:scale-95 transition-all"
+                onClick={() => { pendingActionRef.current = 'import'; setShowStylePicker(true); }}
+              >
                 <IconImport />
-                <span>IMPORT</span>
+                <span>导入</span>
               </button>
-              <button className="wt-bottom-pill-btn" onClick={() => { pendingActionRef.current = 'create'; setShowStylePicker(true); }}>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/15 text-white text-xs font-semibold hover:bg-white/25 active:scale-95 transition-all"
+                onClick={() => { pendingActionRef.current = 'create'; setShowStylePicker(true); }}
+              >
                 <IconPlus />
-                <span>CREATE</span>
+                <span>添加</span>
               </button>
               {isEditing && (
-                <button className="wt-bottom-pill-btn" onClick={() => setIsPropsMenuOpen(true)}>
-                  <IconPlus /> <span>PROPS</span>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/15 text-white text-xs font-semibold hover:bg-white/25 active:scale-95 transition-all"
+                  onClick={() => setIsPropsMenuOpen(true)}
+                >
+                  <IconPlus />
+                  <span>道具</span>
                 </button>
               )}
-              <button className="wt-bottom-pill-btn wt-bottom-pill-active" onClick={() => setShowNpcGen(true)}>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-500/35 border border-blue-400/30 text-white text-xs font-semibold hover:bg-blue-500/45 active:scale-95 transition-all"
+                onClick={() => setShowNpcGen(true)}
+              >
                 <IconPlus />
-                <span>NPC</span>
+                <span>生成配角</span>
               </button>
-              <input
-                ref={fileRef} type="file" accept=".json,.png,image/png,application/json" className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (file) await handleImportFile(file);
-                  e.target.value = "";
-                }}
-              />
             </div>
+            <input
+              ref={fileRef} type="file" accept=".json,.png,image/png,application/json" className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file) await handleImportFile(file);
+                e.target.value = "";
+              }}
+            />
           </div>
         }
       >
