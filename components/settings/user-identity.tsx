@@ -141,6 +141,7 @@ export function UserIdentitySettings() {
                     </button>
                 </div>
             ) : (
+                <>
                 <div className="flex items-center justify-between gap-2 mb-2">
                 <h2 className="m-0 text-base font-semibold text-[var(--s-text,#111)]">我的人设</h2>
                 <button
@@ -210,6 +211,7 @@ export function UserIdentitySettings() {
                         </div>
                     ))}
                 </div>
+                </>
             )}
 
             {editingId && (
