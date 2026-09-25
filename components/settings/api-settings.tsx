@@ -213,12 +213,6 @@ export function ApiSettings({ hideHeading = false }: { hideHeading?: boolean }) 
 
     return (
         <div className="flex flex-col gap-6">
-            {!hideHeading && (
-                <div className="flex items-center">
-                    <h2 className="m-0 mx-2 ts-28 font-bold italic leading-none text-black">API Settings</h2>
-                </div>
-            )}
-
             {configs.length === 0 ? (
                 <div className="ui-empty">
                     <div className="ui-icon-circle">
@@ -233,12 +227,11 @@ export function ApiSettings({ hideHeading = false }: { hideHeading?: boolean }) 
                     </button>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-4">
                     {configs.map(config => (
-                        <div
+                        <button
                             key={config.id}
-                            className="ui-config-card min-w-0 cursor-pointer"
-                            style={{ aspectRatio: "3 / 2", padding: "12px", justifyContent: "space-between" }}
+                            className="settings-v2__row"
                             role="button"
                             tabIndex={0}
                             aria-label={`编辑 ${config.name || config.provider}`}
@@ -251,15 +244,21 @@ export function ApiSettings({ hideHeading = false }: { hideHeading?: boolean }) 
                                 }
                             }}
                         >
-                            <div className="min-w-0 flex flex-col gap-1">
-                                <span className="truncate text-[calc(14.4px*var(--app-text-scale,1))] font-bold leading-tight text-[var(--c-text-title)]">{config.name || config.provider}</span>
-                                <span className="menu-desc truncate">{config.defaultModel || config.provider || "未设置模型"}</span>
+                            <div className="flex-1 text-left">
+                                <div className="font-semibold">{config.name || "未命名配置"}</div>
+                                <div className="text-xs text-[var(--ios-secondary)]">{config.provider || "自定义"}</div>
                             </div>
-                            <div className="flex gap-2 shrink-0 items-center justify-end">
-                                <button
-                                    type="button"
-                                    onClick={(event) => {
-                                        event.stopPropagation();
+                            {isFetching[config.id] ? (
+                                <Loader2 size={18} className="animate-spin text-[var(--ios-secondary)]" />
+                            ) : (
+                                <div className={`w-2.5 h-2.5 rounded-full ${testResult[config.id]?.success ? "bg-[var(--ios-green)]" : "bg-[var(--ios-line)]"}`} />
+                            )}
+                        </button>
+                        <div style={{ display: 'none' }}>
+                            <button
+                                type="button"
+                                onClick={(event) => {
+                                    event.stopPropagation();
                                         setEditingId(config.id);
                                     }}
                                     className="ui-link-btn"
