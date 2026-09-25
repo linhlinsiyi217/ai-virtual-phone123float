@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Eye, EyeOff, ShieldAlert, MessageSquareX } from "lucide-react";
+import { Sparkles, Eye, EyeOff, Plus, Trash2, ShieldAlert, Sliders, MessageSquareX } from "lucide-react";
 import type { Character, CharacterGovernancePreset } from "@/lib/character-types";
 
 type GovernancePanelProps = {
@@ -14,12 +14,12 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
   const [bannedWordsEnabled, setBannedWordsEnabled] = useState(character.bannedWordsEnabled ?? true);
   const [bannedInput, setBannedInput] = useState("");
   const [bannedWords, setBannedWords] = useState<string[]>(character.bannedWords || []);
-
-  const [presets] = useState<CharacterGovernancePreset[]>(
+  
+  const [presets, setPresets] = useState<CharacterGovernancePreset[]>(
     character.governancePresets || [{ id: "default", name: "3.0pro 方案", oocPatchPrompt: character.oocPatchPrompt || "", riskReportPrompt: character.riskReportPrompt || "", updatedAt: new Date().toISOString() }]
   );
   const [activePresetId, setActivePresetId] = useState<string>(character.activePresetId || presets[0]?.id || "default");
-
+  
   const [rawComplaint, setRawComplaint] = useState(character.oocRawComplaint || "");
   const [oocPatchPrompt, setOocPatchPrompt] = useState(character.oocPatchPrompt || "");
   const [riskReportPrompt, setRiskReportPrompt] = useState(character.riskReportPrompt || "");
@@ -30,7 +30,10 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
   const addBannedWord = () => {
     const word = bannedInput.trim();
     if (!word) return;
-    if (bannedWords.includes(word)) { onNotice?.("该禁词已存在"); return; }
+    if (bannedWords.includes(word)) {
+      onNotice?.("该禁词已存在");
+      return;
+    }
     const next = [...bannedWords, word];
     setBannedWords(next);
     setBannedInput("");
@@ -44,7 +47,10 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
   };
 
   const handleProfessionalizeOoc = async () => {
-    if (!rawComplaint.trim()) { onNotice?.("请先输入您的吐槽或发牢骚内容"); return; }
+    if (!rawComplaint.trim()) {
+      onNotice?.("请先输入您的吐槽或发牢骚内容");
+      return;
+    }
     setIsGeneratingOoc(true);
     try {
       const generatedPatch = `### 说话偏好与语气管控规则 (OOC Guardrails)\n* %禁止句式与暗喻%: 严禁使用如 "${rawComplaint.trim()}" 等缺乏真诚感或脱离人设背景的套话/土味台词。\n* %沟通要求%: 保持自然流畅、符合角色身份的表述，拒绝任何黑话、金融借贷暗喻或机械复读。`;
@@ -80,16 +86,21 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
         <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider">人格治理系统 (活人感与风控)</h3>
         <select
           value={activePresetId}
-          onChange={e => { setActivePresetId(e.target.value); onChange({ activePresetId: e.target.value }); }}
+          onChange={e => {
+            setActivePresetId(e.target.value);
+            onChange({ activePresetId: e.target.value });
+          }}
           className="bg-white/10 border border-white/10 text-xs text-white rounded-lg px-2 py-1 outline-none"
         >
           {presets.map(p => (
-            <option key={p.id} value={p.id} className="bg-[#16161a] text-white">{p.name}</option>
+            <option key={p.id} value={p.id} className="bg-[#16161a] text-white">
+              {p.name}
+            </option>
           ))}
         </select>
       </div>
 
-      {/* 禁词表 */}
+      {/* 1. 禁词表 */}
       <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -98,7 +109,11 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
           </div>
           <button
             type="button"
-            onClick={() => { const next = !bannedWordsEnabled; setBannedWordsEnabled(next); onChange({ bannedWordsEnabled: next }); }}
+            onClick={() => {
+              const next = !bannedWordsEnabled;
+              setBannedWordsEnabled(next);
+              onChange({ bannedWordsEnabled: next });
+            }}
             className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-colors ${
               bannedWordsEnabled ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-white/10 text-white/50"
             }`}
@@ -106,6 +121,7 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
             {bannedWordsEnabled ? "已开启 ON" : "已关闭 OFF"}
           </button>
         </div>
+
         {bannedWordsEnabled && (
           <>
             <div className="flex gap-2">
@@ -117,16 +133,23 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
                 placeholder="输入讨厌的口癖/违禁词..."
                 className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-blue-500"
               />
-              <button type="button" onClick={addBannedWord} className="px-3 py-1.5 rounded-xl bg-blue-600 text-xs font-medium text-white hover:bg-blue-500 active:scale-95 transition-all">
+              <button
+                type="button"
+                onClick={addBannedWord}
+                className="px-3 py-1.5 rounded-xl bg-blue-600 text-xs font-medium text-white hover:bg-blue-500 active:scale-95 transition-all"
+              >
                 添加
               </button>
             </div>
+
             {bannedWords.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {bannedWords.map(word => (
                   <span key={word} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300">
                     {word}
-                    <button type="button" onClick={() => removeBannedWord(word)} className="hover:text-red-100 font-bold ml-1">×</button>
+                    <button type="button" onClick={() => removeBannedWord(word)} className="hover:text-red-100 font-bold ml-1">
+                      ×
+                    </button>
                   </span>
                 ))}
               </div>
@@ -135,7 +158,7 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
         )}
       </div>
 
-      {/* OOC 吐槽与指令专业化 */}
+      {/* 2. OOC 吐槽与指令专业化 */}
       <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-white/80">OOC 吐槽与自动管控指令</span>
@@ -149,27 +172,41 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
             <span>{isGeneratingOoc ? "生成中..." : "指令专业化"}</span>
           </button>
         </div>
+
         <textarea
           value={rawComplaint}
-          onChange={e => { setRawComplaint(e.target.value); onChange({ oocRawComplaint: e.target.value }); }}
+          onChange={e => {
+            setRawComplaint(e.target.value);
+            onChange({ oocRawComplaint: e.target.value });
+          }}
           placeholder="写下跟 TA 聊天时让你难受的话（如：不要说'连本带利地讨回来'了！你是男朋友不是放高利贷的）..."
           rows={2}
           className="w-full bg-white/5 border border-white/10 rounded-xl p-2.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-purple-500"
         />
+
         {oocPatchPrompt && (
           <div className="relative p-3 rounded-xl bg-purple-950/30 border border-purple-500/20 text-xs text-purple-200">
             <div className="flex justify-between items-center mb-1">
               <span className="font-semibold text-[11px] text-purple-300">已注入的专业补丁指令：</span>
-              <button type="button" onClick={() => { setOocPatchPrompt(""); onChange({ oocPatchPrompt: "" }); }} className="text-purple-400 hover:text-purple-200 text-[10px]">
+              <button
+                type="button"
+                onClick={() => {
+                  setOocPatchPrompt("");
+                  onChange({ oocPatchPrompt: "" });
+                }}
+                className="text-purple-400 hover:text-purple-200 text-[10px]"
+              >
                 清除补丁
               </button>
             </div>
-            <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed m-0 text-purple-200/90">{oocPatchPrompt}</pre>
+            <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed m-0 text-purple-200/90">
+              {oocPatchPrompt}
+            </pre>
           </div>
         )}
       </div>
 
-      {/* 风控报告自检 */}
+      {/* 3. 风控报告自检 */}
       <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
@@ -189,7 +226,11 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
             {riskReportPrompt && (
               <button
                 type="button"
-                onClick={() => { const next = !isRiskCollapsed; setIsRiskCollapsed(next); onChange({ riskReportCollapsed: next }); }}
+                onClick={() => {
+                  const next = !isRiskCollapsed;
+                  setIsRiskCollapsed(next);
+                  onChange({ riskReportCollapsed: next });
+                }}
                 className="p-1 rounded-lg bg-white/10 text-white/70 hover:text-white"
                 title={isRiskCollapsed ? "展开报告" : "折叠报告"}
               >
@@ -198,6 +239,7 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
             )}
           </div>
         </div>
+
         {riskReportPrompt && !isRiskCollapsed && (
           <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/20 text-xs text-amber-200">
             <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed m-0 text-amber-200/90 max-h-48 overflow-y-auto">

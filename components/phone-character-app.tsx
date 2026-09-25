@@ -2213,12 +2213,12 @@ function CharArchiveView({
 
   const archiveFrame = (
       <div className="char-archive-frame">
-        <div className="char-archive-stamp">CLASSIFIED</div>
+        <div className="char-archive-stamp">机密档案</div>
 
         <div className="char-archive-header">
           <div>
-            <div className="char-archive-title">{isEditing ? "EDITING ARCHIVE" : "ARCHIVAL\nINFORMATION"}</div>
-            <div className="char-archive-subtitle">THE INTELLIGENCE DATABASE</div>
+            <div className="char-archive-title">{isEditing ? "编辑档案" : "角色\n档案"}</div>
+            <div className="char-archive-subtitle">角色信息数据库</div>
           </div>
           <div className="char-archive-id">ID: {char.id.slice(0, 8).toUpperCase()}</div>
         </div>
@@ -2242,7 +2242,7 @@ function CharArchiveView({
               {isEditing && (
                 <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center pointer-events-none text-white">
                   <IconCamera size={24} />
-                  <span className="ts-10 mt-1">{avatarBusy ? "Optimizing..." : "Change Photo"}</span>
+                  <span className="ts-10 mt-1">{avatarBusy ? "处理中…" : "更换照片"}</span>
                 </div>
               )}
             </div>
@@ -2265,13 +2265,13 @@ function CharArchiveView({
                   className="ts-10 px-3 py-1 bg-[#111111] text-white border-none rounded-full cursor-pointer hover:bg-[#222222] transition-colors"
                   onClick={() => setShowUrlInput((v) => !v)}
                 >
-                  Use IMG URL
+                  使用图片链接
                 </button>
                 {showUrlInput && (
                   <div className="flex gap-1 mt-1">
                     <input
                       className="flex-1 ts-10 p-1 border border-[var(--c-input-border)] rounded w-full min-w-0"
-                      placeholder="Image URL..."
+                      placeholder="图片链接…"
                       value={urlInput}
                       onChange={(e) => setUrlInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -2291,11 +2291,11 @@ function CharArchiveView({
 
             {/* Name Box moved to the top of Right Column */}
             <div className="char-archive-name-box flex-1 flex flex-col justify-center text-left border-b border-[var(--c-panel-border)]" style={{ padding: "4px 6px 8px 6px" }}>
-              <span className="ts-8 text-[var(--c-text)] font-mono block mb-0.5">TARGET NAME / CODENAME</span>
+              <span className="ts-8 text-[var(--c-text)] font-mono block mb-0.5">目标名称 / 代号</span>
               {isEditing ? (
                 <input
                   className="char-archive-input ts-20 font-black w-full text-left bg-[var(--c-input)]/50 border border-dashed border-[#666] font-inherit tracking-[1px]"
-                  placeholder="Name or Codename"
+                  placeholder="姓名或代号"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   style={{
@@ -2304,24 +2304,24 @@ function CharArchiveView({
                 />
               ) : (
                 <h2 className="whitespace-pre-wrap break-words ts-20 font-black m-0 tracking-[1px]">
-                  {name || "UNNAMED"}
+                  {name || "未命名"}
                 </h2>
               )}
             </div>
 
             <div className="char-archive-row">
               <div className="char-archive-cell" style={{ flex: 0.8 }}>
-                <span className="char-archive-label">Status</span>
-                <span className="char-archive-val">{isEditing ? "EDITING" : "ACTIVE"}</span>
+                <span className="char-archive-label">状态</span>
+                <span className="char-archive-val">{isEditing ? "编辑中" : "活跃"}</span>
               </div>
               <div className="char-archive-cell" style={{ flex: 1.5 }}>
-                <span className="char-archive-label">WeChat</span>
+                <span className="char-archive-label">微信号</span>
                 <span className="char-archive-val select-text cursor-text tracking-[-0.5px]">
                   {char.wechatID || "N/A"}
                 </span>
               </div>
               <div className="char-archive-cell" style={{ flex: 1.1 }}>
-                <span className="char-archive-label">Update</span>
+                <span className="char-archive-label">更新时间</span>
                 <span className="char-archive-val">{char.updatedAt ? char.updatedAt.slice(0, 10).replace(/-/g, "/") : "N/A"}</span>
               </div>
             </div>
@@ -2331,7 +2331,7 @@ function CharArchiveView({
 
         <div className="char-archive-row">
           <div className="char-archive-cell" style={{ flex: 1.8 }}>
-            <span className="char-archive-label">Tags</span>
+            <span className="char-archive-label">标签</span>
             <div className="flex flex-wrap gap-2">
               {tags.map((t, i) => (
                 <div key={i} className="char-archive-tag">
@@ -2354,9 +2354,9 @@ function CharArchiveView({
                     value={tagInput}
                     onChange={e => setTagInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
-                    placeholder="Add tag..."
+                    placeholder="添加标签…"
                   />
-                  <button onClick={handleAddTag} className="bg-[#4a3f2f] text-white border-none rounded-[2px] px-2 ts-10 cursor-pointer">ADD</button>
+                  <button onClick={handleAddTag} className="bg-[#4a3f2f] text-white border-none rounded-[2px] px-2 ts-10 cursor-pointer">添加</button>
                 </div>
               )}
             </div>
@@ -2383,7 +2383,7 @@ function CharArchiveView({
           <div className="char-wall-settings">
             <div className="char-wall-settings-options">
               <div>
-                <div className="char-wall-settings-label">PHOTO WALL RATIO</div>
+                <div className="char-wall-settings-label">照片墙比例</div>
                 <div className="char-wall-settings-row">
                   {POLAROID_RATIOS.map((ratio, index) => (
                     <button
@@ -2398,7 +2398,7 @@ function CharArchiveView({
                 </div>
               </div>
               <div>
-                <div className="char-wall-settings-label">CARD SIZE</div>
+                <div className="char-wall-settings-label">卡片大小</div>
                 <div className="char-wall-settings-row">
                   {([
                     ["random", "随机"],
@@ -2460,13 +2460,13 @@ function CharArchiveView({
         <div className="char-archive-text-section border-b-0">
           <div className="char-log-entry mb-4">
             <div className="char-log-entry-header">
-              <span>PERSONA / TRAITS</span>
+              <span>人设 / 性格特征</span>
             </div>
             {isEditing ? (
               <AutoResizingTextarea
                 value={persona}
                 onChange={setPersona}
-                placeholder="Describe background, personality..."
+                placeholder="描述背景、性格……"
                 minHeight={120}
                 style={{
                   width: "100%", background: "color-mix(in srgb, var(--c-input) 50%, transparent)",
@@ -2483,13 +2483,13 @@ function CharArchiveView({
           {(isEditing || personality.trim()) && (
             <div className="char-log-entry mb-4 border-t border-dashed border-[#999] pt-3">
               <div className="char-log-entry-header">
-                <span>PERSONALITY</span>
+                <span>性格特征</span>
               </div>
               {isEditing ? (
                 <AutoResizingTextarea
                   value={personality}
                   onChange={setPersonality}
-                  placeholder="Character personality traits..."
+                  placeholder="角色性格特征……"
                   minHeight={60}
                   style={{
                     width: "100%", background: "color-mix(in srgb, var(--c-input) 50%, transparent)",
@@ -2507,7 +2507,7 @@ function CharArchiveView({
           {(isEditing || briefPersona.trim()) && (
             <div className="char-log-entry mb-4 border-t border-dashed border-[#999] pt-3">
               <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                <span className="char-log-entry-header !mb-0">BRIEF PERSONA / 简量人设</span>
+                <span className="char-log-entry-header !mb-0">简量人设</span>
                 {isEditing && (
                   <button
                     className="ts-10 px-3 py-1 bg-[#111111] text-white border-none rounded-full cursor-pointer disabled:opacity-50 hover:bg-[#222222] transition-colors"
@@ -2547,7 +2547,7 @@ function CharArchiveView({
         {isEditing && (
           <div className="char-archive-text-section border-b-0">
             <div className="char-log-entry">
-              <div className="char-log-entry-header"><span>GOVERNANCE / 人格治理</span></div>
+              <div className="char-log-entry-header"><span>人格治理系统</span></div>
               <CharacterGovernancePanel
                 character={char}
                 onChange={(updates) => {
@@ -2562,7 +2562,7 @@ function CharArchiveView({
         <div className="char-archive-actions">
           {!dummy && confirmDelete ? (
             <div className="char-confirm-row">
-              <span className="char-confirm-text">DELETE CHARACTER + PRIVATE CHAT?</span>
+              <span className="char-confirm-text">确认删除角色及私聊记录？</span>
               <button className="char-confirm-yes" disabled={deleteBusy} onClick={async () => {
                 if (deleteBusy) return;
                 setDeleteBusy(true);
@@ -2573,20 +2573,20 @@ function CharArchiveView({
                   setDeleteBusy(false);
                   onNotice?.("删除失败，请重试");
                 }
-              }}>{deleteBusy ? "..." : "YES"}</button>
-              <button className="char-confirm-no" disabled={deleteBusy} onClick={() => setConfirmDelete(false)}>NO</button>
+              }}>{deleteBusy ? "…" : "确认"}</button>
+              <button className="char-confirm-no" disabled={deleteBusy} onClick={() => setConfirmDelete(false)}>取消</button>
             </div>
           ) : (
             !dummy && isEditing ? (
               <>
-                <button className="char-archive-btn char-archive-btn-danger" onClick={() => { if (isDirty()) { setShowUnsavedConfirm("cancel"); } else { onCancelEdit?.(); } }}>CANCEL</button>
-                <button className="char-archive-btn bg-[var(--c-text)] text-[var(--c-page-body-bg)] border-[var(--c-input-border)]" onClick={handleSave}>SAVE</button>
+                <button className="char-archive-btn char-archive-btn-danger" onClick={() => { if (isDirty()) { setShowUnsavedConfirm("cancel"); } else { onCancelEdit?.(); } }}>取消</button>
+                <button className="char-archive-btn bg-[var(--c-text)] text-[var(--c-page-body-bg)] border-[var(--c-input-border)]" onClick={handleSave}>保存</button>
               </>
             ) : !dummy && !isEditing ? (
               <>
-                <button className="char-archive-btn" onClick={onExportPng}>EXPORT IMG</button>
-                <button className="char-archive-btn" onClick={onExportJson}>EXPORT JSON</button>
-                <button className="char-archive-btn char-archive-btn-danger" onClick={() => setConfirmDelete(true)}>DELETE</button>
+                <button className="char-archive-btn" onClick={onExportPng}>导出图片</button>
+                <button className="char-archive-btn" onClick={onExportJson}>导出 JSON</button>
+                <button className="char-archive-btn char-archive-btn-danger" onClick={() => setConfirmDelete(true)}>删除</button>
               </>
             ) : null
           )}

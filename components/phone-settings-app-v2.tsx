@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useContext, useEffect, useLayoutEffect, useCallback, useRef, useMemo, createContext, type CSSProperties, type ReactNode } from "react";
-import { ChevronRight, Search, X, HardDrive, Mic, Image, Fingerprint, Globe, Database, Layers, Link2, CloudUpload, MessageSquare, Wrench, Laptop, UserCircle, Info, SlidersHorizontal, Check, Loader2, LogOut, KeyRound } from "lucide-react";
+import { ChevronRight, Search, X, HardDrive, Mic, Image, Fingerprint, Globe, Database, Layers, Link2, CloudUpload, MessageSquare, Wrench, Laptop, UserCircle, Info, SlidersHorizontal, Check, Loader2, LogOut, KeyRound, User } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { useAccount } from "@/lib/account-context";
 import { isSelfHostedModeEnabled } from "@/lib/self-hosting";
 import { changeAccountPassword } from "@/lib/account-client";
+import { loadUserIdentities } from "@/lib/settings-storage";
 import { ApiSettings } from "./settings/api-settings";
 import { VoiceSettings } from "./settings/voice-settings";
 import { ImageGenerationSettings } from "./settings/image-generation-settings";
@@ -21,15 +22,8 @@ import { CloudServicesPage } from "./settings/cloud-services-setup";
 import { ToolboxSettings } from "./settings/toolbox-settings";
 import { ModerationCenter } from "./settings/moderation-center";
 import { AgentComputerSettings } from "./settings/agent-computer-settings";
-import { fetchIsAdmin } from "@/lib/moderation-client";
-import { loadChatAppSettings, saveChatAppSettings } from "@/lib/chat-storage";
-import { loadUserIdentities } from "@/lib/settings-storage";
-import { loadKeepAlive, saveKeepAlive } from "@/lib/weixin-storage";
-import { BINDING_ACCENTS, CONTENT_APP_ACCENTS } from "@/lib/ui-accent-colors";
-import { Toggle } from "./ui/form";
 import { SettingsShellV2 } from "./settings-preview-v2/shell";
 import { SettingsSection, SettingsRow, SettingsPrimaryButton } from "./settings-preview-v2/controls";
-import { SettingsNavigationContext } from "./settings-preview-v2/nav-shell";
 import { SettingsContext } from "./phone-settings-app";
 import { PhoneCharacterApp } from "./phone-character-app";
 import { PhoneThemeApp } from "./phone-theme-app";
@@ -39,7 +33,6 @@ import "./settings-preview-v2/settings-v2.css";
 export function PhoneSettingsApp({ 
     onClose, 
     onNotice,
-    // 从 desktop-shell 传入的主题与桌面状态
     draftTheme,
     onDraftChange,
     onApplyTheme,
@@ -69,7 +62,6 @@ export function PhoneSettingsApp({
     const [searchQuery, setSearchQuery] = useState("");
     const scrollPosRef = useRef(0);
     
-    // 账号管理状态
     const { account, logout } = useAccount();
     const [pwdModalOpen, setPwdModalOpen] = useState(false);
     const [oldPwd, setOldPwd] = useState("");
@@ -79,6 +71,16 @@ export function PhoneSettingsApp({
     const [pwdError, setPwdError] = useState("");
     const [confirmLogout, setConfirmLogout] = useState(false);
     const [accountSheetOpen, setAccountSheetOpen] = useState(false);
+    const [syncedAvatar, setSyncedAvatar] = useState<string | null>(null);
+
+    useEffect(() => {
+        try {
+            const identities = loadUserIdentities();
+            if (identities.length > 0 && identities[0].avatarUrl) {
+                setSyncedAvatar(identities[0].avatarUrl);
+            }
+        } catch {}
+    }, [currentPageId, accountSheetOpen]);
 
     const setSubpageRightAction = useCallback((page: string, action: ReactNode | null) => {
         setRightActions(prev => ({ ...prev, [page]: action }));
@@ -91,7 +93,6 @@ export function PhoneSettingsApp({
             setCurrentPageId(null);
             setTitle(null);
             setOverrideBack(null);
-            // 这里不清除 searchQuery，保留上一级的搜索状态
         } else {
             onClose();
         }
@@ -106,22 +107,23 @@ export function PhoneSettingsApp({
         setPwdError("");
         try {
             const result = await changeAccountPassword({ oldPassword: oldPwd, newPassword: newPwd });
-            if (!result.ok) { setPwdError(result.error || "修改失败。"); return; }
+            if (!result.ok) { setPwdError(result.error || "修改密码失败。"); return; }
             setPwdModalOpen(false);
             setOldPwd("");
             setNewPwd("");
             setConfirmPwd("");
-            onNotice("密码已修改");
+            onNotice("密码修改成功");
         } finally {
             setPwdBusy(false);
         }
     };
 
     const handleCopyUsername = () => {
+        const username = account?.username || "local_user";
         if (navigator.clipboard?.writeText) {
-            void navigator.clipboard.writeText(account?.username ?? "").then(() => onNotice("用户名已复制"));
+            void navigator.clipboard.writeText(username).then(() => onNotice("用户名已复制到剪贴板"));
         } else {
-            onNotice(`用户名：${account?.username}`);
+            onNotice(`用户名：${username}`);
         }
     };
 
@@ -164,14 +166,10 @@ export function PhoneSettingsApp({
                     onSearchQueryChange={currentPageId ? undefined : setSearchQuery}
                     bodyRef={(el) => {
                         if (!currentPageId && el) {
-                            // 主页挂载时恢复滚动位置
                             if (scrollPosRef.current > 0 && el.scrollTop === 0) {
                                 el.scrollTop = scrollPosRef.current;
                             }
-                            // 监听滚动保存位置
-                            el.onscroll = () => {
-                                scrollPosRef.current = el.scrollTop;
-                            };
+                            el.onscroll = () => { scrollPosRef.current = el.scrollTop; };
                         }
                     }}
                 >
@@ -193,46 +191,60 @@ export function PhoneSettingsApp({
                         wallpaperStyle={wallpaperStyle}
                         searchQuery={searchQuery}
                         account={account}
+                        syncedAvatar={syncedAvatar}
                         onOpenAccount={() => setAccountSheetOpen(true)}
                         onBeforeNavigate={() => {
-                            // 确保在离开首页前最后记录一次
                             const scroller = document.querySelector(".settings-v2__scroller");
-                            if (scroller) scrollPosRef.current = scroller.scrollTop;
+                            if (scroller) scrollPosRef.current = (scroller as HTMLElement).scrollTop;
                         }}
                     />
                 </SettingsShellV2>
             )}
 
+            {/* 账号与人设视口底部 Sheet */}
             {accountSheetOpen && (
                 <div
-                    className="modal-overlay modal-overlay-bottom"
-                    data-ui="modal"
+                    className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
                     onClick={() => setAccountSheetOpen(false)}
                 >
                     <div
-                        className="modal-sheet settings-v2__account-sheet"
-                        data-ui="modal-sheet"
+                        className="w-full max-w-lg bg-[var(--s-bg)] rounded-t-3xl overflow-hidden shadow-2xl p-4"
                         onClick={(event) => event.stopPropagation()}
                     >
-                        <div className="modal-header" data-ui="modal-header">
-                            <button type="button" className="modal-header-btn" onClick={() => setAccountSheetOpen(false)} aria-label="关闭账号信息">
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--s-line)] mb-4">
+                            <h3 className="text-base font-semibold text-[var(--s-text)] m-0">用户信息与安全</h3>
+                            <button 
+                                type="button" 
+                                className="w-8 h-8 rounded-full bg-[var(--s-surface)] flex items-center justify-center text-[var(--s-muted)]" 
+                                onClick={() => setAccountSheetOpen(false)} 
+                                aria-label="关闭"
+                            >
                                 <X size={18} />
                             </button>
-                            <h3 className="modal-title">用户信息</h3>
-                            <span style={{ width: 44 }} />
                         </div>
-                        <div className="settings-v2__account-body">
-                            <div className="settings-v2__account-identity">
-                                <UserCircle size={52} aria-hidden />
-                                <div>
-                                    <strong>{account?.displayName || account?.username || "本地用户"}</strong>
-                                    <p>{account ? `@${account.username}` : "本地模式"}</p>
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-4 p-3 rounded-2xl bg-[var(--s-surface)]">
+                                <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 shrink-0 flex items-center justify-center">
+                                    {syncedAvatar ? (
+                                        <img src={syncedAvatar} alt="头像" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <UserCircle size={40} className="text-gray-400" />
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-lg font-bold text-[var(--s-text)] truncate">
+                                        {account?.displayName || account?.username || "本地用户"}
+                                    </div>
+                                    <div className="text-xs text-[var(--s-muted)] truncate">
+                                        {account ? `@${account.username}` : "自托管 / 本地模式"}
+                                    </div>
                                 </div>
                             </div>
+
                             {account ? (
-                                <>
-                                    <SettingsSection title="账号与安全">
-                                        <SettingsRow icon={UserCircle} label="复制用户名" onClick={handleCopyUsername} />
+                                <div className="space-y-2">
+                                    <SettingsSection title="账号操作">
+                                        <SettingsRow icon={User} label="复制用户名" onClick={handleCopyUsername} />
                                         <SettingsRow icon={KeyRound} label="修改密码" onClick={() => {
                                             setAccountSheetOpen(false);
                                             setPwdError("");
@@ -245,39 +257,47 @@ export function PhoneSettingsApp({
                                             setConfirmLogout(true);
                                         }} />
                                     </SettingsSection>
-                                </>
+                                </div>
                             ) : (
-                                <p className="text-sm text-[var(--settings-secondary)] px-2">当前使用本地模式，没有可修改密码或退出登录的远端账号。</p>
+                                <div className="p-4 rounded-xl bg-[var(--s-surface)] text-center">
+                                    <p className="text-xs text-[var(--s-muted)] m-0">
+                                        当前为本地离线模式。人设与用户资料均持久化存储于本地浏览器。
+                                    </p>
+                                </div>
                             )}
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* 修改密码弹窗 */}
             {pwdModalOpen && (
-                <div className="modal-overlay modal-overlay-bottom" data-ui="modal"
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
                     onClick={() => { if (!pwdBusy) setPwdModalOpen(false); }}>
-                    <div className="modal-sheet settings-v2__account-sheet" data-ui="modal-sheet"
+                    <div className="w-full max-w-lg bg-[var(--s-bg)] rounded-t-3xl overflow-hidden shadow-2xl p-4"
                         onClick={(event) => event.stopPropagation()}>
-                        <div className="modal-header" data-ui="modal-header">
-                            <button type="button" className="modal-header-btn"
-                                disabled={pwdBusy} onClick={() => setPwdModalOpen(false)}>返回</button>
-                            <h3 className="modal-title">修改密码</h3>
-                            <span style={{ width: 44 }} />
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--s-line)] mb-4">
+                            <h3 className="text-base font-semibold text-[var(--s-text)] m-0">修改密码</h3>
+                            <button type="button" className="w-8 h-8 rounded-full bg-[var(--s-surface)] flex items-center justify-center text-[var(--s-muted)]"
+                                disabled={pwdBusy} onClick={() => setPwdModalOpen(false)}>
+                                <X size={18} />
+                            </button>
                         </div>
-                        <div className="settings-v2__password-fields">
-                            <input className="settings-v2__field px-3" type="password" autoComplete="current-password"
+                        <div className="space-y-3">
+                            <input className="w-full h-11 px-3 rounded-xl bg-[var(--s-surface)] text-sm border-0 focus:outline-none text-[var(--s-text)]" 
+                                type="password" autoComplete="current-password"
                                 placeholder="当前密码" value={oldPwd}
                                 onChange={(e) => setOldPwd(e.target.value)} />
-                            <input className="settings-v2__field px-3" type="password" autoComplete="new-password"
+                            <input className="w-full h-11 px-3 rounded-xl bg-[var(--s-surface)] text-sm border-0 focus:outline-none text-[var(--s-text)]" 
+                                type="password" autoComplete="new-password"
                                 placeholder="新密码（至少 6 位）" value={newPwd}
                                 onChange={(e) => setNewPwd(e.target.value)} />
-                            <input className="settings-v2__field px-3" type="password" autoComplete="new-password"
+                            <input className="w-full h-11 px-3 rounded-xl bg-[var(--s-surface)] text-sm border-0 focus:outline-none text-[var(--s-text)]" 
+                                type="password" autoComplete="new-password"
                                 placeholder="再次输入新密码" value={confirmPwd}
                                 onChange={(e) => setConfirmPwd(e.target.value)} />
-                            {pwdError && <p role="alert" className="settings-v2__error">{pwdError}</p>}
-                            <SettingsPrimaryButton disabled={pwdBusy}
-                                onClick={() => void handleChangePassword()}>
+                            {pwdError && <p role="alert" className="text-xs text-[var(--s-red)] m-0">{pwdError}</p>}
+                            <SettingsPrimaryButton disabled={pwdBusy} onClick={() => void handleChangePassword()}>
                                 {pwdBusy ? "正在保存…" : "保存新密码"}
                             </SettingsPrimaryButton>
                         </div>
@@ -300,54 +320,50 @@ export function PhoneSettingsApp({
     );
 }
 
-// 统一子页渲染映射
 function SubpageRenderer({ 
-    pageId, onNotice, draft, onDraftChange, onApply, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle, onBack, setSubpageTitle
+    pageId, onNotice, draft, onDraftChange, onApply, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle, onBack
 }: any) {
-    const renderSubPage = (pageId: string) => {
-        switch (pageId) {
-            case "api": return <ApiSettings hideHeading />;
-            case "voice": return <VoiceSettings />;
-            case "imageGeneration": return <ImageGenerationSettings />;
-            case "presets": return <PresetManager isActive />;
-            case "worldbook": return <WorldBookManager isActive />;
-            case "regex": return <RegexManager isActive />;
-            case "data": return <DataManagement onNotice={onNotice} />;
-            case "binding": return <BindingManager />;
-            case "cloud": return <CloudServicesPage />;
-            case "weixin": return <WeixinSettings onOpenCloudServices={() => {}} />;
-            case "toolbox": return <ToolboxSettings />;
-            case "agentComputer": return <AgentComputerSettings onNotice={onNotice} />;
-            case "moderation": return <ModerationCenter onNotice={onNotice} />;
-            case "identity": return <UserIdentitySettings />;
-            case "about": return <AboutDeclaration />;
-            case "character": return <PhoneCharacterApp onClose={onBack} onNotice={onNotice} />;
-            case "theme": return (
-                <PhoneThemeApp 
-                    draft={draft} 
-                    onDraftChange={onDraftChange} 
-                    onApply={onApply} 
-                    onClose={onBack} 
-                    onNotice={onNotice} 
-                    widgets={widgets}
-                    onWidgetsChange={onWidgetsChange}
-                    onDesktopThemeChange={onDesktopThemeChange}
-                    pageIcons={pageIcons}
-                    iconSkins={iconSkins}
-                    wallpaperStyle={wallpaperStyle}
-                />
-            );
-            case "resources": return <PhoneResourcesApp onClose={onBack} onNotice={onNotice} />;
-            default: return null;
-        }
-    };
-    return renderSubPage(pageId);
+    switch (pageId) {
+        case "api": return <ApiSettings hideHeading />;
+        case "voice": return <VoiceSettings />;
+        case "imageGeneration": return <ImageGenerationSettings />;
+        case "presets": return <PresetManager isActive />;
+        case "worldbook": return <WorldBookManager isActive />;
+        case "regex": return <RegexManager isActive />;
+        case "data": return <DataManagement onNotice={onNotice} />;
+        case "binding": return <BindingManager />;
+        case "cloud": return <CloudServicesPage />;
+        case "weixin": return <WeixinSettings onOpenCloudServices={() => {}} />;
+        case "toolbox": return <ToolboxSettings />;
+        case "agentComputer": return <AgentComputerSettings onNotice={onNotice} />;
+        case "moderation": return <ModerationCenter onNotice={onNotice} />;
+        case "identity": return <UserIdentitySettings />;
+        case "about": return <AboutDeclaration />;
+        case "character": return <PhoneCharacterApp onClose={onBack} onNotice={onNotice} />;
+        case "theme": return (
+            <PhoneThemeApp 
+                draft={draft} 
+                onDraftChange={onDraftChange} 
+                onApply={onApply} 
+                onClose={onBack} 
+                onNotice={onNotice} 
+                widgets={widgets}
+                onWidgetsChange={onWidgetsChange}
+                onDesktopThemeChange={onDesktopThemeChange}
+                pageIcons={pageIcons}
+                iconSkins={iconSkins}
+                wallpaperStyle={wallpaperStyle}
+            />
+        );
+        case "resources": return <PhoneResourcesApp onClose={onBack} onNotice={onNotice} />;
+        default: return null;
+    }
 }
 
 function PhoneSettingsContent({ 
     onClose, onNotice, currentPageId, setCurrentPageId, handleBack,
     draftTheme, onDraftChange, onApplyTheme, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle,
-    searchQuery, setSubpageTitle, onBeforeNavigate, account, onOpenAccount
+    searchQuery, setSubpageTitle, onBeforeNavigate, account, syncedAvatar, onOpenAccount
 }: any) {
     if (currentPageId) return <SubpageRenderer 
         pageId={currentPageId} 
@@ -366,34 +382,31 @@ function PhoneSettingsContent({
 
     return (
         <>
-            {(!searchQuery || "账号 用户信息 密码 安全 我的人设".includes(searchQuery.toLowerCase())) && (
-    <div className="mb-6 bg-[var(--settings-surface,#fff)] border-y border-[var(--settings-line)] -mx-4 px-4">
-        <button type="button" className="flex items-center w-full py-3" onClick={onOpenAccount}>
-            <div className="w-14 h-14 rounded-full bg-[#f0f2f5] dark:bg-[#222228] flex items-center justify-center mr-4 overflow-hidden shrink-0">
-                {(() => {
-                    const identities = typeof window !== "undefined" ? loadUserIdentities() : [];
-                    const activeAvatar = identities.length > 0 ? identities[0].avatarUrl : null;
-                    return activeAvatar ? (
-                        <img src={activeAvatar} alt="用户头像" className="w-full h-full object-cover" />
-                    ) : (
-                        <UserCircle size={32} className="text-[var(--settings-secondary)]" />
-                    );
-                })()}
-            </div>
-            <div className="flex-1 text-left min-w-0">
-                <div className="text-[19px] font-semibold text-[var(--settings-text)] truncate">
-                    {!isSelfHostedModeEnabled() && account ? (account.displayName || account.username) : "本地用户"}
+            {/* 用户信息与账号卡片 */}
+            {(!searchQuery || "账号 用户信息 密码 安全 我的人设 身份".includes(searchQuery.toLowerCase())) && (
+                <div className="mb-6 rounded-2xl bg-[var(--s-surface)] p-3 border border-[var(--s-line)]">
+                    <button type="button" className="flex items-center w-full text-left" onClick={onOpenAccount}>
+                        <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center mr-4 overflow-hidden shrink-0">
+                            {syncedAvatar ? (
+                                <img src={syncedAvatar} alt="人设头像" className="w-full h-full object-cover" />
+                            ) : (
+                                <UserCircle size={36} className="text-gray-400" />
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-[18px] font-semibold text-[var(--s-text)] truncate">
+                                {!isSelfHostedModeEnabled() && account ? (account.displayName || account.username) : "用户信息 / 我的人设"}
+                            </div>
+                            <div className="text-xs text-[var(--s-muted)] truncate">
+                                {!isSelfHostedModeEnabled() && account ? "账号设置、密码与安全" : "本地模式 · 点击查看个人资料与安全"}
+                            </div>
+                        </div>
+                        <ChevronRight size={20} className="text-[var(--s-muted)] shrink-0 ml-2" />
+                    </button>
                 </div>
-                <div className="text-sm text-[var(--settings-secondary)] truncate">
-                    {!isSelfHostedModeEnabled() && account ? "账号设置、密码与安全" : "已同步我的人设资料"}
-                </div>
-            </div>
-            <ChevronRight size={20} className="text-[var(--settings-secondary)] shrink-0 ml-2" />
-        </button>
-    </div>
-)}
+            )}
 
-            {/* 在 PhoneSettingsContent 顶部定义菜单以供筛选 */}
+            {/* 设置分组项 */}
             {(() => {
                 const menu = [
                     { id: "theme", label: "外观", group: "外观与显示", icon: Image },
@@ -404,7 +417,7 @@ function PhoneSettingsContent({
                     { id: "character", label: "角色卷宗", group: "角色与世界", icon: UserCircle },
                     { id: "worldbook", label: "世界书", group: "角色与世界", icon: Globe },
                     { id: "regex", label: "正则规则", group: "角色与世界", icon: Database },
-                    { id: "identity", label: "用户身份", group: "角色与世界", icon: UserCircle },
+                    { id: "identity", label: "我的人设", group: "角色与世界", icon: UserCircle },
                     { id: "resources", label: "资源库", group: "数据与资源", icon: Layers },
                     { id: "data", label: "数据管理", group: "数据与资源", icon: Database },
                     { id: "binding", label: "配置绑定", group: "连接与工具", icon: Link2 },
@@ -417,7 +430,7 @@ function PhoneSettingsContent({
                 const q = String(searchQuery ?? "").trim().toLowerCase();
                 const filtered = q ? menu.filter(i => i.label.toLowerCase().includes(q) || i.group.toLowerCase().includes(q)) : menu;
                 
-                if (filtered.length === 0) return <div className="text-center py-10 text-[var(--settings-secondary)] text-sm">没有找到设置</div>;
+                if (filtered.length === 0) return <div className="text-center py-10 text-[var(--s-muted)] text-sm">没有找到相关设置项</div>;
 
                 const groups = Array.from(new Set(filtered.map(i => i.group)));
                 return groups.map(g => (
