@@ -92,6 +92,7 @@ export function PhoneSettingsApp({
                     onNotice={onNotice} 
                     currentPageId={currentPageId}
                     setCurrentPageId={setCurrentPageId}
+                    handleBack={handleBack}
                     draftTheme={draftTheme}
                     onDraftChange={onDraftChange}
                     onApplyTheme={onApplyTheme}
@@ -109,7 +110,7 @@ export function PhoneSettingsApp({
 
 // 实际需要一个包装器来渲染当前子页
 function SubpageRenderer({ 
-    pageId, onNotice, draft, onDraftChange, onApply, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle 
+    pageId, onNotice, draft, onDraftChange, onApply, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle, onBack 
 }: any) {
     const renderSubPage = (pageId: string) => {
         switch (pageId) {
@@ -128,13 +129,13 @@ function SubpageRenderer({
             case "moderation": return <ModerationCenter onNotice={onNotice} />;
             case "identity": return <UserIdentitySettings />;
             case "about": return <AboutDeclaration />;
-            case "character": return <PhoneCharacterApp onClose={() => {}} onNotice={onNotice} />;
+            case "character": return <PhoneCharacterApp onClose={onBack} onNotice={onNotice} />;
             case "theme": return (
                 <PhoneThemeApp 
                     draft={draft} 
                     onDraftChange={onDraftChange} 
                     onApply={onApply} 
-                    onClose={() => {}} 
+                    onClose={onBack} 
                     onNotice={onNotice} 
                     widgets={widgets}
                     onWidgetsChange={onWidgetsChange}
@@ -144,7 +145,7 @@ function SubpageRenderer({
                     wallpaperStyle={wallpaperStyle}
                 />
             );
-            case "resources": return <PhoneResourcesApp onClose={() => {}} onNotice={onNotice} />;
+            case "resources": return <PhoneResourcesApp onClose={onBack} onNotice={onNotice} />;
             default: return null;
         }
     };
@@ -152,7 +153,7 @@ function SubpageRenderer({
 }
 
 function PhoneSettingsContent({ 
-    onClose, onNotice, currentPageId, setCurrentPageId,
+    onClose, onNotice, currentPageId, setCurrentPageId, handleBack,
     draftTheme, onDraftChange, onApplyTheme, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle
 }: any) {
     const { push } = useContext(SettingsNavigationContext);
@@ -169,6 +170,7 @@ function PhoneSettingsContent({
         pageIcons={pageIcons}
         iconSkins={iconSkins}
         wallpaperStyle={wallpaperStyle}
+        onBack={handleBack}
     />;
 
     return (

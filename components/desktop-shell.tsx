@@ -1117,20 +1117,6 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   );
   const [savedTheme, setSavedTheme] = useState<ThemeProfile>(() => initialThemeProfile ?? readInitialThemeProfile());
   const [draftTheme, setDraftTheme] = useState<ThemeProfile>(() => initialThemeProfile ?? readInitialThemeProfile());
-  
-  const handleDraftChange = useCallback((next: ThemeProfile) => setDraftTheme(next), []);
-  const handleApplyTheme = useCallback(async (next: ThemeProfile) => {
-    setSavedTheme(next);
-    writeThemeProfile(next);
-  }, []);
-  const handleWidgetsChange = useCallback((next: WidgetInstance[]) => setWidgets(next), []);
-  const handleDesktopThemeChange = useCallback((next: { widgets: WidgetInstance[]; iconLayout: DesktopLayout; dock?: DesktopIconId[]; folders?: DesktopFolderMap }) => {
-    setWidgets(next.widgets);
-    saveWidgets(next.widgets);
-    setLayout(next.iconLayout);
-    if (next.dock) { setDock(next.dock); writeDockLayout(next.dock); }
-    if (next.folders) { setFolders(next.folders); writeDesktopFolders(next.folders); }
-  }, []);
 
   useEffect(() => {
     activeAppRef.current = activeApp;
@@ -4051,6 +4037,15 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
         <PhoneSettingsApp
           onClose={() => setActiveApp(null)}
           onNotice={setNotice}
+          draftTheme={draftTheme}
+          onDraftChange={setDraftTheme}
+          onApplyTheme={applyTheme}
+          widgets={widgets}
+          onWidgetsChange={handleWidgetsChange}
+          onDesktopThemeChange={handleThemeDesktopChange}
+          pageIcons={layout}
+          iconSkins={iconSkinUrls}
+          wallpaperStyle={wallpaperStyle}
         />
       );
     }

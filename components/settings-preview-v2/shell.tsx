@@ -16,17 +16,17 @@ export function SettingsShellV2({
     const isMain = !onBack;
 
     return (
-        <div className="flex flex-col h-full bg-[var(--c-page-body-bg)] font-sans">
+        <div className="settings-v2 flex flex-col h-full font-sans">
             {/* 顶部大标题栏 */}
-            <header className={GLASS_STYLES.nav + " px-4 py-4"}>
+            <header className="settings-v2__header px-4 py-4">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold tracking-tight text-[var(--c-text-title)]">
+                    <h1 className="text-2xl font-bold tracking-tight text-[var(--settings-text)]">
                         {title}
                     </h1>
                     {rightAction}
                 </div>
                 {!isMain && (
-                    <button onClick={onBack} className="mt-2 flex items-center text-[var(--c-icon)] active:opacity-70">
+                    <button onClick={onBack} className="settings-v2__glass-button mt-2 px-3 py-1 flex items-center text-sm active:opacity-70">
                         <ChevronRight className="rotate-180 mr-1" size={16} />
                         返回
                     </button>
@@ -35,16 +35,16 @@ export function SettingsShellV2({
 
             {/* 搜索栏 */}
             {isMain && (
-                <div className="px-4 pb-4">
-                    <div className="flex items-center bg-[var(--c-input)] rounded-lg px-3 py-2 text-[var(--c-icon)]">
-                        <Search size={18} className="mr-2" />
-                        <input type="text" placeholder="搜索设置" className="bg-transparent border-none outline-none w-full text-[var(--c-text)]" />
+                <div className="px-4 pb-3">
+                    <div className="flex items-center bg-[#f0f2f5] rounded-xl px-3 py-2 text-[var(--settings-secondary)]">
+                        <Search size={18} className="mr-2 shrink-0" />
+                        <input type="text" placeholder="搜索设置" className="bg-transparent border-none outline-none w-full text-[var(--settings-text)] text-sm" />
                     </div>
                 </div>
             )}
 
             {/* 内容容器 */}
-            <main className="flex-1 overflow-y-auto p-4">
+            <main className="settings-v2__scroller flex-1 p-4">
                 {children}
             </main>
         </div>
