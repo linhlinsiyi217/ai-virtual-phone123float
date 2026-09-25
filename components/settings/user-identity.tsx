@@ -83,7 +83,6 @@ export function UserIdentitySettings() {
         setIdentitiesRaw(list);
         // 直接打开第一条身份进行编辑，不显示网格选择
         if (list.length > 0) setEditingId(list[0].id);
-        }
     }, []);
 
     const setIdentities = useCallback((next: UserIdentity[]) => {

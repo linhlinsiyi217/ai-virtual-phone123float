@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useContext, useEffect, useCallback, useRef, useMemo, type ReactNode } from "react";
-import { ChevronRight, X, HardDrive, Mic, Image, Fingerprint, Globe, Database, Layers, Link2, CloudUpload, MessageSquare, Wrench, Laptop, UserCircle, Info, LogOut, KeyRound, User, ShieldCheck } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, useMemo, type ReactNode } from "react";
+import { ChevronRight, HardDrive, Mic, Image, Fingerprint, Globe, Database, Layers, Link2, CloudUpload, MessageSquare, Wrench, Laptop, UserCircle, Info, LogOut, KeyRound } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { useAccount } from "@/lib/account-context";
-import { isSelfHostedModeEnabled } from "@/lib/self-hosting";
 import { changeAccountPassword } from "@/lib/account-client";
 import { loadUserIdentities } from "@/lib/settings-storage";
 import { ApiSettings } from "./settings/api-settings";
@@ -23,7 +22,7 @@ import { ToolboxSettings } from "./settings/toolbox-settings";
 import { ModerationCenter } from "./settings/moderation-center";
 import { AgentComputerSettings } from "./settings/agent-computer-settings";
 import { SettingsShellV2 } from "./settings-preview-v2/shell";
-import { SettingsSection, SettingsRow, SettingsPrimaryButton } from "./settings-preview-v2/controls";
+import { SettingsSection, SettingsRow } from "./settings-preview-v2/controls";
 import { SettingsContext } from "./phone-settings-app";
 import { PhoneCharacterApp } from "./phone-character-app";
 import { PhoneThemeApp } from "./phone-theme-app";
