@@ -36,6 +36,7 @@ import { WorldTabStrip, WorldCaseSheet, NewWorldSheet } from "@/components/chara
 import { RelationLinkDialog, RelationPairSheet } from "@/components/character/relation-dialogs";
 import { WorldListView } from "@/components/character/world-list-view";
 import { WorldInteriorView } from "@/components/character/world-interior-view";
+import { CharacterDetailView } from "@/components/character/character-detail-view";
 import { loadMomentsConfig, saveMomentsConfig } from "@/lib/moments-storage";
 import type { CanvasBgItem } from "@/lib/character-types";
 import { PageShell } from "@/components/ui/page-shell";
@@ -196,7 +197,11 @@ function getCharacterTimeZoneOptions(currentTimeZone = ""): string[] {
   return options;
 }
 
-export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps) {
+type PhoneCharacterAppPropsExtended = PhoneCharacterAppProps & {
+  isFromSettings?: boolean;
+};
+
+export function PhoneCharacterApp({ onClose, onNotice, isFromSettings = false }: PhoneCharacterAppPropsExtended) {
   // 新三层路由：worlds → world-interior → detail
   // list 类型保留供旧画布逻辑使用，不再作为默认入口
   const [view, setView] = useState<{ type: ViewType; id: string | null; isEditing?: boolean }>({ type: "worlds", id: null, isEditing: false });
@@ -323,6 +328,7 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
             }}
             onWorldsChanged={refreshAll}
             onNotice={onNotice}
+            onClose={isFromSettings ? onClose : undefined}
           />
         )}
 
@@ -370,7 +376,7 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
 
         {/* 第三层：角色详情/编辑 */}
         {view.type === "detail" && (
-          <CharArchiveView
+          <CharacterDetailView
             char={view.id ? (characters.find((c) => c.id === view.id) ?? createCharacter({ name: "", persona: "", avatar: null })) : createCharacter({ name: "", persona: "", avatar: null })}
             isEditing={view.isEditing}
             isExisting={Boolean(view.id)}
@@ -407,15 +413,6 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
                 onNotice(`已创建「${newChar.name || "新角色"}」`);
               }
             }}
-            onRestoreVersion={(version) => {
-              const existing = view.id ? characters.find((c) => c.id === view.id) : null;
-              if (!existing) return;
-              const activeVersion = switchCharacterVersion(existing, version);
-              const restored: Character = { ...version.data, id: existing.id, createdAt: existing.createdAt, updatedAt: new Date().toISOString() };
-              updateChars(characters.map((c) => (c.id === existing.id ? restored : c)));
-              setView({ type: "detail", id: existing.id, isEditing: false });
-              onNotice(`已切换到 V${activeVersion}，未创建新版本`);
-            }}
             onDelete={async () => {
               const characterId = view.id;
               if (characterId) {
@@ -424,15 +421,7 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
                 updateChars(characters.filter((c) => c.id !== characterId));
               }
               handleBackFromDetail();
-              onNotice("已删除档案");
-            }}
-            onExportJson={() => {
-              const c = view.id ? characters.find(x => x.id === view.id) : null;
-              if (c) exportCharacterAsJson(c);
-            }}
-            onExportPng={async () => {
-              const c = view.id ? characters.find(x => x.id === view.id) : null;
-              if (c) { await exportCharacterAsPng(c); onNotice("导出成功"); }
+              onNotice("已删除角色档案");
             }}
             onNotice={onNotice}
           />

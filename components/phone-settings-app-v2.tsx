@@ -194,7 +194,7 @@ function SubpageRenderer({
         case "identity": return <UserIdentitySettings />;
         case "accountSecurity": return <AccountSecurityPage onNotice={onNotice} />;
         case "about": return <AboutDeclaration />;
-        case "character": return <PhoneCharacterApp onClose={onBack} onNotice={onNotice} />;
+        case "character": return <PhoneCharacterApp onClose={onBack} onNotice={onNotice} isFromSettings />;
         case "theme": return (
             <PhoneThemeApp 
                 draft={draft} 
