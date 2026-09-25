@@ -27,7 +27,7 @@ import { loadKeepAlive, saveKeepAlive } from "@/lib/weixin-storage";
 import { BINDING_ACCENTS, CONTENT_APP_ACCENTS } from "@/lib/ui-accent-colors";
 import { Toggle } from "./ui/form";
 import { SettingsShellV2 } from "./settings-preview-v2/shell";
-import { SettingsSection, SettingsRow } from "./settings-preview-v2/controls";
+import { SettingsSection, SettingsRow, SettingsPrimaryButton } from "./settings-preview-v2/controls";
 import { SettingsNavigationContext } from "./settings-preview-v2/nav-shell";
 import { SettingsContext } from "./phone-settings-app";
 import { PhoneCharacterApp } from "./phone-character-app";
@@ -200,6 +200,100 @@ export function PhoneSettingsApp({
                     />
                 </SettingsShellV2>
             )}
+
+            {accountSheetOpen && (
+                <div
+                    className="modal-overlay modal-overlay-bottom"
+                    data-ui="modal"
+                    onClick={() => setAccountSheetOpen(false)}
+                >
+                    <div
+                        className="modal-sheet settings-v2__account-sheet"
+                        data-ui="modal-sheet"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="modal-header" data-ui="modal-header">
+                            <button type="button" className="modal-header-btn" onClick={() => setAccountSheetOpen(false)} aria-label="关闭账号信息">
+                                <X size={18} />
+                            </button>
+                            <h3 className="modal-title">用户信息</h3>
+                            <span style={{ width: 44 }} />
+                        </div>
+                        <div className="settings-v2__account-body">
+                            <div className="settings-v2__account-identity">
+                                <UserCircle size={52} aria-hidden />
+                                <div>
+                                    <strong>{account?.displayName || account?.username || "本地用户"}</strong>
+                                    <p>{account ? `@${account.username}` : "本地模式"}</p>
+                                </div>
+                            </div>
+                            {account ? (
+                                <>
+                                    <SettingsSection title="账号与安全">
+                                        <SettingsRow icon={UserCircle} label="复制用户名" onClick={handleCopyUsername} />
+                                        <SettingsRow icon={KeyRound} label="修改密码" onClick={() => {
+                                            setAccountSheetOpen(false);
+                                            setPwdError("");
+                                            setPwdModalOpen(true);
+                                        }} />
+                                    </SettingsSection>
+                                    <SettingsSection>
+                                        <SettingsRow icon={LogOut} label="退出登录" danger onClick={() => {
+                                            setAccountSheetOpen(false);
+                                            setConfirmLogout(true);
+                                        }} />
+                                    </SettingsSection>
+                                </>
+                            ) : (
+                                <p className="text-sm text-[var(--settings-secondary)] px-2">当前使用本地模式，没有可修改密码或退出登录的远端账号。</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {pwdModalOpen && (
+                <div className="modal-overlay modal-overlay-bottom" data-ui="modal"
+                    onClick={() => { if (!pwdBusy) setPwdModalOpen(false); }}>
+                    <div className="modal-sheet settings-v2__account-sheet" data-ui="modal-sheet"
+                        onClick={(event) => event.stopPropagation()}>
+                        <div className="modal-header" data-ui="modal-header">
+                            <button type="button" className="modal-header-btn"
+                                disabled={pwdBusy} onClick={() => setPwdModalOpen(false)}>返回</button>
+                            <h3 className="modal-title">修改密码</h3>
+                            <span style={{ width: 44 }} />
+                        </div>
+                        <div className="settings-v2__password-fields">
+                            <input className="settings-v2__field px-3" type="password" autoComplete="current-password"
+                                placeholder="当前密码" value={oldPwd}
+                                onChange={(e) => setOldPwd(e.target.value)} />
+                            <input className="settings-v2__field px-3" type="password" autoComplete="new-password"
+                                placeholder="新密码（至少 6 位）" value={newPwd}
+                                onChange={(e) => setNewPwd(e.target.value)} />
+                            <input className="settings-v2__field px-3" type="password" autoComplete="new-password"
+                                placeholder="再次输入新密码" value={confirmPwd}
+                                onChange={(e) => setConfirmPwd(e.target.value)} />
+                            {pwdError && <p role="alert" className="settings-v2__error">{pwdError}</p>}
+                            <SettingsPrimaryButton disabled={pwdBusy}
+                                onClick={() => void handleChangePassword()}>
+                                {pwdBusy ? "正在保存…" : "保存新密码"}
+                            </SettingsPrimaryButton>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {confirmLogout && account && (
+                <ConfirmDialog
+                    title="退出登录"
+                    message={`当前账号 @${account.username}。退出后需要重新登录。`}
+                    icon={LogOut}
+                    variant="danger"
+                    confirmLabel="退出登录"
+                    onConfirm={() => { setConfirmLogout(false); void logout(); }}
+                    onCancel={() => setConfirmLogout(false)}
+                />
+            )}
         </SettingsContext.Provider>
     );
 }
@@ -270,30 +364,19 @@ function PhoneSettingsContent({
 
     return (
         <>
-            {!isSelfHostedModeEnabled() ? (
-                account ? (
-                    <div className="mb-6 bg-[#ffffff] border-y border-[#e5e7eb] -mx-4 px-4">
-                        <button type="button" className="flex items-center w-full py-3" onClick={onOpenAccount}>
-                            <div className="w-14 h-14 rounded-full bg-[#f3f4f6] flex items-center justify-center mr-4">
-                                <UserCircle size={32} className="text-[#9ca3af]" />
-                            </div>
-                            <div className="flex-1 text-left">
-                                <div className="text-[19px] font-semibold text-[#111827]">{account.displayName || account.username}</div>
-                                <div className="text-sm text-[#6b7280]">账号设置、密码与安全</div>
-                            </div>
-                            <ChevronRight size={20} className="text-[#c7c7cc]" />
-                        </button>
-                    </div>
-                ) : null
-            ) : (
+            {(!searchQuery || "账号 用户信息 密码 安全".includes(searchQuery.toLowerCase())) && (
                 <div className="mb-6 bg-[#ffffff] border-y border-[#e5e7eb] -mx-4 px-4">
                     <button type="button" className="flex items-center w-full py-3" onClick={onOpenAccount}>
                         <div className="w-14 h-14 rounded-full bg-[#f3f4f6] flex items-center justify-center mr-4">
                             <UserCircle size={32} className="text-[#9ca3af]" />
                         </div>
                         <div className="flex-1 text-left">
-                            <div className="text-[19px] font-semibold text-[#111827]">本地用户</div>
-                            <div className="text-sm text-[#6b7280]">自托管模式</div>
+                            <div className="text-[19px] font-semibold text-[#111827]">
+                                {!isSelfHostedModeEnabled() && account ? (account.displayName || account.username) : "本地用户"}
+                            </div>
+                            <div className="text-sm text-[#6b7280]">
+                                {!isSelfHostedModeEnabled() && account ? "账号设置、密码与安全" : "自托管模式"}
+                            </div>
                         </div>
                         <ChevronRight size={20} className="text-[#c7c7cc]" />
                     </button>
