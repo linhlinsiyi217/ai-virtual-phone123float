@@ -2,11 +2,15 @@ import { useState, useCallback, useMemo, type ReactNode } from "react";
 import { ChevronRight, Search } from "lucide-react";
 import { SettingsNavigationContext, GLASS_STYLES } from "./nav-shell";
 
+import { X, ChevronLeft } from "lucide-react";
+
 export function SettingsShellV2({ 
     children, 
     title,
     rightAction,
     onBack,
+    onClose,
+    isMain,
     searchQuery,
     onSearchQueryChange,
 }: { 
@@ -14,26 +18,43 @@ export function SettingsShellV2({
     title: string;
     rightAction?: ReactNode;
     onBack?: () => void;
+    onClose?: () => void;
+    isMain?: boolean;
     searchQuery?: string;
     onSearchQueryChange?: (q: string) => void;
 }) {
-    const isMain = !onBack;
-
     return (
         <div className="settings-v2 flex flex-col h-full font-sans">
-            <header className="settings-v2__header px-4 py-4">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold tracking-tight text-[var(--settings-text)]">
-                        {title}
-                    </h1>
-                    {rightAction}
+            <header className="settings-v2__header">
+                <div className="settings-v2__navigation">
+                    {isMain ? (
+                        <h1 className="settings-v2__home-title">设置</h1>
+                    ) : (
+                        <button
+                            type="button"
+                            className="settings-v2__nav-button"
+                            aria-label="返回上一页"
+                            onClick={onBack}
+                        >
+                            <ChevronLeft size={21} strokeWidth={2} />
+                        </button>
+                    )}
+
+                    {!isMain && <h1 className="settings-v2__page-title">{title}</h1>}
+
+                    <div className="settings-v2__trailing">
+                        {isMain ? (
+                            <button
+                                type="button"
+                                className="settings-v2__nav-button"
+                                aria-label="退出设置"
+                                onClick={onClose}
+                            >
+                                <X size={20} strokeWidth={2} />
+                            </button>
+                        ) : rightAction}
+                    </div>
                 </div>
-                {!isMain && (
-                    <button onClick={onBack} className="settings-v2__glass-button mt-2 px-3 py-1 flex items-center text-sm active:opacity-70">
-                        <ChevronRight className="rotate-180 mr-1" size={16} />
-                        返回
-                    </button>
-                )}
             </header>
 
             {isMain && onSearchQueryChange && (

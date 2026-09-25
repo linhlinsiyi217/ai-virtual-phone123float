@@ -152,9 +152,11 @@ export function PhoneSettingsApp({
                 </div>
             ) : (
                 <SettingsShellV2
-                    title={title || "设置"}
+                    isMain={!currentPageId}
+                    title={currentPageId ? (title || "设置") : "设置"}
+                    onClose={onClose}
+                    onBack={handleBack}
                     rightAction={currentPageId ? rightActions[currentPageId] : undefined}
-                    onBack={currentPageId ? handleBack : undefined}
                     searchQuery={currentPageId ? undefined : searchQuery}
                     onSearchQueryChange={currentPageId ? undefined : setSearchQuery}
                 >
