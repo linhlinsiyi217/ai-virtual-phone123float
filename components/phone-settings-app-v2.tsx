@@ -95,6 +95,7 @@ function SubpageRenderer({ pageId, onNotice }: { pageId: string, onNotice: (msg:
 }
 
 function PhoneSettingsContent({ onClose, onNotice, currentPageId, setCurrentPageId }: { onClose: () => void, onNotice: (msg: string) => void, currentPageId: string | null, setCurrentPageId: (id: string | null) => void }) {
+    const { push } = useContext(SettingsNavigationContext);
     
     if (currentPageId) return <SubpageRenderer pageId={currentPageId} onNotice={onNotice} />;
 
@@ -123,6 +124,7 @@ function PhoneSettingsContent({ onClose, onNotice, currentPageId, setCurrentPage
             </SettingsListGroup>
             
             <SettingsListGroup title="角色与世界">
+                <SettingsListItem icon={Fingerprint} label="角色卷宗" onClick={() => { /* 待接入 CharacterApp */ }} />
                 <SettingsListItem icon={Globe} label="世界书" onClick={() => { setCurrentPageId("worldbook"); push("worldbook", "世界书"); }} />
                 <SettingsListItem icon={Database} label="正则规则" onClick={() => { setCurrentPageId("regex"); push("regex", "正则规则"); }} />
                 <SettingsListItem icon={UserCircle} label="用户身份" onClick={() => { setCurrentPageId("identity"); push("identity", "用户身份"); }} />
