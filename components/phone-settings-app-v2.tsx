@@ -149,6 +149,7 @@ export function PhoneSettingsApp({
                         iconSkins={iconSkins}
                         wallpaperStyle={wallpaperStyle}
                         onBack={handleBack}
+                        setSubpageTitle={setTitle}
                     />
                 </div>
             ) : (
@@ -298,9 +299,9 @@ export function PhoneSettingsApp({
     );
 }
 
-// 实际需要一个包装器来渲染当前子页
+// 统一子页渲染映射
 function SubpageRenderer({ 
-    pageId, onNotice, draft, onDraftChange, onApply, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle, onBack 
+    pageId, onNotice, draft, onDraftChange, onApply, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle, onBack, setSubpageTitle
 }: any) {
     const renderSubPage = (pageId: string) => {
         switch (pageId) {
