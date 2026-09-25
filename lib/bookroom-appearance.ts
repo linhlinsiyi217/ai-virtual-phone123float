@@ -51,76 +51,76 @@ export const APPEARANCE_PRESETS: AppearancePreset[] = [
   {
     id: "pearl-white",
     name: "Pearl White",
-    description: "纯白 + 黑 + 极浅冷蓝",
+    description: "纯白冷雾 · 液态玻璃",
     tokens: {
       bgPrimary: "#FFFFFF",
-      bgSecondary: "#F8FAFC",
-      textPrimary: "#111318",
-      textSecondary: "#5E6672",
-      accent: "#3B82F6",
+      bgSecondary: "#F6F8FB",
+      textPrimary: "#101318",
+      textSecondary: "#5B6472",
+      accent: "#2F6BFF",
       cardOpacity: 72,
-      cardBlur: 20,
-      cardShadow: 35,
+      cardBlur: 22,
+      cardShadow: 34,
       borderBrightness: 82,
-      radius: 16,
-      glassHighlight: 55,
+      radius: 18,
+      glassHighlight: 60,
       mode: "light",
     },
   },
   {
     id: "night-pearl",
     name: "Night Pearl",
-    description: "深黑灰 + 冷白",
+    description: "深夜冷灰 · 冷白高光",
     tokens: {
-      bgPrimary: "#111318",
-      bgSecondary: "#1A1D24",
-      textPrimary: "#F1F5F9",
-      textSecondary: "#94A3B8",
-      accent: "#60A5FA",
+      bgPrimary: "#0E1014",
+      bgSecondary: "#171A21",
+      textPrimary: "#F4F6F8",
+      textSecondary: "#AAB2BE",
+      accent: "#7AB2FF",
       cardOpacity: 58,
       cardBlur: 24,
       cardShadow: 45,
       borderBrightness: 30,
-      radius: 16,
-      glassHighlight: 35,
+      radius: 18,
+      glassHighlight: 38,
       mode: "dark",
     },
   },
   {
     id: "paper",
-    name: "Paper",
-    description: "纸张阅读感，干净不泛黄",
+    name: "Paper Ivory",
+    description: "纸页牙白 · 低雾面",
     tokens: {
-      bgPrimary: "#FDFCF9",
-      bgSecondary: "#F5F3EE",
-      textPrimary: "#1A1B1E",
-      textSecondary: "#5C6066",
-      accent: "#2563EB",
-      cardOpacity: 78,
-      cardBlur: 12,
-      cardShadow: 28,
-      borderBrightness: 85,
-      radius: 10,
-      glassHighlight: 30,
+      bgPrimary: "#FBF8F1",
+      bgSecondary: "#F2EDE2",
+      textPrimary: "#23211B",
+      textSecondary: "#6E675A",
+      accent: "#4A6FA5",
+      cardOpacity: 82,
+      cardBlur: 8,
+      cardShadow: 24,
+      borderBrightness: 86,
+      radius: 12,
+      glassHighlight: 24,
       mode: "light",
     },
   },
   {
     id: "mist-blue",
     name: "Mist Blue",
-    description: "极浅冷蓝雾感",
+    description: "雾蓝浸染 · 冷蓝玻璃",
     tokens: {
-      bgPrimary: "#F2F6FA",
-      bgSecondary: "#E8EEF5",
-      textPrimary: "#111318",
-      textSecondary: "#5E6672",
-      accent: "#0EA5E9",
-      cardOpacity: 65,
-      cardBlur: 22,
-      cardShadow: 32,
-      borderBrightness: 80,
-      radius: 18,
-      glassHighlight: 60,
+      bgPrimary: "#E9F1F8",
+      bgSecondary: "#DAE6F2",
+      textPrimary: "#0E1726",
+      textSecondary: "#4E6076",
+      accent: "#1D74D8",
+      cardOpacity: 60,
+      cardBlur: 26,
+      cardShadow: 30,
+      borderBrightness: 76,
+      radius: 20,
+      glassHighlight: 66,
       mode: "light",
     },
   },
@@ -300,18 +300,42 @@ export function appearanceToCssVars(tokens: AppearanceTokens): Record<string, st
 /**
  * 生成作用域 CSS 文本，注入到 .bookroom-app。
  * Phase 8B：含基础背景雾层、Pearl Glass 衍生面与阅读纸张跟随，深浅两套均在此输出。
+ * Phase 9A：按 presetId 注入主题人格差异（雾层色相 / 阅读纸色 / 书架层板），
+ *   让 4 套主题肉眼可分辨；自定义微调时 presetId="custom"，按深浅走通用雾层。
  */
-export function buildAppearanceCss(tokens: AppearanceTokens): string {
+export function buildAppearanceCss(tokens: AppearanceTokens, presetId?: AppearancePresetId): string {
   const vars = appearanceToCssVars(tokens);
   const lines = Object.entries(vars).map(([k, v]) => `  ${k}: ${v};`);
   const dark = tokens.mode === "dark";
-  // 根层冷雾：浅模式极浅冷蓝，深模式冷黑微光
-  const mist = dark
-    ? "radial-gradient(120% 56% at 16% 0%, rgba(96,165,250,0.07), rgba(0,0,0,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(255,255,255,0.04), rgba(0,0,0,0) 64%)"
-    : "radial-gradient(120% 56% at 16% 0%, rgba(255,255,255,0.95), rgba(255,255,255,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(214,226,240,0.55), rgba(214,226,240,0) 64%)";
+  // 根层雾：按主题人格区分（不只依赖深浅）
+  let mist: string;
+  if (presetId === "mist-blue") {
+    mist = "radial-gradient(120% 56% at 16% 0%, rgba(186,212,238,0.5), rgba(186,212,238,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(158,190,226,0.55), rgba(158,190,226,0) 64%)";
+  } else if (presetId === "paper") {
+    mist = "radial-gradient(120% 56% at 16% 0%, rgba(246,240,226,0.85), rgba(246,240,226,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(228,220,201,0.5), rgba(228,220,201,0) 64%)";
+  } else if (dark) {
+    mist = "radial-gradient(120% 56% at 16% 0%, rgba(96,165,250,0.07), rgba(0,0,0,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(255,255,255,0.04), rgba(0,0,0,0) 64%)";
+  } else {
+    mist = "radial-gradient(120% 56% at 16% 0%, rgba(255,255,255,0.95), rgba(255,255,255,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(214,226,240,0.55), rgba(214,226,240,0) 64%)";
+  }
+  // 主题级补色：阅读纸 / 书架层板按主题微调（buildAppearanceCss 幂等，可重复注入）
+  const extra: Record<string, string> = {};
+  if (presetId === "paper" && !dark) {
+    extra["--bookroom-paper"] = "#F8F3E8";
+    extra["--bookroom-shelf-wood"] = "linear-gradient(180deg, #EFE9DC, #E3DCCB)";
+    extra["--bookroom-shelf-wood-stripe"] = "rgba(122,108,84,0.06)";
+  } else if (presetId === "mist-blue" && !dark) {
+    extra["--bookroom-paper"] = "#F3F8FC";
+    extra["--bookroom-shelf-wood"] = "linear-gradient(180deg, #E2ECF6, #D0DFEE)";
+    extra["--bookroom-shelf-wood-stripe"] = "rgba(60,98,140,0.07)";
+  } else if (presetId === "night-pearl" || dark) {
+    extra["--bookroom-paper"] = "#15181E";
+  }
+  const extraLines = Object.entries(extra).map(([k, v]) => `  ${k}: ${v};`);
   return [
     `.bookroom-app {`,
     ...lines,
+    ...extraLines,
     `  --bookroom-mist: ${mist};`,
     `}`,
   ].join("\n");
@@ -332,7 +356,7 @@ export function injectBookroomAppearance(): () => void {
     styleEl.id = BOOKROOM_APPEARANCE_STYLE_ID;
     document.head.appendChild(styleEl);
   }
-  styleEl.textContent = buildAppearanceCss(appearance.tokens);
+  styleEl.textContent = buildAppearanceCss(appearance.tokens, appearance.presetId);
   return () => {
     if (styleEl) styleEl.textContent = "";
   };

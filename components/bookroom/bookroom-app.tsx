@@ -61,7 +61,8 @@ export default function BookRoomApp({ onClose }: Props) {
   const [companionId, setCompanionId] = useState<string>(() => loadCompanionId() ?? "");
   const [roleDrawerOpen, setRoleDrawerOpen] = useState(false);
   const [nightTarget, setNightTarget] = useState<{ book: Book; mode: "night" | "companion" } | null>(null);
-  const [coTarget, setCoTarget] = useState<{ book: Book; initialAsk?: string } | null>(null);
+  // Phase 9A：drawer=true 时共读聊天从右侧滑出（阅读页右上角入口）
+  const [coTarget, setCoTarget] = useState<{ book: Book; initialAsk?: string; drawer?: boolean } | null>(null);
 
   // 外观与皮肤
   const [appearanceOpen, setAppearanceOpen] = useState(false);
@@ -156,6 +157,9 @@ export default function BookRoomApp({ onClose }: Props) {
             onBack={() => setReadingBook(null)}
             onOpenNight={() => setNightTarget({ book: readingBook, mode: "night" })}
             onAskRole={(askText) => setCoTarget({ book: readingBook, initialAsk: askText })}
+            onAiWrite={(idea) => setCreateOpts({ mode: "quick", idea })}
+            companion={companion}
+            onOpenCoRead={() => setCoTarget({ book: readingBook, drawer: true })}
           />
         )
       ) : activeBook ? (
@@ -274,6 +278,7 @@ export default function BookRoomApp({ onClose }: Props) {
           role={companion}
           kind={coTarget.book.type === "manga" ? "manga" : "book"}
           initialAsk={coTarget.initialAsk}
+          variant={coTarget.drawer ? "drawer" : "sheet"}
           onChooseRole={() => {
             setCoTarget(null);
             setRoleDrawerOpen(true);

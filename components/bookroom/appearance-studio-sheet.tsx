@@ -67,11 +67,11 @@ export function AppearanceStudioSheet({ onClose }: Props) {
       styleEl.id = styleId;
       document.head.appendChild(styleEl);
     }
-    styleEl.textContent = buildAppearanceCss(appearance.tokens);
+    styleEl.textContent = buildAppearanceCss(appearance.tokens, appearance.presetId);
     return () => {
       // 组件卸载时不移除，保持外观
     };
-  }, [appearance.tokens]);
+  }, [appearance.tokens, appearance.presetId]);
 
   const showToast = (text: string) => {
     setToast(text);

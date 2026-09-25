@@ -101,15 +101,15 @@ export function MineView({
       const anns = loadBookAnnotations(entry.bookId);
       annotationCount += anns.length;
       const title = resolveShelfBook(entry.bookId)?.title ?? "未知书名";
-      for (const ann of anns.slice(0, 3)) {
+      for (const ann of anns.slice(0, 2)) {
         recentQuotes.push({
           id: ann.id,
           quote: ann.quote,
           bookTitle: title,
         });
-        if (recentQuotes.length >= 3) break;
+        if (recentQuotes.length >= 2) break;
       }
-      if (recentQuotes.length >= 3) break;
+      if (recentQuotes.length >= 2) break;
     }
     const readingCount = entries.filter(e => e.status === "reading").length;
     return {

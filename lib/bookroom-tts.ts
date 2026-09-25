@@ -25,16 +25,22 @@ export type BookTtsController = {
   resume: () => void;
   stop: () => void;
   setRate: (rate: number) => void;
+  /** Phase 9A：朗读音量（0-1），与环境音音量分离；播放中即时生效（重启当前段） */
+  setVolume: (volume: number) => void;
   getStatus: () => BookTtsStatus;
   getIndex: () => number;
 };
 
-export function createBookTts(handlers: BookTtsHandlers = {}): BookTtsController {
+export function createBookTts(
+  handlers: BookTtsHandlers = {},
+  opts: { volume?: number } = {},
+): BookTtsController {
   const synth = window.speechSynthesis;
   let paragraphs: string[] = [];
   let index = -1;
   let status: BookTtsStatus = "idle";
   let rate = 1;
+  let volume = Math.min(1, Math.max(0, opts.volume ?? 1));
   let stopped = false;
 
   const setStatus = (next: BookTtsStatus) => {
@@ -59,8 +65,9 @@ export function createBookTts(handlers: BookTtsHandlers = {}): BookTtsController
       return;
     }
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = /[\u4e00-\u9fff]/.test(text) ? "zh-CN" : "en-US";
+    utterance.lang = /[一-鿿]/.test(text) ? "zh-CN" : "en-US";
     utterance.rate = rate;
+    utterance.volume = volume;
     utterance.onend = () => {
       if (stopped) return;
       // Chrome 在 pause 后恢复也可能触发 onend，用状态守门
@@ -111,6 +118,17 @@ export function createBookTts(handlers: BookTtsHandlers = {}): BookTtsController
       rate = Math.min(2, Math.max(0.5, nextRate));
       if (willPlay && index >= 0) {
         // 从当前段重新开始以应用新语速
+        stopped = false;
+        synth.cancel();
+        setStatus("playing");
+        window.setTimeout(() => { if (!stopped) speakIndex(index); }, 60);
+      }
+    },
+    setVolume(nextVolume) {
+      const willPlay = status === "playing";
+      volume = Math.min(1, Math.max(0, nextVolume));
+      if (willPlay && index >= 0) {
+        // 与 setRate 同理：重启当前段让新音量生效
         stopped = false;
         synth.cancel();
         setStatus("playing");

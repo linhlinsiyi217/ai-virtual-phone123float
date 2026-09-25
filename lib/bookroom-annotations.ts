@@ -13,7 +13,7 @@ import { kvGet, kvRemove, kvSet } from "./kv-db";
 
 export type ReaderAnnotationColor = "blue" | "yellow" | "red" | "green";
 
-export type ReaderAnnotationType = "underline" | "highlight" | "note";
+export type ReaderAnnotationType = "underline" | "highlight" | "note" | "favorite";
 
 export type ReaderAnnotation = {
   id: string;
@@ -61,7 +61,7 @@ export function loadBookAnnotations(bookId: string): ReaderAnnotation[] {
       && typeof (item as ReaderAnnotation).id === "string"
       && typeof (item as ReaderAnnotation).bookId === "string"
       && typeof (item as ReaderAnnotation).quote === "string"
-      && ["underline", "highlight", "note"].includes((item as ReaderAnnotation).type),
+      && ["underline", "highlight", "note", "favorite"].includes((item as ReaderAnnotation).type),
     ));
   } catch {
     return [];

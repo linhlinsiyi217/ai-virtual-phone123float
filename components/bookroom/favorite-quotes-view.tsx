@@ -11,13 +11,14 @@ type Props = {
   onJumpToBook: (bookId: string, chapterIndex: number, paragraphIndex: number) => void;
 };
 
-type Filter = "all" | "highlight" | "underline" | "note";
+type Filter = "all" | "highlight" | "underline" | "note" | "favorite";
 
 const FILTER_LABEL: Record<Filter, string> = {
   all: "全部",
   highlight: "高亮",
   underline: "划线",
   note: "笔记",
+  favorite: "收藏",
 };
 
 function formatDate(ts: number): string {

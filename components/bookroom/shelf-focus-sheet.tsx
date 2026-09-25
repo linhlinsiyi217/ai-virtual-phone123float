@@ -1,20 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   BookOpen,
   Check,
   FolderPlus,
   Heart,
+  ImagePlus,
   Info,
   Pause,
   Pencil,
+  RotateCcw,
   Trash2,
   X,
 } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import {
   listCollections,
+  setCustomCover,
   type BookshelfEntry,
   type ShelfStatus,
 } from "@/lib/bookroom-shelf";
@@ -34,6 +37,8 @@ type Props = {
   onRemoveFromShelf: () => void;
   /** 仅 imported 书显示：删除导入解析内容 */
   onDeleteImported?: () => void;
+  /** Phase 9A：自定义封面变更后通知父级刷新 */
+  onCoverChange?: () => void;
 };
 
 const STATUS_META: Record<ShelfStatus, { label: string; activeLabel: string }> = {
@@ -60,13 +65,50 @@ export function ShelfFocusSheet({
   onAddToCollection,
   onRemoveFromShelf,
   onDeleteImported,
+  onCoverChange,
 }: Props) {
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [coverHint, setCoverHint] = useState<string | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
   const favorite = Boolean(entry.favorite);
   const isImported = book.source === "imported";
+  const hasCustomCover = Boolean(entry.customCover);
 
   const collections = listCollections();
+
+  /* Phase 9A：自定义封面上传 —— 读图 → 等比缩到 480px 宽 → JPEG dataURL 存书架条目 */
+  const handleCoverFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_W = 480;
+        const scale = Math.min(1, MAX_W / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          setCoverHint("封面处理失败");
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        try {
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          setCustomCover(book.id, dataUrl);
+          setCoverHint("封面已更新");
+          onCoverChange?.();
+        } catch {
+          setCoverHint("封面保存失败（存储空间不足）");
+        }
+      };
+      img.onerror = () => setCoverHint("图片读取失败");
+      img.src = String(reader.result);
+    };
+    reader.onerror = () => setCoverHint("文件读取失败");
+    reader.readAsDataURL(file);
+  };
 
   return (
     <BottomSheet title={book.title} onClose={onClose} panelClassName="br-shelf-focus">
@@ -110,6 +152,41 @@ export function ShelfFocusSheet({
           <Heart size={18} strokeWidth={1.9} fill={favorite ? "currentColor" : "none"} />
           <span>{favorite ? "已收藏" : "收藏"}</span>
         </button>
+
+        {/* Phase 9A：自定义封面 / 恢复默认 */}
+        <button
+          type="button"
+          className="br-focus-btn book-pressable"
+          onClick={() => coverInputRef.current?.click()}
+        >
+          <ImagePlus size={18} strokeWidth={1.9} />
+          <span>换封面</span>
+        </button>
+        {hasCustomCover && (
+          <button
+            type="button"
+            className="br-focus-btn book-pressable"
+            onClick={() => {
+              setCustomCover(book.id, null);
+              setCoverHint("已恢复默认封面");
+              onCoverChange?.();
+            }}
+          >
+            <RotateCcw size={18} strokeWidth={1.9} />
+            <span>恢复封面</span>
+          </button>
+        )}
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={e => {
+            const file = e.target.files?.[0];
+            if (file) handleCoverFile(file);
+            e.target.value = "";
+          }}
+        />
 
         <button
           type="button"

@@ -10,6 +10,10 @@ import {
   Highlighter,
   Search,
   Volume2,
+  Star,
+  Share2,
+  Globe,
+  PenLine,
 } from "lucide-react";
 
 export type ReaderMenuAction =
@@ -20,7 +24,11 @@ export type ReaderMenuAction =
   | "translate"
   | "highlight"
   | "search"
-  | "listen";
+  | "listen"
+  | "favorite"
+  | "share"
+  | "websearch"
+  | "aiwrite";
 
 export type ReaderSelectionRect = {
   top: number;
@@ -57,7 +65,15 @@ const ROW_2: Item[] = [
   { action: "listen", label: "从此听", icon: Volume2 },
 ];
 
-const MENU_HEIGHT = 92;
+/* Phase 9A 第三行：收藏 / 分享 / 网页搜索 / AI 写作 */
+const ROW_3: Item[] = [
+  { action: "favorite", label: "收藏", icon: Star, singleOnly: true },
+  { action: "share", label: "分享", icon: Share2 },
+  { action: "websearch", label: "网页搜索", icon: Globe },
+  { action: "aiwrite", label: "AI 写作", icon: PenLine },
+];
+
+const MENU_HEIGHT = 132;
 const MENU_WIDTH = 300;
 
 /**
@@ -104,6 +120,7 @@ export function ReaderSelectionMenu({ rect, singleParagraph, onAction }: Props) 
     >
       <div className="reader-menu-row">{ROW_1.map(renderItem)}</div>
       <div className="reader-menu-row">{ROW_2.map(renderItem)}</div>
+      <div className="reader-menu-row">{ROW_3.map(renderItem)}</div>
     </div>
   );
 }

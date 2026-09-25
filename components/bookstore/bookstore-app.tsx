@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Clock, Search, Trash2, X } from "lucide-react";
+import { Clock, Folder, LayoutGrid, Search, Trash2, X } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import { MOCK_BOOKS } from "@/lib/bookstore-data";
 import type { BookSearchResult } from "@/lib/bookroom/providers";
@@ -13,7 +13,7 @@ import {
   removeSearchTerm,
   type SearchHistoryEntry,
 } from "@/lib/bookroom-search-history";
-import { BookCard } from "./book-card";
+import { BookCard, BookCover } from "./book-card";
 
 const DEBOUNCE_MS = 300;
 
@@ -253,7 +253,7 @@ export function BookstoreHome({ onOpenBook }: Props) {
 
           {/* 本地结果 */}
           {localResults.length > 0 && (
-            <div className="book-grid">
+            <div className="book-grid book-grid-compact">
               {localResults.map(book => (
                 <BookCard key={book.id} book={book} onOpen={onOpenBook} />
               ))}
@@ -268,7 +268,7 @@ export function BookstoreHome({ onOpenBook }: Props) {
                 {online.loading && <span className="br-online-loading">载入中…</span>}
               </div>
               {onlineCount > 0 && (
-                <div className="book-grid">
+                <div className="book-grid book-grid-compact">
                   {online.results.map(book => (
                     <BookCard key={book.id} book={book} onOpen={onOpenBook} />
                   ))}
@@ -308,9 +308,10 @@ export function BookstoreHome({ onOpenBook }: Props) {
   );
 }
 
-/** 推荐列表（非搜索态） */
+/** 推荐列表（非搜索态）。Phase 9A：小书封网格 / 文件夹书夹视图切换 */
 function RecommendGrid({ onOpenBook }: { onOpenBook: (book: Book) => void }) {
   const [category, setCategory] = useState("全部");
+  const [viewMode, setViewMode] = useState<"grid" | "folder">("grid");
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -322,32 +323,97 @@ function RecommendGrid({ onOpenBook }: { onOpenBook: (book: Book) => void }) {
     return category === "全部" ? MOCK_BOOKS : MOCK_BOOKS.filter(book => book.category === category);
   }, [category]);
 
+  /** 文件夹视图：按分类分组（选择具体分类时退化为普通网格语义的一组） */
+  const folderGroups = useMemo(() => {
+    const map = new Map<string, Book[]>();
+    for (const book of matchedBooks) {
+      const list = map.get(book.category) ?? [];
+      list.push(book);
+      map.set(book.category, list);
+    }
+    return [...map.entries()];
+  }, [matchedBooks]);
+
   return (
     <>
-      <div className="br-chip-row br-category-row" role="tablist" aria-label="分类浏览">
-        {categories.map(item => (
+      <div className="br-store-toolbar">
+        <div className="br-chip-row br-category-row" role="tablist" aria-label="分类浏览">
+          {categories.map(item => (
+            <button
+              key={item}
+              type="button"
+              role="tab"
+              aria-selected={category === item}
+              className={`br-chip book-pressable ${category === item ? "is-active" : ""}`}
+              onClick={() => setCategory(item)}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+        <div className="br-store-viewswitch" role="tablist" aria-label="视图切换">
           <button
-            key={item}
             type="button"
             role="tab"
-            aria-selected={category === item}
-            className={`br-chip book-pressable ${category === item ? "is-active" : ""}`}
-            onClick={() => setCategory(item)}
+            aria-selected={viewMode === "grid"}
+            className={`br-store-viewbtn book-pressable ${viewMode === "grid" ? "is-active" : ""}`}
+            onClick={() => setViewMode("grid")}
+            aria-label="封面网格视图"
+            title="封面网格"
           >
-            {item}
+            <LayoutGrid size={15} strokeWidth={1.9} />
           </button>
-        ))}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === "folder"}
+            className={`br-store-viewbtn book-pressable ${viewMode === "folder" ? "is-active" : ""}`}
+            onClick={() => setViewMode("folder")}
+            aria-label="文件夹视图"
+            title="文件夹"
+          >
+            <Folder size={15} strokeWidth={1.9} />
+          </button>
+        </div>
       </div>
       <section className="book-section">
         <div className="book-section-head">
           <h2 className="book-section-title">为你推荐</h2>
           <span className="book-section-more">{matchedBooks.length} 本</span>
         </div>
-        <div className="book-grid">
-          {matchedBooks.map(book => (
-            <BookCard key={book.id} book={book} onOpen={onOpenBook} />
-          ))}
-        </div>
+        {viewMode === "grid" ? (
+          <div className="book-grid book-grid-compact">
+            {matchedBooks.map(book => (
+              <BookCard key={book.id} book={book} onOpen={onOpenBook} />
+            ))}
+          </div>
+        ) : (
+          <div className="br-store-folders">
+            {folderGroups.map(([cat, books]) => (
+              <section key={cat} className="br-store-folder">
+                <div className="br-store-folder-head">
+                  <Folder size={13} strokeWidth={1.9} aria-hidden />
+                  <span className="br-store-folder-name">{cat}</span>
+                  <span className="br-store-folder-count">{books.length}</span>
+                </div>
+                <div className="br-store-folder-books">
+                  {books.map(book => (
+                    <button
+                      key={book.id}
+                      type="button"
+                      className="br-store-folder-book book-pressable"
+                      onClick={() => onOpenBook(book)}
+                      aria-label={`查看《${book.title}》详情`}
+                    >
+                      <BookCover book={book} className="br-store-folder-cover" />
+                      <span className="br-store-folder-title">{book.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
       </section>
     </>
   );

@@ -16,7 +16,7 @@ import {
   type ReaderAnnotationType,
 } from "@/lib/bookroom-annotations";
 import { loadCompanionId } from "@/lib/bookroom-shelf";
-import { isRealCompanionRole, resolveCompanionRoles } from "@/lib/bookroom-mock";
+import { isRealCompanionRole, resolveCompanionRoles, type CompanionRole } from "@/lib/bookroom-mock";
 import {
   createBookTts,
   isBookTtsSupported,
@@ -25,6 +25,24 @@ import {
 } from "@/lib/bookroom-tts";
 import { BrToast } from "./bookroom-ui";
 import { getActiveReadingSkin, buildSkinCss } from "@/lib/bookroom-reading-skins";
+import {
+  loadReaderPrefs,
+  saveBookReaderPrefs,
+  buildReaderPrefsCssVars,
+  resolveReaderColors,
+  buildReaderTexture,
+  READER_PREFS_EVENT,
+  type ReaderPrefs,
+} from "@/lib/bookroom-reader-prefs";
+import {
+  playAmbient,
+  stopAmbient,
+  setAmbientVolume,
+  getAmbientId,
+  setSleepTimer,
+  clearSleepTimer,
+  SLEEP_TIMER_EVENT,
+} from "@/lib/bookroom-audio";
 import {
   ReaderSelectionMenu,
   type ReaderMenuAction,
@@ -47,6 +65,11 @@ type Props = {
   onOpenNight: () => void;
   /** 划词「问 TA」：把含选中原文的问题带入共读聊天层 */
   onAskRole: (askText: string) => void;
+  /** 划词「AI 写作」：把选中原文带入书桌快速新建（Phase 9A） */
+  onAiWrite?: (idea: string) => void;
+  /** Phase 9A：阅读页右上角统一角色共读入口（视觉与主页一致） */
+  companion?: CompanionRole;
+  onOpenCoRead?: () => void;
 };
 
 type TextSelectionInfo = {
@@ -121,7 +144,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
  * Phase 3B 起：正文原生可选，长按/划词浮出上下文工具（复制/划线/笔记/问TA/
  * 翻译/高亮/搜索/从此听）；标注走独立 kv-db，与进度/共读/长期记忆隔离。
  */
-export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
+export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, companion, onOpenCoRead }: Props) {
   const chapters = book.chapters ?? [];
   const total = chapters.length;
 
@@ -141,6 +164,8 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
   const [ttsStatus, setTtsStatus] = useState<BookTtsStatus>("idle");
   const [ttsIndex, setTtsIndex] = useState(-1);
   const [ttsRate, setTtsRate] = useState(1);
+  // Phase 9A P1：阅读外观偏好（内置默认 ← 全局 ← 单本书），夜读 sheet 改动即时生效
+  const [readerPrefs, setReaderPrefs] = useState<ReaderPrefs>(() => loadReaderPrefs(book.id));
   // Phase 8B：安静阅读 —— 顶 / 底栏默认隐藏，单击正文空白处切换
   const [chromeVisible, setChromeVisible] = useState(false);
 
@@ -202,6 +227,49 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
     };
   }, [book.id]);
 
+  /* ── Phase 9A P1：阅读外观偏好 ──
+     挂载时恢复环境音 / 睡眠定时；监听 sheet 保存事件即时应用；
+     睡眠定时到点：停 TTS + 环境音（audio 层已停）并清零偏好。 */
+  useEffect(() => {
+    const initial = loadReaderPrefs(book.id);
+    setReaderPrefs(initial);
+    if (initial.ambientId !== "off") playAmbient(initial.ambientId, initial.ambientVolume / 100);
+    if (initial.sleepTimer > 0) setSleepTimer(initial.sleepTimer);
+
+    const onPrefsChanged = () => {
+      const next = loadReaderPrefs(book.id);
+      setReaderPrefs(prev => {
+        // 环境音播放状态与偏好对齐（偏好可能在 sheet 中改但播放已由 sheet 侧处理）
+        if (next.ambientId !== getAmbientId()) {
+          if (next.ambientId === "off") stopAmbient();
+          else playAmbient(next.ambientId, next.ambientVolume / 100);
+        } else if (next.ambientId !== "off" && next.ambientVolume !== prev.ambientVolume) {
+          setAmbientVolume(next.ambientVolume / 100);
+        }
+        if (next.ttsVolume !== prev.ttsVolume) ttsRef.current?.setVolume(next.ttsVolume / 100);
+        return next;
+      });
+    };
+    const onSleepFired = () => {
+      ttsRef.current?.stop();
+      setReaderPrefs(current => {
+        const next = { ...current, sleepTimer: 0 };
+        saveBookReaderPrefs(book.id, next);
+        return next;
+      });
+      showToast("睡眠定时已到，已停止朗读与环境音");
+    };
+    window.addEventListener(READER_PREFS_EVENT, onPrefsChanged);
+    window.addEventListener(SLEEP_TIMER_EVENT, onSleepFired);
+    return () => {
+      window.removeEventListener(READER_PREFS_EVENT, onPrefsChanged);
+      window.removeEventListener(SLEEP_TIMER_EVENT, onSleepFired);
+      stopAmbient();
+      clearSleepTimer();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book.id]);
+
   /* ── 进度：离开 / 切后台落盘 ── */
   useEffect(() => {
     const flush = () => persist(stateRef.current.chapterIndex, stateRef.current.fraction);
@@ -251,10 +319,15 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
     return () => window.clearTimeout(timer);
   }, [flash]);
 
-  /** 单击正文空白：切换安静模式工具栏；正在划词 / 点标注时不切换 */
+  /** 单击正文空白：切换安静模式工具栏；正在划词 / 点标注 / 工具条还在时不切换 */
   const handleContentTap = () => {
     const sel = window.getSelection();
     if (sel && sel.toString().trim().length > 0) return;
+    // 选区刚收起但浮条仍在（selectionchange 尚未触发）：只关浮条，不切换 chrome
+    if (selection) {
+      setSelection(null);
+      return;
+    }
     setChromeVisible(v => !v);
   };
 
@@ -341,6 +414,22 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
     };
   }, [captureSelection]);
 
+  /* ── Phase 9A：正文区拦截浏览器 / WebView 原生长按菜单 ──
+     只作用于阅读内容根节点，不影响其它页面输入框的系统菜单 */
+  useEffect(() => {
+    const article = articleRef.current;
+    const scroller = scrollRef.current;
+    const prevent = (event: Event) => {
+      event.preventDefault();
+    };
+    article?.addEventListener("contextmenu", prevent, true);
+    scroller?.addEventListener("contextmenu", prevent, true);
+    return () => {
+      article?.removeEventListener("contextmenu", prevent, true);
+      scroller?.removeEventListener("contextmenu", prevent, true);
+    };
+  }, [chapterIndex]);
+
   /* ── TTS 控制器（浏览器 SpeechSynthesis），卸载即停 ── */
   useEffect(() => {
     if (!ttsSupported) return;
@@ -359,10 +448,10 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
         setSheet(current => (current?.kind === "tts" ? null : current));
       },
       onError: message => showToast(message),
-    });
+    }, { volume: loadReaderPrefs(book.id).ttsVolume / 100 });
     ttsRef.current = controller;
     return () => controller.stop();
-  }, [ttsSupported, showToast]);
+  }, [ttsSupported, showToast, book.id]);
 
   /* 切章即停：朗读队列按本章段落建立，避免索引串到新章节 */
   useEffect(() => {
@@ -477,6 +566,41 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
       case "listen":
         startListen(info);
         break;
+      /* ── Phase 9A 第三行动作 ── */
+      case "favorite":
+        if (!single) { showToast("请在同一段落内选择"); return; }
+        createMark("favorite", "blue", info);
+        collapseSelection();
+        showToast("已收藏到语录");
+        break;
+      case "share": {
+        const shareText = `「${info.quote}」\n——《${book.title}》`;
+        const nav = navigator as Navigator & { share?: (data: { text: string }) => Promise<void> };
+        if (typeof nav.share === "function") {
+          nav.share({ text: shareText })
+            .then(() => showToast("已分享"))
+            .catch(() => undefined);
+        } else {
+          void copyToClipboard(shareText).then(ok => showToast(ok ? "已复制，可粘贴分享" : "分享失败"));
+        }
+        collapseSelection();
+        break;
+      }
+      case "websearch": {
+        const url = `https://www.bing.com/search?q=${encodeURIComponent(info.quote.slice(0, 80))}`;
+        window.open(url, "_blank", "noopener,noreferrer");
+        collapseSelection();
+        break;
+      }
+      case "aiwrite":
+        if (onAiWrite) {
+          onAiWrite(info.quote.length > 200 ? `${info.quote.slice(0, 200)}…` : info.quote);
+          collapseSelection();
+        } else {
+          showToast("请先到书桌使用 AI 写作");
+          collapseSelection();
+        }
+        break;
       default:
         break;
     }
@@ -566,7 +690,7 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
         <span
           key={ann.id}
           className={`ra-mark ra-${ann.type}`}
-          data-color={ann.color ?? (ann.type === "underline" ? "blue" : "yellow")}
+          data-color={ann.color ?? (ann.type === "underline" || ann.type === "favorite" ? "blue" : "yellow")}
           onClick={event => {
             event.stopPropagation();
             openManage(ann);
@@ -613,13 +737,47 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
       } as React.CSSProperties
     : {};
 
+  // Phase 9A P1：阅读外观偏好覆盖在皮肤之上（主调节面板），含纸底背景 / 正文色 / 纹理 / 翻页动效
+  const prefsVars = buildReaderPrefsCssVars(readerPrefs) as React.CSSProperties;
+  const readerColors = resolveReaderColors(readerPrefs);
+  const readerTexture = buildReaderTexture(readerPrefs.textureStrength);
+  const rootStyle: React.CSSProperties = {
+    ...skinVars,
+    ...prefsVars,
+    background: readerColors.bg,
+  };
+
   return (
-    <div className="reading-view br-page bookroom-reader-skin-root" style={skinVars}>
+    <div
+      className={`reading-view br-page bookroom-reader-skin-root reader-motion-${readerPrefs.pageMotion}${readerTexture ? " has-texture" : ""}${readerColors.dark ? " is-dark-paper" : ""}`}
+      style={rootStyle}
+    >
+      {readerTexture && (
+        <div
+          className="br-reader-texture"
+          aria-hidden
+          style={{ backgroundImage: readerTexture.backgroundImage, opacity: readerTexture.opacity }}
+        />
+      )}
       <header className={`reading-header${chromeVisible ? " is-chrome-visible" : " is-chrome-hidden"}`}>
         <button className="book-icon-btn book-pressable" type="button" onClick={onBack} aria-label="返回书籍详情">
           <ChevronLeft size={22} strokeWidth={2} />
         </button>
         <span className="reading-header-title">{book.title}</span>
+        {companion && onOpenCoRead && (
+          <button
+            type="button"
+            className="br-role-entry book-pressable reading-role-entry"
+            onClick={onOpenCoRead}
+            aria-label={`和 ${companion.name} 一起读`}
+            title="角色共读"
+          >
+            <span className="br-role-entry-avatar">
+              {companion.avatar ? <img src={companion.avatar} alt="" /> : companion.name.slice(0, 1)}
+            </span>
+            <span className={`br-role-dot br-role-dot-${companion.status}`} aria-hidden />
+          </button>
+        )}
         <button
           className="book-icon-btn book-pressable"
           type="button"
@@ -644,7 +802,11 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
         onScroll={handleScroll}
         onClick={handleContentTap}
       >
-        <article className="reading-article" ref={articleRef}>
+        <article
+          className="reading-article"
+          ref={articleRef}
+          key={readerPrefs.pageMotion === "scroll" ? "static" : `ch-${chapterIndex}`}
+        >
           <h2 className="reading-chapter-title">{chapter?.title ?? ""}</h2>
           {chapter?.content.map((paragraph, i) => (
             <p
@@ -661,7 +823,10 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole }: Props) {
         </article>
       </div>
 
-      <footer className="reading-footer">
+      <footer
+        className="reading-footer"
+        style={{ background: `linear-gradient(180deg, transparent, ${readerColors.bg})` }}
+      >
         <div className="reading-progress-bar">
           <div className="reading-progress-bar-fill" style={{ width: `${scrollPercent}%` }} />
         </div>

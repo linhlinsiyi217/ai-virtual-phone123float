@@ -217,6 +217,21 @@ export function isFavorite(bookId: string): boolean {
   return Boolean(getShelfEntry(bookId)?.favorite);
 }
 
+/** Phase 9A：自定义封面（书架条目级本地覆盖）。dataUrl 传 null 恢复默认封面。 */
+export function setCustomCover(bookId: string, dataUrl: string | null): void {
+  const e = getShelfEntry(bookId);
+  if (!e) return;
+  if (dataUrl) e.customCover = dataUrl;
+  else delete e.customCover;
+  saveShelfEntry(e);
+}
+
+/** Phase 9A：读取自定义封面（无则 null） */
+export function getCustomCover(bookId: string): string | null {
+  const e = getShelfEntry(bookId);
+  return e?.customCover ?? null;
+}
+
 export function isInShelf(bookId: string): boolean {
   return getShelfEntry(bookId) !== null;
 }

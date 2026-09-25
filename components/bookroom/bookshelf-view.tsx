@@ -24,6 +24,7 @@ import {
   createCollection,
   deleteCollection,
   getOnlineSnapshot,
+  getShelfEntry,
   listCollections,
   listShelfEntries,
   loadShelfOrder,
@@ -697,6 +698,12 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
               ? () => confirmDeleteImported(focusTarget.book)
               : undefined
           }
+          onCoverChange={() => {
+            refresh();
+            // 同步刷新聚焦面板里的 entry 快照，保证“恢复封面”按钮状态即时更新
+            const fresh = getShelfEntry(focusTarget.book.id);
+            if (fresh) setFocusTarget({ book: focusTarget.book, entry: fresh });
+          }}
         />
       )}
 

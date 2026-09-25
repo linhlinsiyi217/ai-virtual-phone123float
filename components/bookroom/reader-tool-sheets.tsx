@@ -250,6 +250,7 @@ const TYPE_LABEL: Record<ReaderAnnotation["type"], string> = {
   underline: "划线",
   highlight: "高亮",
   note: "笔记",
+  favorite: "收藏",
 };
 
 export function ReaderAnnotationsSheet({ book, annotations, onJump, onDelete, onClose }: AnnotationsSheetProps) {

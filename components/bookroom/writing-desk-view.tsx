@@ -8,7 +8,11 @@ import {
   ChevronRight,
   Copy,
   Feather,
+  Globe,
+  History,
+  Inbox,
   Library,
+  ListTree,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -18,6 +22,7 @@ import {
   Sparkles,
   Star,
   Trash2,
+  Users,
 } from "lucide-react";
 import {
   listWritingProjects,
@@ -29,6 +34,8 @@ import {
   setWritingStatus,
   publishProjectAsBook,
   getWritingTotalWords,
+  loadChapterDoc,
+  WRITING_MATERIAL_TYPE_LABELS,
   type WritingProject,
   type WritingStatus,
 } from "@/lib/bookroom-writing";
@@ -53,6 +60,17 @@ type Props = {
   uiState: DeskUiState;
   onUiStateChange: (patch: Partial<DeskUiState>) => void;
 };
+
+/** Phase 9A P1：书桌工具入口 */
+type DeskTool = "materials" | "roles" | "world" | "outline" | "versions";
+
+const DESK_TOOLS: { id: DeskTool; label: string; title: string; icon: typeof Inbox }[] = [
+  { id: "materials", label: "灵感", title: "灵感收纳箱", icon: Inbox },
+  { id: "roles", label: "角色", title: "角色板", icon: Users },
+  { id: "world", label: "世界", title: "世界设定 / 世界书", icon: Globe },
+  { id: "outline", label: "大纲", title: "章节大纲", icon: ListTree },
+  { id: "versions", label: "版本", title: "版本历史", icon: History },
+];
 
 const FILTERS: { value: DeskFilter; label: string }[] = [
   { value: "all", label: "全部" },
@@ -101,6 +119,8 @@ export function WritingDeskView({ onOpenProject, onCreate, uiState, onUiStateCha
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<WritingProject | null>(null);
+  // Phase 9A P1：工具入口 BottomSheet
+  const [toolSheet, setToolSheet] = useState<DeskTool | null>(null);
   const scrollElRef = useRef<Element | null>(null);
   const rafRef = useRef<number | null>(null);
 
@@ -209,6 +229,101 @@ export function WritingDeskView({ onOpenProject, onCreate, uiState, onUiStateCha
     const first = p.chapters.slice().sort((a, b) => a.order - b.order)[0];
     return first?.title ?? "尚未建章";
   };
+
+  // Phase 9A P1：最近作品（非归档，按更新时间前 6）
+  const recentProjects = useMemo(
+    () => projects
+      .filter(p => p.status !== "archived")
+      .slice()
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 6),
+    [projects],
+  );
+
+  /* ── Phase 9A P1：工具聚合数据（真实读取，无 mock；打开时才聚合） ── */
+  const visibleProjects = useMemo(() => projects.filter(p => p.status !== "archived"), [projects]);
+
+  const toolMaterials = useMemo(() => {
+    if (toolSheet !== "materials") return [];
+    return visibleProjects
+      .flatMap(p => p.materials.map(m => ({
+        id: m.id,
+        projectId: p.id,
+        projectTitle: p.title,
+        typeLabel: m.type ? (WRITING_MATERIAL_TYPE_LABELS[m.type] ?? "自定义") : "灵感",
+        text: m.text,
+        updatedAt: m.updatedAt ?? m.createdAt,
+      })))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 60);
+  }, [toolSheet, visibleProjects]);
+
+  const toolRoles = useMemo(() => {
+    if (toolSheet !== "roles") return [];
+    const ids = Array.from(new Set(visibleProjects.flatMap(p => p.roleIds)));
+    return ids
+      .map(id => {
+        const c = characters.find(ch => ch.id === id);
+        if (!c) return null;
+        return {
+          id,
+          name: c.name,
+          avatar: c.avatar,
+          projects: visibleProjects.filter(p => p.roleIds.includes(id)).map(p => p.title),
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => Boolean(r));
+  }, [toolSheet, visibleProjects, characters]);
+
+  const toolWorld = useMemo(() => {
+    if (toolSheet !== "world") return { groups: [] as { id: string; name: string; projects: string[] }[], books: [] as { id: string; name: string; projects: string[] }[] };
+    const groupIds = Array.from(new Set(visibleProjects.map(p => p.worldArchiveId).filter((x): x is string => Boolean(x))));
+    const groups = groupIds
+      .map(id => {
+        const g = worldGroups.find(item => item.id === id);
+        if (!g) return null;
+        return { id, name: g.name, projects: visibleProjects.filter(p => p.worldArchiveId === id).map(p => p.title) };
+      })
+      .filter((g): g is NonNullable<typeof g> => Boolean(g));
+    const wbIds = Array.from(new Set(visibleProjects.flatMap(p => p.lorebookIds ?? [])));
+    const books = wbIds
+      .map(id => {
+        const b = worldBooks.find(item => item.id === id);
+        if (!b) return null;
+        return { id, name: b.name, projects: visibleProjects.filter(p => (p.lorebookIds ?? []).includes(id)).map(p => p.title) };
+      })
+      .filter((b): b is NonNullable<typeof b> => Boolean(b));
+    return { groups, books };
+  }, [toolSheet, visibleProjects, worldGroups, worldBooks]);
+
+  const toolOutlines = useMemo(() => {
+    if (toolSheet !== "outline") return [];
+    return visibleProjects
+      .filter(p => p.outline.length > 0)
+      .map(p => ({
+        projectId: p.id,
+        title: p.title,
+        items: p.outline.slice(0, 5),
+        total: p.outline.length,
+      }));
+  }, [toolSheet, visibleProjects]);
+
+  const toolVersions = useMemo(() => {
+    if (toolSheet !== "versions") return [];
+    return visibleProjects
+      .map(p => {
+        let count = 0;
+        let latest = 0;
+        for (const ch of p.chapters) {
+          const doc = loadChapterDoc(p.id, ch.id);
+          count += doc.versions.length;
+          for (const v of doc.versions) latest = Math.max(latest, v.savedAt);
+        }
+        return { projectId: p.id, title: p.title, count, latest };
+      })
+      .filter(row => row.count > 0)
+      .sort((a, b) => b.latest - a.latest);
+  }, [toolSheet, visibleProjects]);
 
   const inShelf = (p: WritingProject): boolean => Boolean(getShelfEntry(p.publishedBookId ?? `generated-${p.id}`));
 
@@ -364,6 +479,52 @@ export function WritingDeskView({ onOpenProject, onCreate, uiState, onUiStateCha
         </div>
       </section>
 
+      {/* ── Phase 9A P1：最近作品（横向紧凑纸卡，非归档前 6） ── */}
+      {hasAnyProject && recentProjects.length > 0 && (
+        <section className="book-section">
+          <div className="book-section-head">
+            <h2 className="book-section-title">最近作品</h2>
+          </div>
+          <div className="br-desk-recent-row">
+            {recentProjects.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                className="br-desk-recent-card book-pressable"
+                onClick={() => onOpenProject(p.id)}
+              >
+                <span className="br-desk-recent-title">{p.title}</span>
+                <span className="br-desk-recent-chapter">{currentChapterTitle(p)}</span>
+                <span className="br-desk-recent-meta">
+                  {getWritingTotalWords(p).toLocaleString()} 字 · {formatRelative(p.updatedAt)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Phase 9A P1：工具入口区（灵感 / 角色 / 世界 / 大纲 / 版本） ── */}
+      <section className="book-section">
+        <div className="br-desk-tools-grid">
+          {DESK_TOOLS.map(tool => {
+            const Icon = tool.icon;
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                className="br-desk-tool book-pressable"
+                onClick={() => setToolSheet(tool.id)}
+                aria-label={tool.title}
+              >
+                <Icon size={18} strokeWidth={1.8} />
+                <span className="br-desk-tool-label">{tool.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {hasAnyProject && (
         <section className="book-section">
           <div className="br-desk-context book-glass">
@@ -437,6 +598,131 @@ export function WritingDeskView({ onOpenProject, onCreate, uiState, onUiStateCha
       )}
 
       <footer className="book-footer">BOOKROOM · DESK</footer>
+
+      {/* ── Phase 9A P1：工具入口 Sheets（真实数据，空态真实文案） ── */}
+      {toolSheet === "materials" && (
+        <BottomSheet title="灵感收纳箱" onClose={() => setToolSheet(null)}>
+          {toolMaterials.length === 0 ? (
+            <p className="br-desk-tool-empty">还没有收纳灵感。在作品里记下片段、场景或人物笔记后会出现在这里。</p>
+          ) : (
+            <div className="br-desk-sheet-list">
+              {toolMaterials.map(m => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className="br-desk-tool-row book-pressable"
+                  onClick={() => { setToolSheet(null); onOpenProject(m.projectId); }}
+                >
+                  <span className="br-desk-tool-row-head">
+                    <span className="br-desk-tool-row-tag">{m.typeLabel}</span>
+                    <span className="br-desk-tool-row-proj">{m.projectTitle}</span>
+                  </span>
+                  <span className="br-desk-tool-row-text">{m.text}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </BottomSheet>
+      )}
+      {toolSheet === "roles" && (
+        <BottomSheet title="角色板" onClose={() => setToolSheet(null)}>
+          {toolRoles.length === 0 ? (
+            <p className="br-desk-tool-empty">还没有作品绑定角色。在写作工程里选择角色后，这里会列出他们。</p>
+          ) : (
+            <div className="br-desk-sheet-list">
+              {toolRoles.map(r => (
+                <div key={r.id} className="br-desk-tool-row is-static">
+                  <span className="br-desk-tool-row-head">
+                    <span className="br-desk-badge-avatar">
+                      {r.avatar ? <img src={r.avatar} alt="" /> : r.name.slice(0, 1)}
+                    </span>
+                    <span className="br-desk-tool-row-name">{r.name}</span>
+                  </span>
+                  <span className="br-desk-tool-row-text">{r.projects.join("、")}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </BottomSheet>
+      )}
+      {toolSheet === "world" && (
+        <BottomSheet title="世界设定 / 世界书" onClose={() => setToolSheet(null)}>
+          {toolWorld.groups.length === 0 && toolWorld.books.length === 0 ? (
+            <p className="br-desk-tool-empty">还没有绑定世界设定。在写作工程里选择世界卷宗或世界书后会显示在这里。</p>
+          ) : (
+            <div className="br-desk-sheet-list">
+              {toolWorld.groups.map(g => (
+                <div key={g.id} className="br-desk-tool-row is-static">
+                  <span className="br-desk-tool-row-head">
+                    <span className="br-desk-tool-row-tag">世界卷宗</span>
+                    <span className="br-desk-tool-row-name">{g.name}</span>
+                  </span>
+                  <span className="br-desk-tool-row-text">{g.projects.join("、")}</span>
+                </div>
+              ))}
+              {toolWorld.books.map(b => (
+                <div key={b.id} className="br-desk-tool-row is-static">
+                  <span className="br-desk-tool-row-head">
+                    <span className="br-desk-tool-row-tag">世界书</span>
+                    <span className="br-desk-tool-row-name">{b.name}</span>
+                  </span>
+                  <span className="br-desk-tool-row-text">{b.projects.join("、")}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </BottomSheet>
+      )}
+      {toolSheet === "outline" && (
+        <BottomSheet title="章节大纲" onClose={() => setToolSheet(null)}>
+          {toolOutlines.length === 0 ? (
+            <p className="br-desk-tool-empty">还没有大纲。在作品工作台里可以让 AI 生成或手动添加章节大纲。</p>
+          ) : (
+            <div className="br-desk-sheet-list">
+              {toolOutlines.map(row => (
+                <button
+                  key={row.projectId}
+                  type="button"
+                  className="br-desk-tool-row book-pressable"
+                  onClick={() => { setToolSheet(null); onOpenProject(row.projectId); }}
+                >
+                  <span className="br-desk-tool-row-head">
+                    <span className="br-desk-tool-row-name">{row.title}</span>
+                    <span className="br-desk-tool-row-proj">{row.total} 节</span>
+                  </span>
+                  <span className="br-desk-tool-row-text">
+                    {row.items.map(item => item.title).join(" · ")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </BottomSheet>
+      )}
+      {toolSheet === "versions" && (
+        <BottomSheet title="版本历史" onClose={() => setToolSheet(null)}>
+          {toolVersions.length === 0 ? (
+            <p className="br-desk-tool-empty">还没有版本快照。AI 改写前会自动保存历史版本，可在章节编辑器中恢复。</p>
+          ) : (
+            <div className="br-desk-sheet-list">
+              {toolVersions.map(row => (
+                <button
+                  key={row.projectId}
+                  type="button"
+                  className="br-desk-tool-row book-pressable"
+                  onClick={() => { setToolSheet(null); onOpenProject(row.projectId); }}
+                >
+                  <span className="br-desk-tool-row-head">
+                    <span className="br-desk-tool-row-name">{row.title}</span>
+                    <span className="br-desk-tool-row-proj">{row.count} 个快照</span>
+                  </span>
+                  <span className="br-desk-tool-row-text">最近保存于 {formatRelative(row.latest)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </BottomSheet>
+      )}
 
       {/* 排序选择 */}
       {sortOpen && (
