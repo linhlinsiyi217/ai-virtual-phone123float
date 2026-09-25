@@ -30,6 +30,10 @@ import { SettingsShellV2 } from "./settings-preview-v2/shell";
 import { SettingsListGroup, SettingsListItem } from "./settings-preview-v2/controls";
 import { SettingsNavigationContext } from "./settings-preview-v2/nav-shell";
 import { SettingsContext } from "./phone-settings-app";
+import { PhoneCharacterApp } from "./phone-character-app";
+import { PhoneThemeApp } from "./phone-theme-app";
+import { PhoneResourcesApp } from "./phone-resources-app";
+import "./settings-preview-v2/settings-v2.css";
 
 export function PhoneSettingsApp({ onClose, onNotice }: { onClose: () => void, onNotice: (msg: string) => void }) {
     const [title, setTitle] = useState<string | null>(null);

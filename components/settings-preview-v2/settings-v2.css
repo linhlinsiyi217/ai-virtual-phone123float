@@ -1,0 +1,78 @@
+.settings-v2 {
+  --settings-bg: #ffffff;
+  --settings-text: #111111;
+  --settings-secondary: #68707d;
+  --settings-blue: #007aff;
+  --settings-line: rgba(17, 17, 17, .09);
+  color: var(--settings-text);
+  background: var(--settings-bg);
+  min-height: 100%;
+}
+
+.settings-v2__header {
+  position: relative;
+  z-index: 5;
+  flex: none;
+  background: rgba(255, 255, 255, .78);
+  -webkit-backdrop-filter: saturate(1.45) blur(20px);
+  backdrop-filter: saturate(1.45) blur(20px);
+  border-bottom: 1px solid var(--settings-line);
+}
+
+.settings-v2__glass-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, .8);
+  border-radius: 999px;
+  color: var(--settings-text);
+  background: linear-gradient(145deg, rgba(255,255,255,.94), rgba(230,238,250,.54));
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.96), inset 0 -1px 1px rgba(99,117,145,.10), 0 3px 12px rgba(22,36,58,.09);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  backdrop-filter: blur(16px) saturate(1.3);
+  transition: transform 180ms cubic-bezier(.2,.8,.2,1), box-shadow 180ms cubic-bezier(.2,.8,.2,1), background-color 180ms cubic-bezier(.2,.8,.2,1);
+  touch-action: manipulation;
+}
+
+.settings-v2__glass-button:active {
+  transform: scale(.96);
+  box-shadow: inset 0 2px 4px rgba(22,36,58,.12), 0 1px 4px rgba(22,36,58,.06);
+}
+
+.settings-v2__group {
+  overflow: hidden;
+  border: 1px solid var(--settings-line);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 5px 22px rgba(22,36,58,.045);
+}
+
+.settings-v2__row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 54px;
+  padding: 10px 16px;
+  color: var(--settings-text);
+  background: transparent;
+  text-align: left;
+  transition: background-color 150ms ease;
+}
+
+.settings-v2__row + .settings-v2__row {
+  border-top: 1px solid var(--settings-line);
+}
+
+.settings-v2__row:active {
+  background: rgba(0,122,255,.07);
+}
+
+.settings-v2__scroller {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
