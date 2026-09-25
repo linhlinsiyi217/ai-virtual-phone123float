@@ -165,6 +165,7 @@ export function PhoneSettingsApp({
                         onNotice={onNotice} 
                         currentPageId={currentPageId}
                         setCurrentPageId={setCurrentPageId}
+                        setSubpageTitle={setTitle}
                         handleBack={handleBack}
                         draftTheme={draftTheme}
                         onDraftChange={onDraftChange}
@@ -230,10 +231,8 @@ function SubpageRenderer({
 function PhoneSettingsContent({ 
     onClose, onNotice, currentPageId, setCurrentPageId, handleBack,
     draftTheme, onDraftChange, onApplyTheme, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle,
-    searchQuery
+    searchQuery, setSubpageTitle
 }: any) {
-    const { push } = useContext(SettingsNavigationContext);
-    
     if (currentPageId) return <SubpageRenderer 
         pageId={currentPageId} 
         onNotice={onNotice} 
@@ -296,7 +295,10 @@ function PhoneSettingsContent({
                 return groups.map(g => (
                     <SettingsListGroup key={g} title={g}>
                         {filtered.filter(i => i.group === g).map(i => (
-                            <SettingsListItem key={i.id} icon={i.icon} label={i.label} onClick={() => { setCurrentPageId(i.id); push(i.id, i.label); }} />
+                            <SettingsListItem key={i.id} icon={i.icon} label={i.label} onClick={() => { 
+                                setSubpageTitle(i.label); 
+                                setCurrentPageId(i.id); 
+                            }} />
                         ))}
                     </SettingsListGroup>
                 ));
