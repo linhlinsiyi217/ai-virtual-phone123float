@@ -158,7 +158,14 @@ export function MangaReaderView({ book, onBack }: Props) {
         </button>
       </header>
 
-      <div className="manga-content" ref={containerRef} onScroll={handleScroll} onClick={handleContentTap}>
+      {/* Phase 9B：漫画页拦截系统图片长按菜单（保存/分享），保持阅读沉浸 */}
+      <div
+        className="manga-content"
+        ref={containerRef}
+        onScroll={handleScroll}
+        onClick={handleContentTap}
+        onContextMenu={e => e.preventDefault()}
+      >
         {pages.map((page, idx) => (
           <figure
             key={page.id}

@@ -1597,13 +1597,20 @@
   max-height: 78%;
   padding: 8px 20px calc(18px + env(safe-area-inset-bottom, 0px));
   border-radius: 28px 28px 0 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.7);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 246, 243, 0.84));
-  box-shadow: 0 -18px 50px rgba(20, 20, 20, 0.16);
-  backdrop-filter: blur(30px) saturate(120%);
-  -webkit-backdrop-filter: blur(30px) saturate(120%);
+  border-top: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.08));
+  background: var(--bookroom-surface-strong, rgba(255, 255, 255, 0.88));
+  box-shadow: var(--bookroom-shadow, 0 -18px 50px rgba(20, 20, 20, 0.16));
+  backdrop-filter: blur(var(--bookroom-glass-blur, 30px)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--bookroom-glass-blur, 30px)) saturate(120%);
   animation: br-sheet-up 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  /* Phase 9B：拖拽关闭时由 JS 写入 translateY，关闭动画走 transition */
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.bookroom-app .br-sheet.is-dragging {
+  transition: none;
+  animation: none;
 }
 
 .bookroom-app .br-sheet-tall {
@@ -1615,6 +1622,18 @@
   max-height: 86%;
 }
 
+/* Phase 9B：拖拽热区包住抓条，扩大可拖范围；touch-action:none 让 pointermove 生效 */
+.bookroom-app .br-sheet-grab-zone {
+  align-self: stretch;
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 2px;
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .bookroom-app .br-sheet-grabber {
   align-self: center;
   width: 38px;
@@ -1622,6 +1641,7 @@
   margin-bottom: 10px;
   border-radius: 999px;
   background: rgba(21, 21, 21, 0.14);
+  pointer-events: none;
 }
 
 .bookroom-app .br-sheet-head {
@@ -2024,6 +2044,15 @@
   color: var(--book-text-tertiary);
 }
 
+/* Phase 9B：iMessage 式时间分隔 */
+.bookroom-app .br-chat-time {
+  align-self: center;
+  margin: 12px 0 6px;
+  font-size: calc(10px * var(--app-text-scale, 1));
+  letter-spacing: 0.06em;
+  color: var(--bookroom-text-3, var(--book-text-tertiary));
+}
+
 .bookroom-app .br-chat-row {
   display: flex;
   align-items: flex-end;
@@ -2060,19 +2089,19 @@
   padding: 10px 14px;
   border-radius: 18px;
   border-bottom-left-radius: 6px;
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--bookroom-border, rgba(0, 0, 0, 0.07));
+  background: var(--bookroom-surface-strong, rgba(255, 255, 255, 0.86));
   font-size: calc(13.5px * var(--app-text-scale, 1));
   line-height: 1.65;
   color: var(--book-text);
 }
 
 .bookroom-app .br-chat-row.is-mine .br-chat-bubble {
-  border-color: var(--book-text);
+  border-color: var(--bookroom-text, var(--book-text));
   border-radius: 18px;
   border-bottom-right-radius: 6px;
-  background: var(--book-text);
-  color: rgba(247, 246, 243, 0.94);
+  background: var(--bookroom-text, var(--book-text));
+  color: var(--bookroom-bg, #f7f6f3);
 }
 
 .bookroom-app .br-chat-actions {
@@ -2194,11 +2223,11 @@
     calc(var(--page-header-safe-top, max(48px, env(safe-area-inset-top, 48px))) + 10px)
     16px
     calc(16px + env(safe-area-inset-bottom, 0px));
-  border-left: 1px solid rgba(255, 255, 255, 0.7);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 246, 243, 0.86));
+  border-left: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.08));
+  background: var(--bookroom-surface-strong, rgba(255, 255, 255, 0.9));
   box-shadow: -16px 0 44px rgba(20, 20, 20, 0.14);
-  backdrop-filter: blur(30px) saturate(120%);
-  -webkit-backdrop-filter: blur(30px) saturate(120%);
+  backdrop-filter: blur(var(--bookroom-glass-blur, 30px)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--bookroom-glass-blur, 30px)) saturate(120%);
   animation: br-drawer-in 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
@@ -2549,6 +2578,10 @@
   border-radius: 4px;
   /* 仅极轻投影以分离页面，不做卡片感 */
   box-shadow: 0 1px 3px rgba(20, 20, 20, 0.06);
+  /* Phase 9B：拦截 iOS/WebView 图片长按系统菜单 */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* 底部工具条：页码 + 百分比，极轻 */
@@ -2703,11 +2736,11 @@
   z-index: 130;
   padding: 6px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  background: linear-gradient(180deg, rgba(252, 251, 248, 0.94), rgba(245, 244, 241, 0.92));
+  border: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.08));
+  background: var(--bookroom-surface-strong, rgba(252, 251, 248, 0.94));
   box-shadow: 0 14px 38px rgba(20, 20, 20, 0.2);
-  backdrop-filter: blur(24px) saturate(120%);
-  -webkit-backdrop-filter: blur(24px) saturate(120%);
+  backdrop-filter: blur(var(--bookroom-glass-blur, 24px)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--bookroom-glass-blur, 24px)) saturate(120%);
   animation: br-reader-menu-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
@@ -2745,6 +2778,82 @@
 
 .bookroom-app .reader-menu-item:disabled {
   opacity: 0.32;
+}
+
+.bookroom-app .reader-menu-row + .reader-menu-row {
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.06));
+}
+
+.bookroom-app .reader-menu-item {
+  color: var(--bookroom-text, inherit);
+}
+
+.bookroom-app .reader-menu-item:not(:disabled):active {
+  background: color-mix(in srgb, var(--bookroom-text, #111318) 8%, transparent);
+}
+
+/* ── Phase 9B：阅读页未选角色时的低存在感入口 ── */
+.bookroom-app .reading-role-empty {
+  flex: 0 0 auto;
+  border: 1px dashed var(--bookroom-border, rgba(17, 19, 24, 0.14));
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: transparent;
+  font-family: inherit;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  letter-spacing: 0.04em;
+  color: var(--bookroom-text-3, rgba(17, 19, 24, 0.42));
+}
+
+.bookroom-app .reading-role-empty:active {
+  background: color-mix(in srgb, var(--bookroom-text, #111318) 6%, transparent);
+}
+
+/* ── Phase 9B：划词「更多」/ 阅读工具半弹窗 ── */
+.bookroom-app .br-more-quote {
+  margin: 2px 2px 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--bookroom-surface-soft, rgba(17, 19, 24, 0.04));
+  font-size: calc(12px * var(--app-text-scale, 1));
+  line-height: 1.6;
+  color: var(--bookroom-text-2, rgba(17, 19, 24, 0.6));
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bookroom-app .br-more-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bookroom-app .br-more-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  font-family: inherit;
+  font-size: calc(13.5px * var(--app-text-scale, 1));
+  color: var(--bookroom-text, #111318);
+  text-align: left;
+}
+
+.bookroom-app .br-more-action:active {
+  background: color-mix(in srgb, var(--bookroom-text, #111318) 6%, transparent);
+}
+
+.bookroom-app .br-more-action svg {
+  color: var(--bookroom-text-2, rgba(17, 19, 24, 0.55));
+  flex: 0 0 auto;
 }
 
 /* ── 正文标注：高亮 / 划线 / 笔记标记（不改行高、不影响选择） ── */
@@ -4811,6 +4920,26 @@
   gap: 8px;
   padding: 10px 14px;
   border-radius: 14px;
+}
+.bookroom-app .br-desk-quick-new {
+  flex: none;
+}
+/* Phase 9B：书桌标题区 */
+.bookroom-app .br-desk-head {
+  padding: 6px 4px 2px;
+}
+.bookroom-app .br-desk-title {
+  margin: 0;
+  font-size: calc(19px * var(--app-text-scale, 1));
+  font-weight: 640;
+  letter-spacing: 0.02em;
+  color: var(--bookroom-text, #111318);
+}
+.bookroom-app .br-desk-subtitle {
+  margin: 3px 0 0;
+  font-size: calc(11.5px * var(--app-text-scale, 1));
+  letter-spacing: 0.02em;
+  color: var(--bookroom-text-3, rgba(17, 19, 24, 0.42));
 }
 .bookroom-app .br-desk-quick-icon {
   flex: none;
@@ -6882,8 +7011,76 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-bottom: 10px;
+  width: 100%;
+  padding: 0 0 10px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
   color: var(--bookroom-text-2, #59616d);
+}
+.bookroom-app .br-store-folder-chevron {
+  flex: 0 0 auto;
+  color: var(--bookroom-text-3, rgba(17, 19, 24, 0.42));
+  transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.bookroom-app .br-store-folder.is-open .br-store-folder-chevron {
+  transform: rotate(180deg);
+}
+/* Phase 9B：折叠态露出的 3~5 本小书脊 */
+.bookroom-app .br-store-folder-peek {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  width: 100%;
+  padding: 2px 2px 4px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+.bookroom-app .br-store-folder-peek-item {
+  flex: 0 0 auto;
+  width: 34px;
+  margin-right: -10px;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(17, 19, 24, 0.16);
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.bookroom-app .br-store-folder-peek:active .br-store-folder-peek-item {
+  transform: translateY(2px) !important;
+}
+.bookroom-app .br-store-folder-peek-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4.2;
+  border-radius: 4px;
+}
+.bookroom-app .br-store-folder-peek-more {
+  flex: 0 0 auto;
+  margin-left: 16px;
+  align-self: center;
+  font-size: calc(10.5px * var(--app-text-scale, 1));
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--bookroom-text-3, rgba(17, 19, 24, 0.42));
+}
+/* Phase 9B：轻量展开 —— grid-template-rows 高度动画 + opacity，可被打断 */
+.bookroom-app .br-store-folder-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 320ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 240ms ease;
+}
+.bookroom-app .br-store-folder.is-open .br-store-folder-body {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.bookroom-app .br-store-folder-body > .br-store-folder-books {
+  overflow: hidden;
+  min-height: 0;
 }
 .bookroom-app .br-store-folder-name {
   font-size: calc(12px * var(--app-text-scale, 1));
@@ -6954,6 +7151,9 @@
   .bookroom-app .br-chat-quick-chip { transition: none; }
   .bookroom-app .br-chat-quick-chip:active { transform: none; }
   .bookroom-app .br-store-viewbtn { transition: none; }
+  .bookroom-app .br-store-folder-body { transition: none; }
+  .bookroom-app .br-store-folder-chevron,
+  .bookroom-app .br-store-folder-peek-item { transition: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -6970,6 +7170,14 @@
 
 /* 纸张纹理叠层：绝对定位铺底，内容层抬升保持清晰 */
 .bookroom-app .br-reader-texture {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Phase 9B：渐变 / 自定义图片纸底层（在纹理层之下、正文之下） */
+.bookroom-app .br-reader-bg-layer {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -7095,6 +7303,51 @@
   color: var(--bookroom-accent, #3b82f6);
 }
 
+/* Phase 9B — 纸底自定义图片输入 */
+.bookroom-app .br-bg-image-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.bookroom-app .br-bg-image-input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.1));
+  border-radius: 999px;
+  background: var(--bookroom-surface, rgba(255, 255, 255, 0.6));
+  color: var(--bookroom-text, #111318);
+  font-family: inherit;
+  font-size: calc(12.5px * var(--app-text-scale, 1));
+  outline: none;
+}
+.bookroom-app .br-bg-image-input::placeholder {
+  color: var(--bookroom-text-3, #9aa2ad);
+}
+.bookroom-app .br-bg-image-input:focus-visible {
+  border-color: var(--bookroom-accent, #3b82f6);
+}
+.bookroom-app .br-bg-image-upload {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  cursor: pointer;
+}
+.bookroom-app .br-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* reduced-motion：关闭翻页动效 */
 @media (prefers-reduced-motion: reduce) {
   .bookroom-app .reader-motion-fade .reading-article,
@@ -7151,26 +7404,28 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 工具入口区：5 枚紧凑入口 */
+/* Phase 9B：2×2 工作入口（横向小卡） */
 .bookroom-app .br-desk-tools-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 .bookroom-app .br-desk-tool {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 6px;
-  padding: 13px 4px 11px;
+  gap: 10px;
+  padding: 14px 14px;
   border-radius: var(--bookroom-radius, 16px);
   background: var(--bookroom-surface, rgba(255, 255, 255, 0.6));
   border: 1px solid var(--bookroom-border, rgba(17, 19, 24, 0.08));
   color: var(--bookroom-text-2, #59616d);
   font-family: inherit;
+  text-align: left;
 }
 .bookroom-app .br-desk-tool-label {
-  font-size: calc(11px * var(--app-text-scale, 1));
+  font-size: calc(12px * var(--app-text-scale, 1));
+  font-weight: 560;
   letter-spacing: 0.02em;
 }
 

@@ -9,7 +9,6 @@ import {
   Copy,
   Feather,
   Globe,
-  History,
   Inbox,
   Library,
   ListTree,
@@ -34,7 +33,6 @@ import {
   setWritingStatus,
   publishProjectAsBook,
   getWritingTotalWords,
-  loadChapterDoc,
   WRITING_MATERIAL_TYPE_LABELS,
   type WritingProject,
   type WritingStatus,
@@ -61,15 +59,14 @@ type Props = {
   onUiStateChange: (patch: Partial<DeskUiState>) => void;
 };
 
-/** Phase 9A P1：书桌工具入口 */
-type DeskTool = "materials" | "roles" | "world" | "outline" | "versions";
+/** Phase 9B：书桌 2×2 工作入口（版本历史入口保留在项目工作台内） */
+type DeskTool = "materials" | "roles" | "world" | "outline";
 
 const DESK_TOOLS: { id: DeskTool; label: string; title: string; icon: typeof Inbox }[] = [
   { id: "materials", label: "灵感", title: "灵感收纳箱", icon: Inbox },
-  { id: "roles", label: "角色", title: "角色板", icon: Users },
-  { id: "world", label: "世界", title: "世界设定 / 世界书", icon: Globe },
+  { id: "roles", label: "角色", title: "人物 / 角色", icon: Users },
+  { id: "world", label: "世界", title: "世界设定", icon: Globe },
   { id: "outline", label: "大纲", title: "章节大纲", icon: ListTree },
-  { id: "versions", label: "版本", title: "版本历史", icon: History },
 ];
 
 const FILTERS: { value: DeskFilter; label: string }[] = [
@@ -308,23 +305,6 @@ export function WritingDeskView({ onOpenProject, onCreate, uiState, onUiStateCha
       }));
   }, [toolSheet, visibleProjects]);
 
-  const toolVersions = useMemo(() => {
-    if (toolSheet !== "versions") return [];
-    return visibleProjects
-      .map(p => {
-        let count = 0;
-        let latest = 0;
-        for (const ch of p.chapters) {
-          const doc = loadChapterDoc(p.id, ch.id);
-          count += doc.versions.length;
-          for (const v of doc.versions) latest = Math.max(latest, v.savedAt);
-        }
-        return { projectId: p.id, title: p.title, count, latest };
-      })
-      .filter(row => row.count > 0)
-      .sort((a, b) => b.latest - a.latest);
-  }, [toolSheet, visibleProjects]);
-
   const inShelf = (p: WritingProject): boolean => Boolean(getShelfEntry(p.publishedBookId ?? `generated-${p.id}`));
 
   const openActions = (p: WritingProject) => setActionProject(p);
@@ -444,42 +424,13 @@ export function WritingDeskView({ onOpenProject, onCreate, uiState, onUiStateCha
 
   return (
     <>
-      <section className="book-section">
-        <button
-          type="button"
-          className="br-write-hero book-glass book-pressable"
-          onClick={() => onCreate()}
-        >
-          <span className="br-write-hero-icon" aria-hidden>
-            <Feather size={22} strokeWidth={1.8} />
-          </span>
-          <span className="br-write-hero-main">
-            <span className="br-write-hero-title">开始新的写作</span>
-            <span className="br-write-hero-desc">人设 × 记忆 × AI，陪你把故事慢慢写完</span>
-          </span>
-          <ChevronRight size={18} strokeWidth={2} className="br-write-hero-arrow" />
-        </button>
-      </section>
+      {/* ── Phase 9B：顶部标题 + 轻副标题 ── */}
+      <header className="br-desk-head">
+        <h2 className="br-desk-title">书桌</h2>
+        <p className="br-desk-subtitle">人设 × 记忆 × AI，把故事慢慢写完</p>
+      </header>
 
-      <section className="book-section">
-        <div className="br-desk-quick book-glass">
-          <Sparkles size={15} strokeWidth={2} className="br-desk-quick-icon" />
-          <input
-            type="text"
-            className="br-desk-quick-input"
-            placeholder="一句话快速开始，如：写一个民国悬疑故事"
-            value={quickIdea}
-            onChange={e => setQuickIdea(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") handleQuickStart(); }}
-          />
-          <button type="button" className="br-desk-quick-btn book-pressable" onClick={handleQuickStart}>
-            <Search size={13} strokeWidth={2} />
-            开始
-          </button>
-        </div>
-      </section>
-
-      {/* ── Phase 9A P1：最近作品（横向紧凑纸卡，非归档前 6） ── */}
+      {/* ── Phase 9B：最近作品（横向紧凑纸卡，非归档前 6） ── */}
       {hasAnyProject && recentProjects.length > 0 && (
         <section className="book-section">
           <div className="book-section-head">
@@ -504,7 +455,35 @@ export function WritingDeskView({ onOpenProject, onCreate, uiState, onUiStateCha
         </section>
       )}
 
-      {/* ── Phase 9A P1：工具入口区（灵感 / 角色 / 世界 / 大纲 / 版本） ── */}
+      {/* ── 快速开始：一句话创建 + 手动新建 ── */}
+      <section className="book-section">
+        <div className="br-desk-quick book-glass">
+          <Sparkles size={15} strokeWidth={2} className="br-desk-quick-icon" />
+          <input
+            type="text"
+            className="br-desk-quick-input"
+            placeholder="一句话快速开始，如：写一个民国悬疑故事"
+            value={quickIdea}
+            onChange={e => setQuickIdea(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") handleQuickStart(); }}
+          />
+          <button type="button" className="br-desk-quick-btn book-pressable" onClick={handleQuickStart}>
+            <Search size={13} strokeWidth={2} />
+            开始
+          </button>
+          <button
+            type="button"
+            className="book-icon-btn book-pressable br-desk-quick-new"
+            onClick={() => onCreate()}
+            aria-label="手动新建作品"
+            title="手动新建作品"
+          >
+            <Plus size={16} strokeWidth={2.2} />
+          </button>
+        </div>
+      </section>
+
+      {/* ── Phase 9B：2×2 工作入口（灵感 / 角色 / 世界 / 大纲） ── */}
       <section className="book-section">
         <div className="br-desk-tools-grid">
           {DESK_TOOLS.map(tool => {
@@ -693,30 +672,6 @@ export function WritingDeskView({ onOpenProject, onCreate, uiState, onUiStateCha
                   <span className="br-desk-tool-row-text">
                     {row.items.map(item => item.title).join(" · ")}
                   </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </BottomSheet>
-      )}
-      {toolSheet === "versions" && (
-        <BottomSheet title="版本历史" onClose={() => setToolSheet(null)}>
-          {toolVersions.length === 0 ? (
-            <p className="br-desk-tool-empty">还没有版本快照。AI 改写前会自动保存历史版本，可在章节编辑器中恢复。</p>
-          ) : (
-            <div className="br-desk-sheet-list">
-              {toolVersions.map(row => (
-                <button
-                  key={row.projectId}
-                  type="button"
-                  className="br-desk-tool-row book-pressable"
-                  onClick={() => { setToolSheet(null); onOpenProject(row.projectId); }}
-                >
-                  <span className="br-desk-tool-row-head">
-                    <span className="br-desk-tool-row-name">{row.title}</span>
-                    <span className="br-desk-tool-row-proj">{row.count} 个快照</span>
-                  </span>
-                  <span className="br-desk-tool-row-text">最近保存于 {formatRelative(row.latest)}</span>
                 </button>
               ))}
             </div>

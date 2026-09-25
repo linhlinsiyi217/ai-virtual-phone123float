@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Bookmark, ChevronLeft, ChevronRight, MoonStar } from "lucide-react";
+import { Bookmark, ChevronLeft, ChevronRight, Globe, Headphones, Highlighter, Languages, MoonStar, MoreHorizontal, Search } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import { loadReadingProgress, saveReadingProgress, getOverallPercent } from "@/lib/reading-progress";
 import { markFinished, markReading } from "@/lib/bookroom-shelf";
@@ -23,7 +23,7 @@ import {
   type BookTtsController,
   type BookTtsStatus,
 } from "@/lib/bookroom-tts";
-import { BrToast } from "./bookroom-ui";
+import { BrToast, BottomSheet } from "./bookroom-ui";
 import { getActiveReadingSkin, buildSkinCss } from "@/lib/bookroom-reading-skins";
 import {
   loadReaderPrefs,
@@ -31,6 +31,7 @@ import {
   buildReaderPrefsCssVars,
   resolveReaderColors,
   buildReaderTexture,
+  buildReaderBackgroundLayer,
   READER_PREFS_EVENT,
   type ReaderPrefs,
 } from "@/lib/bookroom-reader-prefs";
@@ -95,6 +96,8 @@ type ActiveSheet =
   | { kind: "annotations" }
   | { kind: "manage"; annotation: ReaderAnnotation }
   | { kind: "tts" }
+  | { kind: "more"; info: TextSelectionInfo }
+  | { kind: "tools" }
   | null;
 
 /** 计算选区端点在段落纯文本中的偏移（段落内有标注 span 也能正确换算） */
@@ -163,7 +166,7 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
   const [flash, setFlash] = useState<{ p: number; nonce: number } | null>(null);
   const [ttsStatus, setTtsStatus] = useState<BookTtsStatus>("idle");
   const [ttsIndex, setTtsIndex] = useState(-1);
-  const [ttsRate, setTtsRate] = useState(1);
+  const [ttsRate, setTtsRate] = useState(() => loadReaderPrefs(book.id).ttsRate);
   // Phase 9A P1：阅读外观偏好（内置默认 ← 全局 ← 单本书），夜读 sheet 改动即时生效
   const [readerPrefs, setReaderPrefs] = useState<ReaderPrefs>(() => loadReaderPrefs(book.id));
   // Phase 8B：安静阅读 —— 顶 / 底栏默认隐藏，单击正文空白处切换
@@ -247,6 +250,10 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
           setAmbientVolume(next.ambientVolume / 100);
         }
         if (next.ttsVolume !== prev.ttsVolume) ttsRef.current?.setVolume(next.ttsVolume / 100);
+        if (next.ttsRate !== prev.ttsRate) {
+          ttsRef.current?.setRate(next.ttsRate);
+          setTtsRate(next.ttsRate);
+        }
         return next;
       });
     };
@@ -515,9 +522,7 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
     collapseSelection();
   };
 
-  const handleMenuAction = (action: ReaderMenuAction) => {
-    const info = selection;
-    if (!info) return;
+  const runMenuAction = (action: ReaderMenuAction, info: TextSelectionInfo) => {
     const single = info.startPara === info.endPara;
     switch (action) {
       case "copy":
@@ -604,6 +609,26 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
       default:
         break;
     }
+  };
+
+  const handleMenuAction = (action: ReaderMenuAction) => {
+    const info = selection;
+    if (!info) return;
+    /* Phase 9B：「更多」收进半弹窗（翻译 / 高亮 / 从此听 / 网页搜索） */
+    if (action === "more") {
+      setSelection(null);
+      setSheet({ kind: "more", info });
+      return;
+    }
+    runMenuAction(action, info);
+  };
+
+  /** 「更多」半弹窗里的动作：基于保存的选区信息执行（不依赖实时 selection） */
+  const handleMoreAction = (action: ReaderMenuAction) => {
+    if (sheet?.kind !== "more") return;
+    const info = sheet.info;
+    setSheet(null);
+    runMenuAction(action, info);
   };
 
   /* ── 标注点击：选区折叠时才打开管理，避免与划词冲突 ── */
@@ -741,6 +766,8 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
   const prefsVars = buildReaderPrefsCssVars(readerPrefs) as React.CSSProperties;
   const readerColors = resolveReaderColors(readerPrefs);
   const readerTexture = buildReaderTexture(readerPrefs.textureStrength);
+  // Phase 9B：渐变 / 自定义图片背景层（饱和度 / 模糊只作用于该层）
+  const bgLayer = buildReaderBackgroundLayer(readerPrefs, readerColors.bg);
   const rootStyle: React.CSSProperties = {
     ...skinVars,
     ...prefsVars,
@@ -752,6 +779,13 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
       className={`reading-view br-page bookroom-reader-skin-root reader-motion-${readerPrefs.pageMotion}${readerTexture ? " has-texture" : ""}${readerColors.dark ? " is-dark-paper" : ""}`}
       style={rootStyle}
     >
+      {bgLayer && (
+        <div
+          className="br-reader-bg-layer"
+          aria-hidden
+          style={{ background: bgLayer.background, filter: bgLayer.filter }}
+        />
+      )}
       {readerTexture && (
         <div
           className="br-reader-texture"
@@ -764,19 +798,32 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
           <ChevronLeft size={22} strokeWidth={2} />
         </button>
         <span className="reading-header-title">{book.title}</span>
+        {/* Phase 9B：右侧统一为 共读角色 / 书签 / 夜读 / 更多。
+            未选真实角色时显示低存在感文字入口；已选则显示实时角色头像。 */}
         {companion && onOpenCoRead && (
-          <button
-            type="button"
-            className="br-role-entry book-pressable reading-role-entry"
-            onClick={onOpenCoRead}
-            aria-label={`和 ${companion.name} 一起读`}
-            title="角色共读"
-          >
-            <span className="br-role-entry-avatar">
-              {companion.avatar ? <img src={companion.avatar} alt="" /> : companion.name.slice(0, 1)}
-            </span>
-            <span className={`br-role-dot br-role-dot-${companion.status}`} aria-hidden />
-          </button>
+          isRealCompanionRole(companion.id) ? (
+            <button
+              type="button"
+              className="br-role-entry book-pressable reading-role-entry"
+              onClick={onOpenCoRead}
+              aria-label={`和 ${companion.name} 一起读`}
+              title="角色共读"
+            >
+              <span className="br-role-entry-avatar">
+                {companion.avatar ? <img src={companion.avatar} alt="" /> : companion.name.slice(0, 1)}
+              </span>
+              <span className={`br-role-dot br-role-dot-${companion.status}`} aria-hidden />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="reading-role-empty book-pressable"
+              onClick={onOpenCoRead}
+              aria-label="选择陪读角色"
+            >
+              陪读
+            </button>
+          )
         )}
         <button
           className="book-icon-btn book-pressable"
@@ -794,6 +841,14 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
         >
           <MoonStar size={17} strokeWidth={2} />
         </button>
+        <button
+          className="book-icon-btn book-pressable"
+          type="button"
+          aria-label="更多阅读工具"
+          onClick={() => setSheet({ kind: "tools" })}
+        >
+          <MoreHorizontal size={17} strokeWidth={2} />
+        </button>
       </header>
 
       <div
@@ -810,7 +865,7 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
           <h2 className="reading-chapter-title">{chapter?.title ?? ""}</h2>
           {chapter?.content.map((paragraph, i) => (
             <p
-              className={`reading-body-paragraph${flash?.p === i ? " ra-flash" : ""}${ttsIndex === i ? " is-speaking" : ""}`}
+              className={`reading-body-paragraph${flash?.p === i ? " ra-flash" : ""}${ttsIndex === i && readerPrefs.highlightSpeaking ? " is-speaking" : ""}`}
               key={i}
               data-pindex={i}
             >
@@ -924,9 +979,75 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
           onRateChange={rate => {
             setTtsRate(rate);
             ttsRef.current?.setRate(rate);
+            // 与夜读设置同源：语速改动写回单本书偏好层
+            saveBookReaderPrefs(book.id, { ...loadReaderPrefs(book.id), ttsRate: rate });
           }}
           onClose={() => setSheet(null)}
         />
+      )}
+
+      {/* Phase 9B：划词菜单「更多」— 翻译 / 高亮 / 从此听 / 网页搜索 */}
+      {sheet?.kind === "more" && (
+        <BottomSheet title="更多" onClose={() => setSheet(null)}>
+          <div className="br-more-quote">「{sheet.info.quote.length > 60 ? `${sheet.info.quote.slice(0, 60)}…` : sheet.info.quote}」</div>
+          <div className="br-more-actions">
+            <button type="button" className="br-more-action book-pressable" onClick={() => handleMoreAction("translate")}>
+              <Languages size={17} strokeWidth={1.9} />
+              <span>翻译</span>
+            </button>
+            <button type="button" className="br-more-action book-pressable" onClick={() => handleMoreAction("highlight")}>
+              <Highlighter size={17} strokeWidth={1.9} />
+              <span>高亮</span>
+            </button>
+            <button type="button" className="br-more-action book-pressable" onClick={() => handleMoreAction("listen")}>
+              <Headphones size={17} strokeWidth={1.9} />
+              <span>从此听</span>
+            </button>
+            <button type="button" className="br-more-action book-pressable" onClick={() => handleMoreAction("websearch")}>
+              <Globe size={17} strokeWidth={1.9} />
+              <span>网页搜索</span>
+            </button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* Phase 9B：顶部「更多」— 阅读工具集合（均为已有真实功能入口） */}
+      {sheet?.kind === "tools" && (
+        <BottomSheet title="阅读工具" onClose={() => setSheet(null)}>
+          <div className="br-more-actions">
+            <button
+              type="button"
+              className="br-more-action book-pressable"
+              onClick={() => {
+                if (!ttsSupported) {
+                  showToast("当前设备不支持朗读");
+                  return;
+                }
+                ttsRef.current?.start(chapter?.content ?? [], 0, 0);
+                setSheet({ kind: "tts" });
+              }}
+            >
+              <Headphones size={17} strokeWidth={1.9} />
+              <span>从本章开始听</span>
+            </button>
+            <button
+              type="button"
+              className="br-more-action book-pressable"
+              onClick={() => setSheet({ kind: "search", query: "" })}
+            >
+              <Search size={17} strokeWidth={1.9} />
+              <span>书内搜索</span>
+            </button>
+            <button
+              type="button"
+              className="br-more-action book-pressable"
+              onClick={() => setSheet({ kind: "annotations" })}
+            >
+              <Bookmark size={17} strokeWidth={1.9} />
+              <span>我的标注</span>
+            </button>
+          </div>
+        </BottomSheet>
       )}
 
       <BrToast text={toast} />

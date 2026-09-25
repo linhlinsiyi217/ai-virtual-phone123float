@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, MessageCircleHeart, Quote, Send, Sparkles, X } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import { isRealCompanionRole, resolveRoleDisplayById, type CompanionRole } from "@/lib/bookroom-mock";
@@ -24,6 +24,17 @@ import {
   type CoReadingSession,
 } from "@/lib/bookroom-sessions";
 import { BottomSheet } from "./bookroom-ui";
+
+/** Phase 9B：聊天时间分隔标签（iMessage 风格：今天显示时分，跨天带月日） */
+function formatChatTime(ts: number): string {
+  const d = new Date(ts);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  if (sameDay) return `${hh}:${mm}`;
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}`;
+}
 
 type Props = {
   book: Book;
@@ -238,27 +249,26 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
     send("我想听听你此刻陪我读的心情。");
   };
 
-  /* Phase 9A：快捷提问 chips —— 点击即以用户身份发出预制问题 */
-  const quickAsk = (preset: "meaning" | "summary" | "why" | "predict" | "voice") => {
+  /* Phase 9B：快捷提问 chips —— 问这一段 / 总结 / 解释 / 陪我聊聊 */
+  const quickAsk = (preset: "segment" | "summary" | "explain" | "chat") => {
     if (sending) return;
     const excerpt = (contentRef.currentExcerpt || contentRef.pageCaption || "").slice(0, 160);
     switch (preset) {
-      case "meaning":
+      case "segment":
         send(excerpt
-          ? `这一段我读得不太明白：「${excerpt}」\n你能帮我解释一下吗？`
-          : "这一段我读得不太明白，你能帮我解释一下吗？");
+          ? `读到这一段：「${excerpt}」\n想听听你的感受。`
+          : "想听听你对现在这一段落的感受。");
         break;
       case "summary":
         send("帮我轻轻总结一下我们目前读到的内容吧。");
         break;
-      case "why":
-        send("你觉得故事里的他为什么这样做？聊聊你的理解。");
+      case "explain":
+        send(excerpt
+          ? `这一段我读得不太明白：「${excerpt}」\n你能帮我解释一下吗？`
+          : "这一段我读得不太明白，你能帮我解释一下吗？");
         break;
-      case "predict":
-        send("猜猜接下来可能会发生什么？只用我们已经读到的内容，不要剧透后面。");
-        break;
-      case "voice":
-        send("用你自己的口吻，跟我说一句此刻最想说的话。");
+      case "chat":
+        send("先不聊书了，陪我聊聊吧。");
         break;
     }
   };
@@ -313,20 +323,28 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
       </div>
 
       <div className="br-chat-list" ref={listRef}>
-        {messages.map(message => {
+        {messages.map((message, index) => {
           if (message.role === "system") {
             return <p key={message.id} className="br-chat-system">{message.content}</p>;
           }
+          /* Phase 9B：iMessage 式时间分隔 —— 首条或与上一条间隔超 5 分钟时显示 */
+          const prev = messages[index - 1];
+          const showTime = !prev || (message.createdAt - prev.createdAt > 5 * 60 * 1000);
           const mine = message.role === "user";
           return (
-            <div key={message.id} className={`br-chat-row ${mine ? "is-mine" : ""}`}>
-              {!mine && (
-                <span className="br-chat-bubble-avatar">
-                  {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
-                </span>
+            <Fragment key={message.id}>
+              {showTime && (
+                <p className="br-chat-time">{formatChatTime(message.createdAt)}</p>
               )}
-              <span className="br-chat-bubble">{message.content}</span>
-            </div>
+              <div className={`br-chat-row ${mine ? "is-mine" : ""}`}>
+                {!mine && (
+                  <span className="br-chat-bubble-avatar">
+                    {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
+                  </span>
+                )}
+                <span className="br-chat-bubble">{message.content}</span>
+              </div>
+            </Fragment>
           );
         })}
 
@@ -396,11 +414,10 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
 
       {roleReady && (
         <div className="br-chat-quick" role="group" aria-label="快捷提问">
-          <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("meaning")} disabled={sending}>这段什么意思</button>
-          <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("summary")} disabled={sending}>帮我总结</button>
-          <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("why")} disabled={sending}>他为什么这样</button>
-          <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("predict")} disabled={sending}>猜后续</button>
-          <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("voice")} disabled={sending}>以角色口吻回复</button>
+          <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("segment")} disabled={sending}>问这一段</button>
+          <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("summary")} disabled={sending}>总结</button>
+          <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("explain")} disabled={sending}>解释</button>
+          <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("chat")} disabled={sending}>陪我聊聊</button>
         </div>
       )}
 

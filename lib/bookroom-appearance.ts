@@ -70,38 +70,40 @@ export const APPEARANCE_PRESETS: AppearancePreset[] = [
   {
     id: "night-pearl",
     name: "Night Pearl",
-    description: "深夜冷灰 · 冷白高光",
+    description: "石墨深夜 · 银灰高光",
     tokens: {
-      bgPrimary: "#0E1014",
-      bgSecondary: "#171A21",
-      textPrimary: "#F4F6F8",
-      textSecondary: "#AAB2BE",
-      accent: "#7AB2FF",
-      cardOpacity: 58,
-      cardBlur: 24,
-      cardShadow: 45,
-      borderBrightness: 30,
+      /* 深石墨灰而非死黑；文字柔白而非纯白（Phase 9B 强化） */
+      bgPrimary: "#12151B",
+      bgSecondary: "#1A1E26",
+      textPrimary: "#E6EAF0",
+      textSecondary: "#9AA4B2",
+      accent: "#8FB8F5",
+      cardOpacity: 52,
+      cardBlur: 26,
+      cardShadow: 52,
+      borderBrightness: 34,
       radius: 18,
-      glassHighlight: 38,
+      glassHighlight: 44,
       mode: "dark",
     },
   },
   {
     id: "paper",
     name: "Paper Ivory",
-    description: "纸页牙白 · 低雾面",
+    description: "暖象牙纸 · 低玻璃 · 纸纹",
     tokens: {
-      bgPrimary: "#FBF8F1",
-      bgSecondary: "#F2EDE2",
-      textPrimary: "#23211B",
-      textSecondary: "#6E675A",
-      accent: "#4A6FA5",
-      cardOpacity: 82,
-      cardBlur: 8,
-      cardShadow: 24,
-      borderBrightness: 86,
-      radius: 12,
-      glassHighlight: 24,
+      /* 暖象牙纸：明显偏暖、弱玻璃、纸张颗粒感（Phase 9B 强化） */
+      bgPrimary: "#FAF3E6",
+      bgSecondary: "#F0E8D6",
+      textPrimary: "#2B251A",
+      textSecondary: "#786E5C",
+      accent: "#8A6B3F",
+      cardOpacity: 88,
+      cardBlur: 5,
+      cardShadow: 20,
+      borderBrightness: 90,
+      radius: 14,
+      glassHighlight: 14,
       mode: "light",
     },
   },
@@ -312,7 +314,9 @@ export function buildAppearanceCss(tokens: AppearanceTokens, presetId?: Appearan
   if (presetId === "mist-blue") {
     mist = "radial-gradient(120% 56% at 16% 0%, rgba(186,212,238,0.5), rgba(186,212,238,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(158,190,226,0.55), rgba(158,190,226,0) 64%)";
   } else if (presetId === "paper") {
-    mist = "radial-gradient(120% 56% at 16% 0%, rgba(246,240,226,0.85), rgba(246,240,226,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(228,220,201,0.5), rgba(228,220,201,0) 64%)";
+    /* 暖雾 + 纸张颗粒（SVG feTurbulence 平铺，低透明，reduced-motion 无动画属性不受影响） */
+    const grain = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E\")";
+    mist = `${grain}, radial-gradient(120% 56% at 16% 0%, rgba(246,238,220,0.9), rgba(246,238,220,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(226,214,188,0.55), rgba(226,214,188,0) 64%)`;
   } else if (dark) {
     mist = "radial-gradient(120% 56% at 16% 0%, rgba(96,165,250,0.07), rgba(0,0,0,0) 60%), radial-gradient(110% 60% at 100% 100%, rgba(255,255,255,0.04), rgba(0,0,0,0) 64%)";
   } else {
@@ -321,9 +325,9 @@ export function buildAppearanceCss(tokens: AppearanceTokens, presetId?: Appearan
   // 主题级补色：阅读纸 / 书架层板按主题微调（buildAppearanceCss 幂等，可重复注入）
   const extra: Record<string, string> = {};
   if (presetId === "paper" && !dark) {
-    extra["--bookroom-paper"] = "#F8F3E8";
-    extra["--bookroom-shelf-wood"] = "linear-gradient(180deg, #EFE9DC, #E3DCCB)";
-    extra["--bookroom-shelf-wood-stripe"] = "rgba(122,108,84,0.06)";
+    extra["--bookroom-paper"] = "#F6EEDD";
+    extra["--bookroom-shelf-wood"] = "linear-gradient(180deg, #EDE4D0, #DFD3BA)";
+    extra["--bookroom-shelf-wood-stripe"] = "rgba(122,104,76,0.08)";
   } else if (presetId === "mist-blue" && !dark) {
     extra["--bookroom-paper"] = "#F3F8FC";
     extra["--bookroom-shelf-wood"] = "linear-gradient(180deg, #E2ECF6, #D0DFEE)";

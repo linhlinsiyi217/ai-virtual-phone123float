@@ -6,14 +6,11 @@ import {
   Underline as UnderlineIcon,
   StickyNote,
   Sparkles,
-  Languages,
-  Highlighter,
   Search,
-  Volume2,
   Star,
   Share2,
-  Globe,
   PenLine,
+  MoreHorizontal,
 } from "lucide-react";
 
 export type ReaderMenuAction =
@@ -28,7 +25,8 @@ export type ReaderMenuAction =
   | "favorite"
   | "share"
   | "websearch"
-  | "aiwrite";
+  | "aiwrite"
+  | "more";
 
 export type ReaderSelectionRect = {
   top: number;
@@ -51,45 +49,57 @@ type Item = {
   singleOnly?: boolean;
 };
 
+/* Phase 9B：两行主菜单 + 「更多」收进 BottomSheet
+   第一行：复制 / 划线 / 笔记 / 收藏 / 分享
+   第二行：搜索 / 问TA / AI写作 / 更多 */
 const ROW_1: Item[] = [
   { action: "copy", label: "复制", icon: Copy },
   { action: "underline", label: "划线", icon: UnderlineIcon, singleOnly: true },
   { action: "note", label: "笔记", icon: StickyNote, singleOnly: true },
-  { action: "ask", label: "问TA", icon: Sparkles },
+  { action: "favorite", label: "收藏", icon: Star, singleOnly: true },
+  { action: "share", label: "分享", icon: Share2 },
 ];
 
 const ROW_2: Item[] = [
-  { action: "translate", label: "翻译", icon: Languages },
-  { action: "highlight", label: "高亮", icon: Highlighter, singleOnly: true },
   { action: "search", label: "搜索", icon: Search },
-  { action: "listen", label: "从此听", icon: Volume2 },
+  { action: "ask", label: "问TA", icon: Sparkles },
+  { action: "aiwrite", label: "AI写作", icon: PenLine },
+  { action: "more", label: "更多", icon: MoreHorizontal },
 ];
 
-/* Phase 9A 第三行：收藏 / 分享 / 网页搜索 / AI 写作 */
-const ROW_3: Item[] = [
-  { action: "favorite", label: "收藏", icon: Star, singleOnly: true },
-  { action: "share", label: "分享", icon: Share2 },
-  { action: "websearch", label: "网页搜索", icon: Globe },
-  { action: "aiwrite", label: "AI 写作", icon: PenLine },
-];
+const MENU_HEIGHT = 96;
+const MENU_WIDTH = 272;
 
-const MENU_HEIGHT = 132;
-const MENU_WIDTH = 300;
+let cachedSafeTop = -1;
+/** 读取顶部安全区（状态栏 / 灵动岛）：通过 env(safe-area-inset-top) 探针，菜单不能压上去 */
+function safeTop(): number {
+  if (typeof window === "undefined" || typeof document === "undefined") return 0;
+  if (cachedSafeTop >= 0) return cachedSafeTop;
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;top:0;padding-top:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none;";
+  document.body.appendChild(probe);
+  cachedSafeTop = Math.round(parseFloat(getComputedStyle(probe).paddingTop) || 0);
+  document.body.removeChild(probe);
+  return cachedSafeTop;
+}
 
 /**
- * 阅读器正文划词工具菜单（Phase 3B）：
+ * 阅读器正文划词工具菜单（Phase 3B，Phase 9B 两行化）：
  * 纯展示层，跟随选区浮出；正文区非常驻工具栏。
  * 用 onPointerDown preventDefault 保住系统选区，点击后由调用方收起。
+ * 定位：优先选区上方，不足则下方；横向夹入视口；避开状态栏安全区。
  */
 export function ReaderSelectionMenu({ rect, singleParagraph, onAction }: Props) {
   const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 679;
-  const placeAbove = rect.top > MENU_HEIGHT + 24;
-  const rawTop = placeAbove ? rect.top - MENU_HEIGHT - 10 : rect.bottom + 10;
-  // 纵向也夹进视口：跨多行的大选区上下翻转后仍可能超出屏幕
-  const top = Math.max(8, Math.min(rawTop, viewportHeight - MENU_HEIGHT - 8));
-  const minLeft = Math.min(rect.left, rect.right) ;
-  const center = (rect.left + rect.right) / 2;
   const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 390;
+  const topSafe = safeTop() + 6;
+
+  const placeAbove = rect.top - topSafe > MENU_HEIGHT + 18;
+  const rawTop = placeAbove ? rect.top - MENU_HEIGHT - 10 : rect.bottom + 10;
+  // 纵向夹入视口：跨多行大选区上下翻转后仍可能超出屏幕
+  const top = Math.max(topSafe, Math.min(rawTop, viewportHeight - MENU_HEIGHT - 8));
+  const minLeft = Math.min(rect.left, rect.right);
+  const center = (rect.left + rect.right) / 2;
   const left = Math.max(8, Math.min(center - MENU_WIDTH / 2, Math.min(minLeft, viewportWidth - MENU_WIDTH - 8)));
 
   const renderItem = (item: Item) => {
@@ -120,7 +130,6 @@ export function ReaderSelectionMenu({ rect, singleParagraph, onAction }: Props) 
     >
       <div className="reader-menu-row">{ROW_1.map(renderItem)}</div>
       <div className="reader-menu-row">{ROW_2.map(renderItem)}</div>
-      <div className="reader-menu-row">{ROW_3.map(renderItem)}</div>
     </div>
   );
 }

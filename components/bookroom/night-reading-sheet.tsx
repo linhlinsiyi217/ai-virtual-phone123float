@@ -15,6 +15,7 @@ import {
   type ReaderPaperId,
   type ReaderPageMotion,
   type ReaderFontFamily,
+  type ReaderBgMode,
 } from "@/lib/bookroom-reader-prefs";
 import {
   playAmbient,
@@ -58,6 +59,12 @@ const MOTION_OPTIONS: { value: ReaderPageMotion; label: string }[] = [
   { value: "scroll", label: "滚动" },
   { value: "fade", label: "淡入翻页" },
   { value: "flip", label: "轻拟真翻页" },
+];
+
+const BG_MODE_OPTIONS: { value: ReaderBgMode; label: string }[] = [
+  { value: "solid", label: "纯色" },
+  { value: "gradient", label: "渐变" },
+  { value: "image", label: "自定义图片" },
 ];
 
 type SheetTab = "typo" | "paper" | "night";
@@ -193,6 +200,8 @@ export function NightReadingSheet({ book, mode, onClose }: Props) {
                 display={prefs.lineHeight.toFixed(2)} onChange={v => update({ lineHeight: v })} />
               <PrefsSlider label="段距" min={0.4} max={2.4} step={0.1} value={prefs.paragraphSpacing}
                 display={`${prefs.paragraphSpacing.toFixed(1)}em`} onChange={v => update({ paragraphSpacing: v })} />
+              <PrefsSlider label="字距" min={-0.5} max={3} step={0.1} value={prefs.letterSpacing}
+                display={`${prefs.letterSpacing.toFixed(1)}px`} onChange={v => update({ letterSpacing: v })} />
               <PrefsSlider label="页边距" min={12} max={48} step={1} value={prefs.paddingX}
                 display={`${Math.round(prefs.paddingX)}px`} onChange={v => update({ paddingX: v })} />
               <PrefsSlider label="正文宽度" min={78} max={100} step={1} value={prefs.textWidth}
@@ -218,6 +227,8 @@ export function NightReadingSheet({ book, mode, onClose }: Props) {
               onChange={v => update({ indentFirstLine: v })} />
             <PrefsSwitch label="两端对齐" checked={prefs.justify}
               onChange={v => update({ justify: v })} />
+            <PrefsSwitch label="段落间空行" checked={prefs.paragraphBlank}
+              onChange={v => update({ paragraphBlank: v })} />
           </section>
         </>
       )}
@@ -225,6 +236,59 @@ export function NightReadingSheet({ book, mode, onClose }: Props) {
       {/* ── 纸底 ── */}
       {tab === "paper" && mode === "night" && (
         <>
+          <section className="br-sheet-section">
+            <h4 className="br-sheet-label">纸底模式</h4>
+            <div className="br-chip-row">
+              {BG_MODE_OPTIONS.map(item => (
+                <button key={item.value} type="button"
+                  className={`br-chip book-pressable ${prefs.bgMode === item.value ? "is-active" : ""}`}
+                  onClick={() => update({ bgMode: item.value })}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            {prefs.bgMode === "image" && (
+              <>
+                <div className="br-bg-image-row">
+                  <input
+                    type="url"
+                    className="br-bg-image-input"
+                    placeholder="粘贴图片链接，或选择本地图片"
+                    value={prefs.bgImageUrl.startsWith("data:") ? "" : prefs.bgImageUrl}
+                    onChange={event => update({ bgImageUrl: event.target.value.trim() })}
+                    aria-label="背景图片链接"
+                  />
+                  <label className="br-sheet-secondary book-pressable br-bg-image-upload">
+                    上传
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="br-visually-hidden"
+                      onChange={event => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 3 * 1024 * 1024) {
+                          flash("图片请控制在 3MB 以内");
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          if (typeof reader.result === "string") update({ bgImageUrl: reader.result });
+                        };
+                        reader.readAsDataURL(file);
+                        event.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+                {prefs.bgImageUrl && (
+                  <p className="br-sheet-note">
+                    {prefs.bgImageUrl.startsWith("data:") ? "已使用本地上传的图片" : "已使用图片链接"}，建议配合背景模糊提升文字可读性
+                  </p>
+                )}
+              </>
+            )}
+          </section>
           <section className="br-sheet-section">
             <h4 className="br-sheet-label">主题纸底</h4>
             <div className="br-paper-grid">
@@ -253,6 +317,14 @@ export function NightReadingSheet({ book, mode, onClose }: Props) {
               <PrefsSlider label="纸张纹理" min={0} max={100} step={5} value={prefs.textureStrength}
                 display={prefs.textureStrength === 0 ? "无" : `${Math.round(prefs.textureStrength)}%`}
                 onChange={v => update({ textureStrength: v })} />
+              <PrefsSlider label="背景饱和度" min={40} max={180} step={5} value={prefs.bgSaturation}
+                display={`${Math.round(prefs.bgSaturation)}%`} disabled={prefs.bgMode === "solid"}
+                onChange={v => update({ bgSaturation: v })} />
+              <PrefsSlider label="背景模糊" min={0} max={16} step={1} value={prefs.bgBlur}
+                display={`${Math.round(prefs.bgBlur)}px`} disabled={prefs.bgMode === "solid"}
+                onChange={v => update({ bgBlur: v })} />
+              <PrefsSlider label="文字对比度" min={60} max={130} step={5} value={prefs.textContrast}
+                display={`${Math.round(prefs.textContrast)}%`} onChange={v => update({ textContrast: v })} />
             </div>
           </section>
           <section className="br-sheet-section">
@@ -311,7 +383,13 @@ export function NightReadingSheet({ book, mode, onClose }: Props) {
               <PrefsSlider label="朗读音量" min={0} max={100} step={1} value={prefs.ttsVolume}
                 display={`${Math.round(prefs.ttsVolume)}%`} disabled={!ttsAvailable || !prefs.ttsEnabled}
                 onChange={v => update({ ttsVolume: v })} />
+              <PrefsSlider label="朗读速度" min={0.5} max={2} step={0.05} value={prefs.ttsRate}
+                display={`${prefs.ttsRate.toFixed(2)}×`} disabled={!ttsAvailable || !prefs.ttsEnabled}
+                onChange={v => update({ ttsRate: v })} />
             </div>
+            <PrefsSwitch label="高亮当前朗读段落" checked={prefs.highlightSpeaking}
+              disabled={!ttsAvailable || !prefs.ttsEnabled}
+              onChange={v => update({ highlightSpeaking: v })} />
             <p className="br-sheet-note">
               <Volume2 size={12} strokeWidth={2} />
               朗读音量与环境音相互独立；长按正文「从此听」开始朗读
@@ -339,17 +417,18 @@ export function NightReadingSheet({ book, mode, onClose }: Props) {
         </>
       )}
 
-      {/* ── 底部：持久化操作 ── */}
+      {/* ── 底部：持久化操作（改动即时作用于本书；此处管理全局默认） ── */}
       <div className="br-sheet-footer-row">
         <button type="button" className="br-sheet-secondary book-pressable" onClick={handleSetDefault}>
-          设为默认
+          设为所有书默认
         </button>
         {hasBookOverride && (
           <button type="button" className="br-sheet-secondary book-pressable" onClick={handleClearBook}>
-            恢复全局
+            本书恢复默认
           </button>
         )}
       </div>
+      <p className="br-sheet-note">以上调整即时应用到本书；「设为所有书默认」后新书将继承这套外观</p>
       {hint && <p className="br-sheet-hint">{hint}</p>}
 
       <button type="button" className="br-sheet-primary book-pressable" onClick={onClose}>

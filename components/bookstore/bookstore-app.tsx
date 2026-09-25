@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Clock, Folder, LayoutGrid, Search, Trash2, X } from "lucide-react";
+import { ChevronDown, Clock, Folder, LayoutGrid, Search, Trash2, X } from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import { MOCK_BOOKS } from "@/lib/bookstore-data";
 import type { BookSearchResult } from "@/lib/bookroom/providers";
@@ -390,31 +390,70 @@ function RecommendGrid({ onOpenBook }: { onOpenBook: (book: Book) => void }) {
         ) : (
           <div className="br-store-folders">
             {folderGroups.map(([cat, books]) => (
-              <section key={cat} className="br-store-folder">
-                <div className="br-store-folder-head">
-                  <Folder size={13} strokeWidth={1.9} aria-hidden />
-                  <span className="br-store-folder-name">{cat}</span>
-                  <span className="br-store-folder-count">{books.length}</span>
-                </div>
-                <div className="br-store-folder-books">
-                  {books.map(book => (
-                    <button
-                      key={book.id}
-                      type="button"
-                      className="br-store-folder-book book-pressable"
-                      onClick={() => onOpenBook(book)}
-                      aria-label={`查看《${book.title}》详情`}
-                    >
-                      <BookCover book={book} className="br-store-folder-cover" />
-                      <span className="br-store-folder-title">{book.title}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
+              <StoreFolder key={cat} cat={cat} books={books} onOpenBook={onOpenBook} />
             ))}
           </div>
         )}
       </section>
     </>
+  );
+}
+
+/**
+ * Phase 9B：文件夹/书夹卡片 —— 折叠时只露出 3~5 本小书脊，
+ * 点击头部或书脊轻量展开（grid-template-rows + opacity，reduced-motion 降级），不整页硬跳。
+ */
+function StoreFolder({ cat, books, onOpenBook }: { cat: string; books: Book[]; onOpenBook: (book: Book) => void }) {
+  const [open, setOpen] = useState(false);
+  const peekBooks = books.slice(0, 5);
+  return (
+    <section className={`br-store-folder ${open ? "is-open" : ""}`}>
+      <button
+        type="button"
+        className="br-store-folder-head book-pressable"
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        aria-label={`${open ? "收起" : "展开"}书夹「${cat}」`}
+      >
+        <Folder size={13} strokeWidth={1.9} aria-hidden />
+        <span className="br-store-folder-name">{cat}</span>
+        <span className="br-store-folder-count">{books.length}</span>
+        <ChevronDown size={14} strokeWidth={2} className="br-store-folder-chevron" aria-hidden />
+      </button>
+      {!open && (
+        <button
+          type="button"
+          className="br-store-folder-peek book-pressable"
+          onClick={() => setOpen(true)}
+          aria-label={`展开书夹「${cat}」，共 ${books.length} 本`}
+        >
+          {peekBooks.map((book, i) => (
+            <span key={book.id} className="br-store-folder-peek-item" style={{ transform: `rotate(${(i - (peekBooks.length - 1) / 2) * 1.6}deg)` }}>
+              <BookCover book={book} className="br-store-folder-peek-cover" />
+            </span>
+          ))}
+          {books.length > peekBooks.length && (
+            <span className="br-store-folder-peek-more">+{books.length - peekBooks.length}</span>
+          )}
+        </button>
+      )}
+      <div className="br-store-folder-body" aria-hidden={!open}>
+        <div className="br-store-folder-books">
+          {books.map(book => (
+            <button
+              key={book.id}
+              type="button"
+              className="br-store-folder-book book-pressable"
+              onClick={() => onOpenBook(book)}
+              aria-label={`查看《${book.title}》详情`}
+              tabIndex={open ? 0 : -1}
+            >
+              <BookCover book={book} className="br-store-folder-cover" />
+              <span className="br-store-folder-title">{book.title}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
