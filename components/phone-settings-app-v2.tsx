@@ -108,7 +108,9 @@ export function PhoneSettingsApp({
 }
 
 // 实际需要一个包装器来渲染当前子页
-function SubpageRenderer({ pageId, onNotice }: { pageId: string, onNotice: (msg: string) => void }) {
+function SubpageRenderer({ 
+    pageId, onNotice, draft, onDraftChange, onApply, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle 
+}: any) {
     const renderSubPage = (pageId: string) => {
         switch (pageId) {
             case "api": return <ApiSettings />;

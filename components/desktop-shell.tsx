@@ -1117,6 +1117,21 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   );
   const [savedTheme, setSavedTheme] = useState<ThemeProfile>(() => initialThemeProfile ?? readInitialThemeProfile());
   const [draftTheme, setDraftTheme] = useState<ThemeProfile>(() => initialThemeProfile ?? readInitialThemeProfile());
+  
+  const handleDraftChange = useCallback((next: ThemeProfile) => setDraftTheme(next), []);
+  const handleApplyTheme = useCallback(async (next: ThemeProfile) => {
+    setSavedTheme(next);
+    writeThemeProfile(next);
+  }, []);
+  const handleWidgetsChange = useCallback((next: WidgetInstance[]) => setWidgets(next), []);
+  const handleDesktopThemeChange = useCallback((next: { widgets: WidgetInstance[]; iconLayout: DesktopLayout; dock?: DesktopIconId[]; folders?: DesktopFolderMap }) => {
+    setWidgets(next.widgets);
+    saveWidgets(next.widgets);
+    setLayout(next.iconLayout);
+    if (next.dock) { setDock(next.dock); writeDockLayout(next.dock); }
+    if (next.folders) { setFolders(next.folders); writeDesktopFolders(next.folders); }
+  }, []);
+
   useEffect(() => {
     activeAppRef.current = activeApp;
   }, [activeApp]);
