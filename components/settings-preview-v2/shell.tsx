@@ -13,6 +13,7 @@ export function SettingsShellV2({
     isMain,
     searchQuery,
     onSearchQueryChange,
+    bodyRef,
 }: { 
     children: ReactNode; 
     title: string;
@@ -22,6 +23,7 @@ export function SettingsShellV2({
     isMain?: boolean;
     searchQuery?: string;
     onSearchQueryChange?: (q: string) => void;
+    bodyRef?: React.Ref<HTMLElement>;
 }) {
     return (
         <div className="settings-v2 flex flex-col h-full font-sans">
@@ -72,7 +74,7 @@ export function SettingsShellV2({
                 </div>
             )}
 
-            <main className="settings-v2__scroller flex-1 p-4">
+            <main ref={bodyRef} className="settings-v2__scroller flex-1 p-4">
                 {children}
             </main>
         </div>

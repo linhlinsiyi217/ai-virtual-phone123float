@@ -66,6 +66,7 @@ export function PhoneSettingsApp({
     const [rightActions, setRightActions] = useState<Record<string, ReactNode>>({});
     const [currentPageId, setCurrentPageId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
+    const scrollPosRef = useRef(0);
     
     // 账号管理状态
     const { account, logout } = useAccount();
@@ -159,6 +160,18 @@ export function PhoneSettingsApp({
                     rightAction={currentPageId ? rightActions[currentPageId] : undefined}
                     searchQuery={currentPageId ? undefined : searchQuery}
                     onSearchQueryChange={currentPageId ? undefined : setSearchQuery}
+                    bodyRef={(el) => {
+                        if (!currentPageId && el) {
+                            // 主页挂载时恢复滚动位置
+                            if (scrollPosRef.current > 0 && el.scrollTop === 0) {
+                                el.scrollTop = scrollPosRef.current;
+                            }
+                            // 监听滚动保存位置
+                            el.onscroll = () => {
+                                scrollPosRef.current = el.scrollTop;
+                            };
+                        }
+                    }}
                 >
                     <PhoneSettingsContent 
                         onClose={onClose} 
@@ -177,6 +190,11 @@ export function PhoneSettingsApp({
                         iconSkins={iconSkins}
                         wallpaperStyle={wallpaperStyle}
                         searchQuery={searchQuery}
+                        onBeforeNavigate={() => {
+                            // 确保在离开首页前最后记录一次
+                            const scroller = document.querySelector(".settings-v2__scroller");
+                            if (scroller) scrollPosRef.current = scroller.scrollTop;
+                        }}
                     />
                 </SettingsShellV2>
             )}
@@ -231,7 +249,7 @@ function SubpageRenderer({
 function PhoneSettingsContent({ 
     onClose, onNotice, currentPageId, setCurrentPageId, handleBack,
     draftTheme, onDraftChange, onApplyTheme, widgets, onWidgetsChange, onDesktopThemeChange, pageIcons, iconSkins, wallpaperStyle,
-    searchQuery, setSubpageTitle
+    searchQuery, setSubpageTitle, onBeforeNavigate
 }: any) {
     if (currentPageId) return <SubpageRenderer 
         pageId={currentPageId} 
@@ -296,6 +314,7 @@ function PhoneSettingsContent({
                     <SettingsListGroup key={g} title={g}>
                         {filtered.filter(i => i.group === g).map(i => (
                             <SettingsListItem key={i.id} icon={i.icon} label={i.label} onClick={() => { 
+                                if (typeof onBeforeNavigate === "function") onBeforeNavigate();
                                 setSubpageTitle(i.label); 
                                 setCurrentPageId(i.id); 
                             }} />
