@@ -7,17 +7,20 @@ export function SettingsShellV2({
     title,
     rightAction,
     onBack,
+    searchQuery,
+    onSearchQueryChange,
 }: { 
     children: ReactNode; 
     title: string;
     rightAction?: ReactNode;
     onBack?: () => void;
+    searchQuery?: string;
+    onSearchQueryChange?: (q: string) => void;
 }) {
     const isMain = !onBack;
 
     return (
         <div className="settings-v2 flex flex-col h-full font-sans">
-            {/* 顶部大标题栏 */}
             <header className="settings-v2__header px-4 py-4">
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold tracking-tight text-[var(--settings-text)]">
@@ -33,17 +36,21 @@ export function SettingsShellV2({
                 )}
             </header>
 
-            {/* 搜索栏 */}
-            {isMain && (
+            {isMain && onSearchQueryChange && (
                 <div className="px-4 pb-3">
                     <div className="flex items-center bg-[#f0f2f5] rounded-xl px-3 py-2 text-[var(--settings-secondary)]">
                         <Search size={18} className="mr-2 shrink-0" />
-                        <input type="text" placeholder="搜索设置" className="bg-transparent border-none outline-none w-full text-[var(--settings-text)] text-sm" />
+                        <input 
+                            type="text" 
+                            placeholder="搜索设置" 
+                            className="bg-transparent border-none outline-none w-full text-[var(--settings-text)] text-sm"
+                            value={searchQuery}
+                            onChange={(e) => onSearchQueryChange(e.target.value)}
+                        />
                     </div>
                 </div>
             )}
 
-            {/* 内容容器 */}
             <main className="settings-v2__scroller flex-1 p-4">
                 {children}
             </main>

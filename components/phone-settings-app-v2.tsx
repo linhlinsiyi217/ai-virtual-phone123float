@@ -65,6 +65,7 @@ export function PhoneSettingsApp({
     const [overrideBack, setOverrideBack] = useState<(() => void) | null>(null);
     const [rightActions, setRightActions] = useState<Record<string, ReactNode>>({});
     const [currentPageId, setCurrentPageId] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
 
     const setSubpageRightAction = useCallback((page: string, action: ReactNode | null) => {
         setRightActions(prev => ({ ...prev, [page]: action }));
@@ -73,37 +74,70 @@ export function PhoneSettingsApp({
     const handleBack = useCallback(() => {
         if (overrideBack) {
             overrideBack();
-        } else {
+        } else if (currentPageId) {
             setCurrentPageId(null);
             setTitle(null);
             setOverrideBack(null);
+            setSearchQuery("");
+        } else {
+            onClose();
         }
-    }, [overrideBack]);
+    }, [overrideBack, currentPageId, onClose]);
+
+    const settingsContextValue = useMemo(() => ({ 
+        setSubpageTitle: setTitle, 
+        setOverrideBack, 
+        setSubpageRightAction 
+    }), [setSubpageRightAction]);
+
+    const isEmbeddedApp = ["character", "theme", "resources"].includes(currentPageId ?? "");
 
     return (
-        <SettingsContext.Provider value={{ setSubpageTitle: setTitle, setOverrideBack, setSubpageRightAction }}>
-            <SettingsShellV2
-                title={title || "设置"}
-                rightAction={currentPageId ? rightActions[currentPageId] : undefined}
-                onBack={currentPageId ? handleBack : undefined}
-            >
-                <PhoneSettingsContent 
-                    onClose={onClose} 
-                    onNotice={onNotice} 
-                    currentPageId={currentPageId}
-                    setCurrentPageId={setCurrentPageId}
-                    handleBack={handleBack}
-                    draftTheme={draftTheme}
-                    onDraftChange={onDraftChange}
-                    onApplyTheme={onApplyTheme}
-                    widgets={widgets}
-                    onWidgetsChange={onWidgetsChange}
-                    onDesktopThemeChange={onDesktopThemeChange}
-                    pageIcons={pageIcons}
-                    iconSkins={iconSkins}
-                    wallpaperStyle={wallpaperStyle}
-                />
-            </SettingsShellV2>
+        <SettingsContext.Provider value={settingsContextValue}>
+            {isEmbeddedApp ? (
+                <div className="settings-v2-embedded">
+                    <SubpageRenderer
+                        pageId={currentPageId}
+                        onNotice={onNotice}
+                        draft={draftTheme}
+                        onDraftChange={onDraftChange}
+                        onApply={onApplyTheme}
+                        widgets={widgets}
+                        onWidgetsChange={onWidgetsChange}
+                        onDesktopThemeChange={onDesktopThemeChange}
+                        pageIcons={pageIcons}
+                        iconSkins={iconSkins}
+                        wallpaperStyle={wallpaperStyle}
+                        onBack={handleBack}
+                    />
+                </div>
+            ) : (
+                <SettingsShellV2
+                    title={title || "设置"}
+                    rightAction={currentPageId ? rightActions[currentPageId] : undefined}
+                    onBack={currentPageId ? handleBack : undefined}
+                    searchQuery={currentPageId ? undefined : searchQuery}
+                    onSearchQueryChange={currentPageId ? undefined : setSearchQuery}
+                >
+                    <PhoneSettingsContent 
+                        onClose={onClose} 
+                        onNotice={onNotice} 
+                        currentPageId={currentPageId}
+                        setCurrentPageId={setCurrentPageId}
+                        handleBack={handleBack}
+                        draftTheme={draftTheme}
+                        onDraftChange={onDraftChange}
+                        onApplyTheme={onApplyTheme}
+                        widgets={widgets}
+                        onWidgetsChange={onWidgetsChange}
+                        onDesktopThemeChange={onDesktopThemeChange}
+                        pageIcons={pageIcons}
+                        iconSkins={iconSkins}
+                        wallpaperStyle={wallpaperStyle}
+                        searchQuery={searchQuery}
+                    />
+                </SettingsShellV2>
+            )}
         </SettingsContext.Provider>
     );
 }
