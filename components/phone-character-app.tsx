@@ -34,6 +34,8 @@ import {
 } from "@/lib/character-world-storage";
 import { WorldTabStrip, WorldCaseSheet, NewWorldSheet } from "@/components/character/world-tabs";
 import { RelationLinkDialog, RelationPairSheet } from "@/components/character/relation-dialogs";
+import { WorldListView } from "@/components/character/world-list-view";
+import { WorldInteriorView } from "@/components/character/world-interior-view";
 import { loadMomentsConfig, saveMomentsConfig } from "@/lib/moments-storage";
 import type { CanvasBgItem } from "@/lib/character-types";
 import { PageShell } from "@/components/ui/page-shell";
@@ -56,7 +58,7 @@ import { kvGet, kvSet } from "@/lib/kv-db";
 import { normalizeTimeZone } from "@/lib/character-time";
 import { removeCharacterChatReferences } from "@/lib/character-chat-cleanup";
 
-type ViewType = "list" | "detail";
+type ViewType = "worlds" | "list" | "world-interior" | "detail";
 
 // 画布连线：与世界观关系同步——同一对角色间的多条关系合并为一条线，标签并列显示
 type CanvasRelationLine = { key: string; aId: string; bId: string; labels: string[] };
@@ -195,12 +197,15 @@ function getCharacterTimeZoneOptions(currentTimeZone = ""): string[] {
 }
 
 export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps) {
-  const [view, setView] = useState<{ type: ViewType; id: string | null; isEditing?: boolean }>({ type: "list", id: null, isEditing: false });
+  // 新三层路由：worlds → world-interior → detail
+  // list 类型保留供旧画布逻辑使用，不再作为默认入口
+  const [view, setView] = useState<{ type: ViewType; id: string | null; isEditing?: boolean }>({ type: "worlds", id: null, isEditing: false });
   const [characters, setCharacters] = useState<Character[]>(() => loadCharacters());
   const [bgItems, setBgItems] = useState<CanvasBgItem[]>(() => loadBackgroundItems());
   const [transition, setTransition] = useState<TransitionState | null>(null);
   const [pendingPlacementChar, setPendingPlacementChar] = useState<Character | null>(null);
   const [pendingPolaroidStyle, setPendingPolaroidStyle] = useState<number>(0);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   // ── 世界卷宗：分组数据 + 当前打开的卷宗（持久记忆） ──
   const [worldGroups, setWorldGroups] = useState<CharacterWorldGroup[]>(() => loadCharacterWorldGroups());
@@ -232,17 +237,10 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
     saveBackgroundItems(next);
   }
 
-  // Handle clicking a polaroid
+  // 保留旧画布视图的 handleSelectChar（供 list 视图）
   function handleSelectChar(char: Character, e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
-
-    setTransition({
-      char,
-      sourceRect: rect,
-      phase: "start",
-    });
-
-    // Animate
+    setTransition({ char, sourceRect: rect, phase: "start" });
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setTransition((p) => p ? { ...p, phase: "fly" } : null);
@@ -251,20 +249,98 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
           setTimeout(() => {
             setView({ type: "detail", id: char.id });
             setTransition(null);
-          }, 400); // Wait for flip 0.4s
-        }, 400); // Wait for fly 0.4s
+          }, 400);
+        }, 400);
       });
     });
   }
 
-  // Handle back from detail
+  const currentWorld = worldGroups.find(g => g.id === safeWorldId) ?? worldGroups[0];
+
+  function refreshAll() {
+    setCharacters(loadCharacters());
+    setWorldGroups(loadCharacterWorldGroups());
+  }
+
+  async function handleImportFile(file: File) {
+    try {
+      let imported: CharacterImportData | null = null;
+      if (file.name.endsWith(".png") || file.type === "image/png") {
+        const buf = await file.arrayBuffer();
+        imported = parseCharacterFromPng(buf);
+      } else {
+        const text = await file.text();
+        imported = parseCharacterFromJson(text);
+      }
+      if (!imported) { onNotice("无法解析该角色文件"); return; }
+      const newChar = createCharacter(imported);
+      const updatedChars = [...loadCharacters(), newChar];
+      saveCharacters(updatedChars);
+      if (safeWorldId !== DEFAULT_CHARACTER_WORLD_ID) {
+        moveCharacterToWorld(newChar.id, safeWorldId);
+      }
+      refreshAll();
+      onNotice(`已导入「${newChar.name || "未命名"}」`);
+    } catch (e) {
+      if (e instanceof Error && e.message === CHAR_BLOCKED_FIELDS) {
+        onNotice("该角色文件格式不兼容，请使用本应用导出的文件");
+      } else {
+        onNotice("导入失败，请检查文件格式");
+      }
+    }
+  }
+
   function handleBackFromDetail() {
-    setView({ type: "list", id: null, isEditing: false });
+    if (currentWorld) {
+      setView({ type: "world-interior", id: safeWorldId });
+    } else {
+      setView({ type: "worlds", id: null });
+    }
   }
 
   return (
     <>
+      <input
+        ref={importFileRef}
+        type="file"
+        accept=".json,.png,image/png,application/json"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (file) await handleImportFile(file);
+          e.target.value = "";
+        }}
+      />
       <div className="char-app">
+        {/* 第一层：世界列表 */}
+        {view.type === "worlds" && (
+          <WorldListView
+            worldGroups={worldGroups}
+            characters={characters}
+            onSelectWorld={(worldId) => {
+              selectWorldId(worldId);
+              setView({ type: "world-interior", id: worldId });
+            }}
+            onWorldsChanged={refreshAll}
+            onNotice={onNotice}
+          />
+        )}
+
+        {/* 第二层：世界内部 */}
+        {view.type === "world-interior" && currentWorld && (
+          <WorldInteriorView
+            world={currentWorld}
+            characters={characters}
+            onSelectChar={(char) => setView({ type: "detail", id: char.id })}
+            onBack={() => setView({ type: "worlds", id: null })}
+            onCharsChanged={refreshAll}
+            onNotice={onNotice}
+            onAddChar={() => setView({ type: "detail", id: null, isEditing: true })}
+            onImportChar={() => importFileRef.current?.click()}
+          />
+        )}
+
+        {/* 旧画布视图（list）：保留供需要时访问 */}
         {view.type === "list" && (
           <CharListView
             characters={characters}
@@ -274,14 +350,13 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
             onSelectWorld={selectWorldId}
             onUpdateChars={updateChars}
             onUpdateBgItems={updateBgItems}
-            onClose={onClose}
+            onClose={() => setView({ type: "worlds", id: null })}
             onSelect={handleSelectChar}
             onCreate={(style: number) => { setPendingPolaroidStyle(style); setView({ type: "detail", id: null, isEditing: true }); }}
             pendingPlacementChar={pendingPlacementChar}
             onStartCharPlacement={(char: Character) => setPendingPlacementChar(char)}
             onPlacementDone={(placed: Character) => {
               setPendingPlacementChar(null);
-              // 新建/导入的角色放进当前打开的卷宗（normalize 默认丢进默认世界）
               if (safeWorldId !== DEFAULT_CHARACTER_WORLD_ID) {
                 moveCharacterToWorld(placed.id, safeWorldId);
               } else {
@@ -293,6 +368,7 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
           />
         )}
 
+        {/* 第三层：角色详情/编辑 */}
         {view.type === "detail" && (
           <CharArchiveView
             char={view.id ? (characters.find((c) => c.id === view.id) ?? createCharacter({ name: "", persona: "", avatar: null })) : createCharacter({ name: "", persona: "", avatar: null })}
@@ -304,7 +380,7 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
               if (view.id) {
                 setView({ type: "detail", id: view.id, isEditing: false });
               } else {
-                setView({ type: "list", id: null, isEditing: false });
+                handleBackFromDetail();
               }
             }}
             onSave={(data, createVersion) => {
@@ -313,34 +389,29 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
                 const nextVersion = createVersion
                   ? backupCharacterVersion(existing, "manual", "手动编辑前备份")
                   : overwriteCharacterVersion(existing.id);
-                const updated: Character = {
-                  ...existing,
-                  ...data,
-                  updatedAt: new Date().toISOString(),
-                };
+                const updated: Character = { ...existing, ...data, updatedAt: new Date().toISOString() };
                 updateChars(characters.map((c) => (c.id === existing.id ? updated : c)));
                 setView({ type: "detail", id: existing.id, isEditing: false });
-                onNotice(createVersion
-                  ? `已备份旧卡，当前为 V${nextVersion}`
-                  : `已覆盖旧版本，当前为 V${nextVersion}`);
+                onNotice(createVersion ? `已备份旧卡，当前为 V${nextVersion}` : `已覆盖旧版本，当前为 V${nextVersion}`);
               } else {
+                // 新建：直接保存到当前世界，不需要点画布放置
                 const newChar = createCharacter(data);
                 newChar.polaroidStyle = pendingPolaroidStyle;
-                setPendingPlacementChar(newChar);
-                setView({ type: "list", id: null, isEditing: false });
-                onNotice("点击画布放置角色");
+                const fresh = loadCharacters();
+                saveCharacters([...fresh, newChar]);
+                if (safeWorldId !== DEFAULT_CHARACTER_WORLD_ID) {
+                  moveCharacterToWorld(newChar.id, safeWorldId);
+                }
+                refreshAll();
+                setView({ type: "world-interior", id: safeWorldId });
+                onNotice(`已创建「${newChar.name || "新角色"}」`);
               }
             }}
             onRestoreVersion={(version) => {
               const existing = view.id ? characters.find((c) => c.id === view.id) : null;
               if (!existing) return;
               const activeVersion = switchCharacterVersion(existing, version);
-              const restored: Character = {
-                ...version.data,
-                id: existing.id,
-                createdAt: existing.createdAt,
-                updatedAt: new Date().toISOString(),
-              };
+              const restored: Character = { ...version.data, id: existing.id, createdAt: existing.createdAt, updatedAt: new Date().toISOString() };
               updateChars(characters.map((c) => (c.id === existing.id ? restored : c)));
               setView({ type: "detail", id: existing.id, isEditing: false });
               onNotice(`已切换到 V${activeVersion}，未创建新版本`);
@@ -352,7 +423,7 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
                 clearCharacterVersions(characterId);
                 updateChars(characters.filter((c) => c.id !== characterId));
               }
-              setView({ type: "list", id: null, isEditing: false });
+              handleBackFromDetail();
               onNotice("已删除档案");
             }}
             onExportJson={() => {
@@ -361,20 +432,13 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
             }}
             onExportPng={async () => {
               const c = view.id ? characters.find(x => x.id === view.id) : null;
-              if (c) {
-                await exportCharacterAsPng(c);
-                onNotice("导出成功");
-              }
+              if (c) { await exportCharacterAsPng(c); onNotice("导出成功"); }
             }}
             onNotice={onNotice}
           />
         )}
       </div>
-
-      {/* Fly & Flip Transition Overlay */}
-      {transition && (
-        <FlipTransitionOverlay transit={transition} />
-      )}
+      {transition && <FlipTransitionOverlay transit={transition} />}
     </>
   );
 }
