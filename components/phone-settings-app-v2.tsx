@@ -66,6 +66,17 @@ export function PhoneSettingsApp({
     const [rightActions, setRightActions] = useState<Record<string, ReactNode>>({});
     const [currentPageId, setCurrentPageId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
+    
+    // 账号管理状态
+    const { account, logout } = useAccount();
+    const [pwdModalOpen, setPwdModalOpen] = useState(false);
+    const [oldPwd, setOldPwd] = useState("");
+    const [newPwd, setNewPwd] = useState("");
+    const [confirmPwd, setConfirmPwd] = useState("");
+    const [pwdBusy, setPwdBusy] = useState(false);
+    const [pwdError, setPwdError] = useState("");
+    const [confirmLogout, setConfirmLogout] = useState(false);
+    const [accountSheetOpen, setAccountSheetOpen] = useState(false);
 
     const setSubpageRightAction = useCallback((page: string, action: ReactNode | null) => {
         setRightActions(prev => ({ ...prev, [page]: action }));
@@ -83,6 +94,34 @@ export function PhoneSettingsApp({
             onClose();
         }
     }, [overrideBack, currentPageId, onClose]);
+
+    const handleChangePassword = async () => {
+        if (pwdBusy) return;
+        if (!oldPwd || !newPwd) { setPwdError("请填写当前密码和新密码。"); return; }
+        if (newPwd.length < 6) { setPwdError("新密码至少需要 6 位。"); return; }
+        if (newPwd !== confirmPwd) { setPwdError("两次输入的新密码不一致。"); return; }
+        setPwdBusy(true);
+        setPwdError("");
+        try {
+            const result = await changeAccountPassword({ oldPassword: oldPwd, newPassword: newPwd });
+            if (!result.ok) { setPwdError(result.error || "修改失败。"); return; }
+            setPwdModalOpen(false);
+            setOldPwd("");
+            setNewPwd("");
+            setConfirmPwd("");
+            onNotice("密码已修改");
+        } finally {
+            setPwdBusy(false);
+        }
+    };
+
+    const handleCopyUsername = () => {
+        if (navigator.clipboard?.writeText) {
+            void navigator.clipboard.writeText(account?.username ?? "").then(() => onNotice("用户名已复制"));
+        } else {
+            onNotice(`用户名：${account?.username}`);
+        }
+    };
 
     const settingsContextValue = useMemo(() => ({ 
         setSubpageTitle: setTitle, 
@@ -210,17 +249,17 @@ function PhoneSettingsContent({
 
     return (
         <>
-            {!isSelfHostedModeEnabled() && (
-                <div className="mb-6 bg-[#ffffff] border border-[#e5e7eb] rounded-2xl overflow-hidden shadow-sm">
-                    <button className="flex items-center w-full px-4 py-4 active:bg-[#f9fafb]" onClick={() => {}}>
-                        <div className="w-12 h-12 rounded-full bg-[#f3f4f6] flex items-center justify-center mr-4">
-                            <UserCircle size={24} className="text-[#6b7280]" />
+            {!isSelfHostedModeEnabled() && account && (
+                <div className="mb-6 bg-[#ffffff] border-y border-[#e5e7eb] -mx-4 px-4">
+                    <button className="flex items-center w-full py-3" onClick={() => setAccountSheetOpen(true)}>
+                        <div className="w-14 h-14 rounded-full bg-[#f3f4f6] flex items-center justify-center mr-4">
+                            <UserCircle size={32} className="text-[#9ca3af]" />
                         </div>
                         <div className="flex-1 text-left">
-                            <div className="text-[17px] font-semibold text-[#111827]">账号管理</div>
-                            <div className="text-sm text-[#6b7280]">点击查看账号设置</div>
+                            <div className="text-[19px] font-semibold text-[#111827]">{account.displayName || account.username}</div>
+                            <div className="text-sm text-[#6b7280]">账号设置、密码与安全</div>
                         </div>
-                        <ChevronRight size={20} className="text-[#9ca3af]" />
+                        <ChevronRight size={20} className="text-[#c7c7cc]" />
                     </button>
                 </div>
             )}
