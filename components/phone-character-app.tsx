@@ -377,6 +377,7 @@ export function PhoneCharacterApp({ onClose, onNotice, isFromSettings = false }:
         {/* 第三层：角色详情/编辑 */}
         {view.type === "detail" && (
           <CharacterDetailView
+            key={view.id ?? "new-character"}
             char={view.id ? (characters.find((c) => c.id === view.id) ?? createCharacter({ name: "", persona: "", avatar: null })) : createCharacter({ name: "", persona: "", avatar: null })}
             isEditing={view.isEditing}
             isExisting={Boolean(view.id)}

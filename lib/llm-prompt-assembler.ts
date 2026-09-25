@@ -1,6 +1,7 @@
 // lib/llm-prompt-assembler.ts
 
 import { Character } from "./character-types";
+import { characterProfileSummary } from "./character-profile-summary";
 import { ChatMessage } from "./chat-storage";
 import type { StateValue } from "./chat-storage";
 import { PresetConfig, Prompt, PromptOrderEntry, WorldBookConfig, RegexConfig, WorldBookEntry } from "./settings-types";
@@ -412,7 +413,7 @@ function getMarkerContent(
 ): string | null {
     switch (identifier) {
         case "charDescription":
-            return `You are ${character.name}.\n${character.persona}`;
+            return `You are ${character.name}.\n${character.persona}${characterProfileSummary(character, true) ? `\n\n【分类档案】\n${characterProfileSummary(character, true)}` : ""}`;
         case "charPersonality":
             return character.personality?.trim() || null;
         case "personaDescription":
@@ -655,7 +656,7 @@ export function assemblePromptPayload(input: AssemblerInput): LLMMessage[] {
         engine.lastUserMessage = history.filter(m => m.role === "user").pop()?.content ?? "";
         engine.lastCharMessage = history.filter(m => m.role === "assistant").pop()?.content ?? "";
         engine.lastMessage = history.length > 0 ? history[history.length - 1].content : "";
-        engine.description = character.persona ?? "";
+        engine.description = [character.persona, characterProfileSummary(character, true)].filter(Boolean).join("\n\n【分类档案】\n");
         engine.personality = character.personality ?? "";
         engine.persona = userIdentity?.bio ?? "";
         engine.stateStr = stateStr;
@@ -1849,7 +1850,7 @@ export function assembleGroupPromptPayload(input: GroupAssemblerInput): LLMMessa
             engine,
             input.memberTimeContexts?.[char.id] ?? buildCharacterTimeContext(char.timeZone),
         );
-        engine.description = char.persona ?? "";
+        engine.description = [char.persona, characterProfileSummary(char, true)].filter(Boolean).join("\n\n【分类档案】\n");
         engine.personality = char.personality ?? "";
         engine.persona = userIdentity?.bio ?? "";
         engine.stateStr = formatStateValuesForPrompt(m.currentStateValues);

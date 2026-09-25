@@ -20,6 +20,7 @@ import { loadMemoryConfig } from "./memory-storage";
 import { retrieveCoreMemoriesForPrompt, retrieveMemoriesForPrompt } from "./memory-service";
 import { formatCoreMemories, formatLongTermMemories } from "./memory-injector";
 import type { Character } from "./character-types";
+import { characterProfileSummary } from "./character-profile-summary";
 
 export type GeneratedSupportingCharacter = {
     name: string;
@@ -139,6 +140,8 @@ function buildSystemPrompt(character: Character, worldContext: string, coreMemor
     sections.push(`你是角色档案助手。以下是角色「${character.name}」的资料，请为TA生成配角（同一世界观中的次要人物），用于丰富TA的人际圈。`);
     sections.push(`【角色设定】\n${character.persona || "（暂无）"}`);
     if (character.personality?.trim()) sections.push(`【性格】\n${character.personality.trim()}`);
+    const profileSummary = characterProfileSummary(character, true);
+    if (profileSummary) sections.push(`【分类档案】\n${profileSummary}`);
     if (coreMemories) sections.push(`【核心记忆】\n${coreMemories}`);
     if (longTermMemories) sections.push(`【相关长期记忆】\n${longTermMemories}`);
     if (worldContext) sections.push(`【世界观与人际】\n${worldContext}`);

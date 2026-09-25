@@ -1,4 +1,4 @@
-import type { Character, CanvasBgItem } from "./character-types";
+import type { Character, CanvasBgItem, CharacterProfileDetails } from "./character-types";
 import { normalizeTimeZone } from "./character-time";
 import { kvGet, kvSet, registerKvMigration } from "./kv-db";
 
@@ -144,6 +144,8 @@ export function exportCharacterAsJson(char: Character): void {
     name: char.name,
     description: char.persona,
     personality: char.personality || "",
+    profileDetails: char.profileDetails || {},
+    faceReferenceImage: char.faceReferenceImage || "",
     avatar: char.avatar ?? "none",
     tags: char.tags || [],
     wechatID: char.wechatID || "",
@@ -203,12 +205,20 @@ export function parseCharacterFromJson(
     const polaroidImageZoom = typeof src.polaroidImageZoom === "number" && Number.isFinite(src.polaroidImageZoom)
       ? Math.max(1, Math.min(3, src.polaroidImageZoom))
       : undefined;
+    const profileDetails: CharacterProfileDetails = {};
+    if (src.profileDetails && typeof src.profileDetails === "object" && !Array.isArray(src.profileDetails)) {
+      for (const [key, value] of Object.entries(src.profileDetails)) {
+        if (typeof value === "string") (profileDetails as Record<string, string>)[key] = value;
+      }
+    }
 
     return {
       name: String(src.name ?? ""),
       persona: String(src.description ?? src.persona ?? ""),
       avatar: validAvatar(src.avatar),
       personality: typeof src.personality === "string" && src.personality.trim() ? src.personality : undefined,
+      profileDetails,
+      faceReferenceImage: validAvatar(src.faceReferenceImage) || undefined,
       tags: Array.isArray(src.tags) ? src.tags.map(String) : [],
       wechatID: typeof src.wechatID === "string" && src.wechatID.trim() ? src.wechatID : undefined,
       timeZone: normalizeTimeZone(src.timeZone ?? src.timezone ?? src.time_zone),
@@ -430,6 +440,7 @@ export async function exportCharacterAsPng(char: Character): Promise<void> {
     name: char.name,
     description: char.persona,
     personality: char.personality || "",
+    profileDetails: char.profileDetails || {},
     avatar: "none",
     tags: char.tags || [],
     wechatID: char.wechatID || "",

@@ -15,6 +15,29 @@ export type CharacterCustomApiConfig = {
   temperature?: number;
 };
 
+/** Optional structured dossier fields. Legacy persona text remains intact. */
+export type CharacterProfileDetails = {
+  alias?: string;
+  ageAndBirthday?: string;
+  role?: string;
+  signature?: string;
+  memorableQuote?: string;
+  appearance?: string;
+  clothing?: string;
+  background?: string;
+  occupation?: string;
+  goals?: string;
+  secrets?: string;
+  strengthsAndFlaws?: string;
+  desiresAndFears?: string;
+  habitsAndHobbies?: string;
+  relationshipStyle?: string;
+  boundaries?: string;
+  speakingStyle?: string;
+  dailyRoutine?: string;
+  initiative?: string;
+};
+
 export type Character = {
   id: string;
   name: string;
@@ -24,6 +47,8 @@ export type Character = {
   briefPersonaUpdatedAt?: string; // 简介生成时间；早于 updatedAt 时编辑器提示「设定已更新，建议重新生成」
   wechatID?: string;     // 手机号格式的微信号
   personality?: string;    // 角色性格
+  profileDetails?: CharacterProfileDetails; // 分类细节，不覆盖完整原始人设
+  faceReferenceImage?: string; // 仅存本地参考图，不代表已接入生图模型
   timeZone?: string;       // IANA 时区，例如 America/New_York；空值表示跟随系统时间
   tags?: string[];
   createdAt: string;

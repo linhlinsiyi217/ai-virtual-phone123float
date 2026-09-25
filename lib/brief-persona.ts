@@ -12,10 +12,11 @@
 import { simpleLLMCall } from "./api-helpers";
 import { loadApiConfigs, loadBindingConfig, resolveBinding } from "./settings-storage";
 import type { Character } from "./character-types";
+import { characterProfileSummary } from "./character-profile-summary";
 
 /** 按传入的角色资料（可以是编辑器里未保存的表单态）生成简量人设文本。失败抛错（含用户可读信息）。 */
 export async function generateBriefPersonaText(character: Character): Promise<string> {
-    if (!character.persona?.trim() && !character.personality?.trim()) {
+    if (!character.persona?.trim() && !character.personality?.trim() && !characterProfileSummary(character)) {
         throw new Error("角色还没有设定内容，先填写人设再生成简介。");
     }
 
@@ -32,6 +33,7 @@ export async function generateBriefPersonaText(character: Character): Promise<st
         "",
         `【角色设定】\n${character.persona?.trim() || "（暂无）"}`,
         ...(character.personality?.trim() ? ["", `【性格】\n${character.personality.trim()}`] : []),
+        ...(characterProfileSummary(character) ? ["", `【分类档案】\n${characterProfileSummary(character)}`] : []),
         "",
         "要求：",
         "- 第三人称，100~200 字",
