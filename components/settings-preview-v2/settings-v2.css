@@ -1,9 +1,12 @@
 .settings-v2 {
   --settings-bg: #ffffff;
+  --settings-surface: #f2f3f7;
   --settings-text: #111111;
   --settings-secondary: #68707d;
   --settings-blue: #007aff;
   --settings-line: rgba(17, 17, 17, .09);
+  --settings-danger: #ff3b30;
+  --settings-green: #28c76f;
   color: var(--settings-text);
   background: var(--settings-bg);
   min-height: 100%;

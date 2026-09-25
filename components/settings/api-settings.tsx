@@ -233,7 +233,7 @@ export function ApiSettings({ hideHeading = false }: { hideHeading?: boolean }) 
                             <div
                                 key={config.id}
                                 className={`flex items-center bg-white ${
-                                    index > 0 ? "border-t border-[var(--ios-line)]" : ""
+                                    index > 0 ? "border-t border-[var(--settings-line)]" : ""
                                 }`}
                             >
                                 <button
@@ -246,7 +246,7 @@ export function ApiSettings({ hideHeading = false }: { hideHeading?: boolean }) 
                                         <span className="block truncate font-semibold">
                                             {config.name || config.provider || "未命名配置"}
                                         </span>
-                                        <span className="block truncate text-xs text-[var(--ios-secondary)]">
+                                        <span className="block truncate text-xs text-[var(--settings-secondary)]">
                                             {isTesting[config.id]
                                                 ? "测试中…"
                                                 : testResult[config.id]?.success
@@ -254,6 +254,7 @@ export function ApiSettings({ hideHeading = false }: { hideHeading?: boolean }) 
                                                     : testResult[config.id]
                                                         ? "连接失败"
                                                         : "未测试"}
+                                            {config.defaultModel ? ` • ${config.defaultModel}` : ""}
                                         </span>
                                     </span>
                                 </button>
@@ -263,7 +264,7 @@ export function ApiSettings({ hideHeading = false }: { hideHeading?: boolean }) 
                                     aria-label={`删除 ${config.name || config.provider}`}
                                     onClick={() => setConfirmDeleteId(config.id)}
                                 >
-                                    <Trash2 size={17} className="text-[var(--ios-danger)]" />
+                                    <Trash2 size={17} className="text-[var(--settings-danger)]" />
                                 </button>
                             </div>
                         ))}
