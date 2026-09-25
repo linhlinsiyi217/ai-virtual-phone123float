@@ -27,7 +27,7 @@ import { loadKeepAlive, saveKeepAlive } from "@/lib/weixin-storage";
 import { BINDING_ACCENTS, CONTENT_APP_ACCENTS } from "@/lib/ui-accent-colors";
 import { Toggle } from "./ui/form";
 import { SettingsShellV2 } from "./settings-preview-v2/shell";
-import { SettingsListGroup, SettingsListItem } from "./settings-preview-v2/controls";
+import { SettingsSection, SettingsRow } from "./settings-preview-v2/controls";
 import { SettingsNavigationContext } from "./settings-preview-v2/nav-shell";
 import { SettingsContext } from "./phone-settings-app";
 import { PhoneCharacterApp } from "./phone-character-app";
@@ -270,15 +270,30 @@ function PhoneSettingsContent({
 
     return (
         <>
-            {!isSelfHostedModeEnabled() && account && (
+            {!isSelfHostedModeEnabled() ? (
+                account ? (
+                    <div className="mb-6 bg-[#ffffff] border-y border-[#e5e7eb] -mx-4 px-4">
+                        <button type="button" className="flex items-center w-full py-3" onClick={onOpenAccount}>
+                            <div className="w-14 h-14 rounded-full bg-[#f3f4f6] flex items-center justify-center mr-4">
+                                <UserCircle size={32} className="text-[#9ca3af]" />
+                            </div>
+                            <div className="flex-1 text-left">
+                                <div className="text-[19px] font-semibold text-[#111827]">{account.displayName || account.username}</div>
+                                <div className="text-sm text-[#6b7280]">账号设置、密码与安全</div>
+                            </div>
+                            <ChevronRight size={20} className="text-[#c7c7cc]" />
+                        </button>
+                    </div>
+                ) : null
+            ) : (
                 <div className="mb-6 bg-[#ffffff] border-y border-[#e5e7eb] -mx-4 px-4">
-                    <button className="flex items-center w-full py-3" onClick={onOpenAccount}>
+                    <button type="button" className="flex items-center w-full py-3" onClick={onOpenAccount}>
                         <div className="w-14 h-14 rounded-full bg-[#f3f4f6] flex items-center justify-center mr-4">
                             <UserCircle size={32} className="text-[#9ca3af]" />
                         </div>
                         <div className="flex-1 text-left">
-                            <div className="text-[19px] font-semibold text-[#111827]">{account.displayName || account.username}</div>
-                            <div className="text-sm text-[#6b7280]">账号设置、密码与安全</div>
+                            <div className="text-[19px] font-semibold text-[#111827]">本地用户</div>
+                            <div className="text-sm text-[#6b7280]">自托管模式</div>
                         </div>
                         <ChevronRight size={20} className="text-[#c7c7cc]" />
                     </button>
@@ -313,15 +328,15 @@ function PhoneSettingsContent({
 
                 const groups = Array.from(new Set(filtered.map(i => i.group)));
                 return groups.map(g => (
-                    <SettingsListGroup key={g} title={g}>
+                    <SettingsSection key={g} title={g}>
                         {filtered.filter(i => i.group === g).map(i => (
-                            <SettingsListItem key={i.id} icon={i.icon} label={i.label} onClick={() => { 
+                            <SettingsRow key={i.id} icon={i.icon} label={i.label} onClick={() => { 
                                 if (typeof onBeforeNavigate === "function") onBeforeNavigate();
                                 setSubpageTitle(i.label); 
                                 setCurrentPageId(i.id); 
                             }} />
                         ))}
-                    </SettingsListGroup>
+                    </SettingsSection>
                 ));
             })()}
         </>

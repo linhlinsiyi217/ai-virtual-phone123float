@@ -30,6 +30,21 @@
   font-size: 28px;
   font-weight: 700;
 }
+.settings-v2__home-exit {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.settings-v2__home-exit:active { opacity: .58; }
+.settings-v2__home-exit:focus-visible {
+  outline: 2px solid #007aff;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
 .settings-v2__page-title {
   grid-column: 2;
   grid-row: 1;
@@ -91,19 +106,19 @@
 .settings-v2__group {
   overflow: hidden;
   border: 1px solid var(--settings-line);
-  border-radius: 20px;
-  background: #ffffff;
-  box-shadow: 0 5px 22px rgba(22,36,58,.045);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 3px 14px rgba(20, 35, 55, .035);
 }
 
 .settings-v2__row {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 54px;
+  min-height: 56px;
   padding: 10px 16px;
   color: var(--settings-text);
-  background: transparent;
+  background: #fff;
   text-align: left;
   transition: background-color 150ms ease;
 }
@@ -113,7 +128,66 @@
 }
 
 .settings-v2__row:active {
-  background: rgba(0,122,255,.07);
+  background: rgba(0, 122, 255, .055);
+}
+
+.settings-v2__row--danger {
+  color: #d53535;
+}
+
+.settings-v2__field {
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: #f4f5f8;
+  color: #111;
+}
+
+.settings-v2__primary {
+  min-height: 44px;
+  border-radius: 12px;
+  background: #007aff;
+  color: #fff;
+  font-weight: 600;
+}
+
+.settings-v2__account-sheet {
+  max-height: min(82dvh, 720px);
+  overflow: hidden;
+  background: #fff;
+}
+.settings-v2__account-body {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+.settings-v2__account-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 4px 18px;
+}
+.settings-v2__account-identity p {
+  margin: 4px 0 0;
+  color: #68707d;
+  font-size: 13px;
+}
+.settings-v2__password-fields {
+  display: grid;
+  gap: 12px;
+  padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+.settings-v2__error {
+  color: #d53535;
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-v2 *, .settings-v2-embedded * {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
 }
 
 .settings-v2__scroller {

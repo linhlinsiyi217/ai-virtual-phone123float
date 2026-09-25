@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, type ReactNode } from "react";
 import { ChevronRight, Search } from "lucide-react";
 import { SettingsNavigationContext, GLASS_STYLES } from "./nav-shell";
 
-import { X, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 
 export function SettingsShellV2({ 
     children, 
@@ -30,31 +30,31 @@ export function SettingsShellV2({
             <header className="settings-v2__header">
                 <div className="settings-v2__navigation">
                     {isMain ? (
-                        <h1 className="settings-v2__home-title">设置</h1>
+                        <h1 className="settings-v2__home-title">
+                            <button
+                                type="button"
+                                className="settings-v2__home-exit"
+                                onClick={onClose}
+                                aria-label="退出设置，返回桌面"
+                            >
+                                设置
+                            </button>
+                        </h1>
                     ) : (
-                        <button
-                            type="button"
-                            className="settings-v2__nav-button"
-                            aria-label="返回上一页"
-                            onClick={onBack}
-                        >
-                            <ChevronLeft size={21} strokeWidth={2} />
-                        </button>
-                    )}
-
-                    {!isMain && <h1 className="settings-v2__page-title">{title}</h1>}
-
-                    <div className="settings-v2__trailing">
-                        {isMain ? (
+                        <>
                             <button
                                 type="button"
                                 className="settings-v2__nav-button"
-                                aria-label="退出设置"
-                                onClick={onClose}
+                                onClick={onBack}
+                                aria-label="返回上一页"
                             >
-                                <X size={20} strokeWidth={2} />
+                                <ChevronLeft size={21} strokeWidth={2} />
                             </button>
-                        ) : rightAction}
+                            <h1 className="settings-v2__page-title">{title}</h1>
+                        </>
+                    )}
+                    <div className="settings-v2__trailing">
+                        {!isMain && rightAction}
                     </div>
                 </div>
             </header>
