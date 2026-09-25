@@ -137,23 +137,87 @@
 }
 
 .settings-v2__row--danger {
-  color: #d53535;
+  color: var(--settings-danger);
 }
 
 .settings-v2__field {
+  width: 100%;
   min-height: 44px;
-  border: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(17,17,17,.055);
   border-radius: 12px;
-  background: #f4f5f8;
-  color: #111;
+  outline: none;
+  background: var(--settings-surface);
+  color: var(--settings-text);
+  font-size: 15px;
+}
+
+.settings-v2__field:focus {
+  border-color: rgba(0,122,255,.45);
+  box-shadow: 0 0 0 3px rgba(0,122,255,.12);
 }
 
 .settings-v2__primary {
   min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
   border-radius: 12px;
-  background: #007aff;
+  background: var(--settings-blue);
   color: #fff;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.settings-v2__primary:active { filter: brightness(.91); }
+
+/* 暗色模式变量与触控防误触追加 */
+@media (prefers-color-scheme: dark) {
+  .settings-v2 {
+    --settings-bg: #0a0a0c;
+    --settings-surface: #16161a;
+    --settings-text: #f5f5f7;
+    --settings-secondary: #8e8e93;
+    --settings-line: rgba(255, 255, 255, 0.08);
+  }
+  .settings-v2__header {
+    background: rgba(18, 18, 22, 0.82);
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+  }
+  .settings-v2__group {
+    background: #16161a;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .settings-v2__row {
+    background: #16161a;
+    color: #f5f5f7;
+  }
+  .settings-v2__row + .settings-v2__row {
+    border-top-color: rgba(255, 255, 255, 0.08);
+  }
+  .settings-v2__field {
+    background: #222228;
+    color: #fff;
+  }
+}
+
+.settings-v2 button,
+.settings-v2__row {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.settings-v2__row:active {
+  background: rgba(0, 122, 255, 0.08);
+  transform: scale(0.995);
+  transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.settings-v2__primary:active,
+.settings-v2__glass-button:active {
+  transform: scale(0.96);
+  transition: transform 100ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .settings-v2__account-sheet {
