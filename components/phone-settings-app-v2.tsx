@@ -210,53 +210,55 @@ function PhoneSettingsContent({
     return (
         <>
             {!isSelfHostedModeEnabled() && (
-                <div className="mb-6 bg-[var(--c-card)]/70 backdrop-blur-md rounded-2xl border border-[var(--c-card-border)] overflow-hidden shadow-sm">
-                    <button className="flex items-center w-full px-4 py-4 active:bg-black/5" onClick={() => {}}>
-                        <div className="w-12 h-12 rounded-full bg-[var(--c-card-border)] flex items-center justify-center mr-4">
-                            <UserCircle size={24} />
+                <div className="mb-6 bg-[#ffffff] border border-[#e5e7eb] rounded-2xl overflow-hidden shadow-sm">
+                    <button className="flex items-center w-full px-4 py-4 active:bg-[#f9fafb]" onClick={() => {}}>
+                        <div className="w-12 h-12 rounded-full bg-[#f3f4f6] flex items-center justify-center mr-4">
+                            <UserCircle size={24} className="text-[#6b7280]" />
                         </div>
                         <div className="flex-1 text-left">
-                            <div className="text-[17px] font-semibold">账号管理</div>
-                            <div className="text-sm text-[var(--c-icon)]">点击查看账号设置</div>
+                            <div className="text-[17px] font-semibold text-[#111827]">账号管理</div>
+                            <div className="text-sm text-[#6b7280]">点击查看账号设置</div>
                         </div>
-                        <ChevronRight size={20} className="text-[var(--c-icon)]" />
+                        <ChevronRight size={20} className="text-[#9ca3af]" />
                     </button>
                 </div>
             )}
 
-            <SettingsListGroup title="外观与显示">
-                <SettingsListItem icon={Image} label="外观" onClick={() => { setCurrentPageId("theme"); push("theme", "外观"); }} />
-            </SettingsListGroup>
-            <SettingsListGroup title="AI 与生成">
-                <SettingsListItem icon={HardDrive} label="API 设置" onClick={() => { setCurrentPageId("api"); push("api", "API 设置"); }} />
-                <SettingsListItem icon={Mic} label="语音 API" onClick={() => { setCurrentPageId("voice"); push("voice", "语音 API"); }} />
-                <SettingsListItem icon={Image} label="图像生成 API" onClick={() => { setCurrentPageId("imageGeneration"); push("imageGeneration", "图像生成 API"); }} />
-                <SettingsListItem icon={Fingerprint} label="预设" onClick={() => { setCurrentPageId("presets"); push("presets", "预设"); }} />
-            </SettingsListGroup>
-            
-            <SettingsListGroup title="角色与世界">
-                <SettingsListItem icon={UserCircle} label="角色卷宗" onClick={() => { setCurrentPageId("character"); push("character", "角色卷宗"); }} />
-                <SettingsListItem icon={Globe} label="世界书" onClick={() => { setCurrentPageId("worldbook"); push("worldbook", "世界书"); }} />
-                <SettingsListItem icon={Database} label="正则规则" onClick={() => { setCurrentPageId("regex"); push("regex", "正则规则"); }} />
-                <SettingsListItem icon={UserCircle} label="用户身份" onClick={() => { setCurrentPageId("identity"); push("identity", "用户身份"); }} />
-            </SettingsListGroup>
+            {/* 在 PhoneSettingsContent 顶部定义菜单以供筛选 */}
+            {(() => {
+                const menu = [
+                    { id: "theme", label: "外观", group: "外观与显示", icon: Image },
+                    { id: "api", label: "API 设置", group: "AI 与生成", icon: HardDrive },
+                    { id: "voice", label: "语音 API", group: "AI 与生成", icon: Mic },
+                    { id: "imageGeneration", label: "图像生成 API", group: "AI 与生成", icon: Image },
+                    { id: "presets", label: "预设", group: "AI 与生成", icon: Fingerprint },
+                    { id: "character", label: "角色卷宗", group: "角色与世界", icon: UserCircle },
+                    { id: "worldbook", label: "世界书", group: "角色与世界", icon: Globe },
+                    { id: "regex", label: "正则规则", group: "角色与世界", icon: Database },
+                    { id: "identity", label: "用户身份", group: "角色与世界", icon: UserCircle },
+                    { id: "resources", label: "资源库", group: "数据与资源", icon: Layers },
+                    { id: "data", label: "数据管理", group: "数据与资源", icon: Database },
+                    { id: "binding", label: "配置绑定", group: "连接与工具", icon: Link2 },
+                    { id: "cloud", label: "云服务部署", group: "连接与工具", icon: CloudUpload },
+                    { id: "weixin", label: "微信接入", group: "连接与工具", icon: MessageSquare },
+                    { id: "toolbox", label: "聊天工具箱", group: "连接与工具", icon: Wrench },
+                    { id: "agentComputer", label: "角色电脑", group: "连接与工具", icon: Laptop },
+                    { id: "about", label: "关于与声明", group: "关于", icon: Info },
+                ];
+                const q = searchQuery.toLowerCase();
+                const filtered = q ? menu.filter(i => i.label.toLowerCase().includes(q) || i.group.toLowerCase().includes(q)) : menu;
+                
+                if (filtered.length === 0) return <div className="text-center py-10 text-[var(--settings-secondary)] text-sm">没有找到设置</div>;
 
-            <SettingsListGroup title="数据与资源">
-                <SettingsListItem icon={Layers} label="资源库" onClick={() => { setCurrentPageId("resources"); push("resources", "资源库"); }} />
-                <SettingsListItem icon={Database} label="数据管理" onClick={() => { setCurrentPageId("data"); push("data", "数据管理"); }} />
-            </SettingsListGroup>
-
-            <SettingsListGroup title="连接与工具">
-                <SettingsListItem icon={Link2} label="配置绑定" onClick={() => { setCurrentPageId("binding"); push("binding", "配置绑定"); }} />
-                <SettingsListItem icon={CloudUpload} label="云服务部署" onClick={() => { setCurrentPageId("cloud"); push("cloud", "云服务部署"); }} />
-                <SettingsListItem icon={MessageSquare} label="微信接入" onClick={() => { setCurrentPageId("weixin"); push("weixin", "微信接入"); }} />
-                <SettingsListItem icon={Wrench} label="聊天工具箱" onClick={() => { setCurrentPageId("toolbox"); push("toolbox", "聊天工具箱"); }} />
-                <SettingsListItem icon={Laptop} label="角色电脑" onClick={() => { setCurrentPageId("agentComputer"); push("agentComputer", "角色电脑"); }} />
-            </SettingsListGroup>
-            
-            <SettingsListGroup title="关于">
-                 <SettingsListItem icon={Info} label="关于与声明" onClick={() => { setCurrentPageId("about"); push("about", "关于与声明"); }} />
-            </SettingsListGroup>
+                const groups = Array.from(new Set(filtered.map(i => i.group)));
+                return groups.map(g => (
+                    <SettingsListGroup key={g} title={g}>
+                        {filtered.filter(i => i.group === g).map(i => (
+                            <SettingsListItem key={i.id} icon={i.icon} label={i.label} onClick={() => { setCurrentPageId(i.id); push(i.id, i.label); }} />
+                        ))}
+                    </SettingsListGroup>
+                ));
+            })()}
         </>
     );
 }
