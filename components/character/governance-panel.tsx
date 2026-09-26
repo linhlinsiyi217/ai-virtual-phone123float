@@ -75,13 +75,13 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
   };
 
   return (
-    <div className="space-y-4 pt-3 border-t border-white/10 mt-4">
+    <div className="space-y-4 pt-3 border-t border-slate-200/80 dark:border-white/10 mt-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider">人格治理系统 (活人感与风控)</h3>
+        <h3 className="text-xs font-semibold text-slate-600 dark:text-white/70 tracking-wider">人格治理系统 · 禁词与 OOC 修正</h3>
         <select
           value={activePresetId}
           onChange={e => { setActivePresetId(e.target.value); onChange({ activePresetId: e.target.value }); }}
-          className="bg-white/10 border border-white/10 text-xs text-white rounded-lg px-2 py-1 outline-none"
+          className="bg-white/70 dark:bg-white/10 border border-slate-200 dark:border-white/10 text-xs text-slate-800 dark:text-white rounded-lg px-2 py-1 outline-none"
         >
           {presets.map(p => (
             <option key={p.id} value={p.id} className="bg-[#16161a] text-white">{p.name}</option>
@@ -90,17 +90,17 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
       </div>
 
       {/* 禁词表 */}
-      <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+      <div className="char-detail-panel p-3.5 rounded-2xl space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MessageSquareX size={16} className="text-red-400" />
-            <span className="text-xs font-semibold text-white">禁词表规则</span>
+            <span className="text-xs font-semibold text-slate-800 dark:text-white">禁词表规则</span>
           </div>
           <button
             type="button"
             onClick={() => { const next = !bannedWordsEnabled; setBannedWordsEnabled(next); onChange({ bannedWordsEnabled: next }); }}
             className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-colors ${
-              bannedWordsEnabled ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-white/10 text-white/50"
+              bannedWordsEnabled ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30" : "bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-white/50"
             }`}
           >
             {bannedWordsEnabled ? "已开启 ON" : "已关闭 OFF"}
@@ -115,7 +115,7 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
                 onChange={e => setBannedInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") addBannedWord(); }}
                 placeholder="输入讨厌的口癖/违禁词..."
-                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-blue-500"
+                className="flex-1 min-w-0 bg-white/60 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
               />
               <button type="button" onClick={addBannedWord} className="px-3 py-1.5 rounded-xl bg-blue-600 text-xs font-medium text-white hover:bg-blue-500 active:scale-95 transition-all">
                 添加
@@ -124,7 +124,7 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
             {bannedWords.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {bannedWords.map(word => (
-                  <span key={word} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300">
+                  <span key={word} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-300">
                     {word}
                     <button type="button" onClick={() => removeBannedWord(word)} className="hover:text-red-100 font-bold ml-1">×</button>
                   </span>
@@ -136,14 +136,14 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
       </div>
 
       {/* OOC 吐槽与指令专业化 */}
-      <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+      <div className="char-detail-panel p-3.5 rounded-2xl space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-white/80">OOC 吐槽与自动管控指令</span>
+          <span className="text-xs font-semibold text-slate-800 dark:text-white/80">OOC 吐槽与自动管控指令</span>
           <button
             type="button"
             onClick={handleProfessionalizeOoc}
             disabled={isGeneratingOoc}
-            className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 active:scale-95 transition-all"
+            className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-[#007aff]/10 text-[#0068d8] border border-[#007aff]/20 hover:bg-[#007aff]/20 active:scale-95 transition-all"
           >
             <Sparkles size={12} />
             <span>{isGeneratingOoc ? "生成中..." : "指令专业化"}</span>
@@ -154,34 +154,34 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
           onChange={e => { setRawComplaint(e.target.value); onChange({ oocRawComplaint: e.target.value }); }}
           placeholder="写下跟 TA 聊天时让你难受的话（如：不要说'连本带利地讨回来'了！你是男朋友不是放高利贷的）..."
           rows={2}
-          className="w-full bg-white/5 border border-white/10 rounded-xl p-2.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-purple-500"
+          className="w-full bg-white/60 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-2.5 text-xs text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#007aff]"
         />
         {oocPatchPrompt && (
-          <div className="relative p-3 rounded-xl bg-purple-950/30 border border-purple-500/20 text-xs text-purple-200">
+          <div className="relative p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-500/20 text-xs text-slate-800 dark:text-blue-100">
             <div className="flex justify-between items-center mb-1">
-              <span className="font-semibold text-[11px] text-purple-300">已注入的专业补丁指令：</span>
-              <button type="button" onClick={() => { setOocPatchPrompt(""); onChange({ oocPatchPrompt: "" }); }} className="text-purple-400 hover:text-purple-200 text-[10px]">
+              <span className="font-semibold text-[11px] text-[#007aff]">已保存的补丁指令：</span>
+              <button type="button" onClick={() => { setOocPatchPrompt(""); onChange({ oocPatchPrompt: "" }); }} className="text-[#007aff] text-[10px]">
                 清除补丁
               </button>
             </div>
-            <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed m-0 text-purple-200/90">{oocPatchPrompt}</pre>
+            <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed m-0 text-slate-700 dark:text-blue-100/90">{oocPatchPrompt}</pre>
           </div>
         )}
       </div>
 
       {/* 风控报告自检 */}
-      <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+      <div className="char-detail-panel p-3.5 rounded-2xl space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <ShieldAlert size={14} className="text-amber-400" />
-            <span className="text-xs font-semibold text-white/80">模型风控自检报告</span>
+            <span className="text-xs font-semibold text-slate-800 dark:text-white/80">模型风控自检报告</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleGenerateRiskReport}
               disabled={isGeneratingRisk}
-              className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 active:scale-95 transition-all"
+              className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-[#007aff]/10 text-[#0068d8] border border-[#007aff]/20 hover:bg-[#007aff]/20 active:scale-95 transition-all"
             >
               <Sparkles size={12} />
               <span>{isGeneratingRisk ? "分析中..." : "生成报告"}</span>
@@ -190,7 +190,7 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
               <button
                 type="button"
                 onClick={() => { const next = !isRiskCollapsed; setIsRiskCollapsed(next); onChange({ riskReportCollapsed: next }); }}
-                className="p-1 rounded-lg bg-white/10 text-white/70 hover:text-white"
+                className="p-1 rounded-lg bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-white/70"
                 title={isRiskCollapsed ? "展开报告" : "折叠报告"}
               >
                 {isRiskCollapsed ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -199,8 +199,8 @@ export function CharacterGovernancePanel({ character, onChange, onNotice }: Gove
           </div>
         </div>
         {riskReportPrompt && !isRiskCollapsed && (
-          <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/20 text-xs text-amber-200">
-            <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed m-0 text-amber-200/90 max-h-48 overflow-y-auto">
+          <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-500/20 text-xs text-slate-800 dark:text-blue-100">
+            <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed m-0 text-slate-700 dark:text-blue-100/90 max-h-48 overflow-y-auto">
               {riskReportPrompt}
             </pre>
           </div>

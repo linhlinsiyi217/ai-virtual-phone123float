@@ -254,30 +254,30 @@ export function WorldInteriorView({
     }, [onCharsChanged, onNotice]);
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="char-view-enter flex flex-col h-full bg-[#f7f9fb] dark:bg-[#161a1e]">
             {/* 顶栏 */}
-            <div className="flex items-center gap-3 px-4 pt-2 pb-3">
+            <div className="char-view-header grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 px-4 pb-3">
                 <button
                     type="button"
                     onClick={onBack}
-                    className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 active:scale-95 shrink-0"
+                    className="char-glass-control relative z-[3] w-11 h-11 rounded-full flex items-center justify-center text-gray-700 active:scale-95 shrink-0"
                     aria-label="返回"
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                 </button>
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 text-center pointer-events-none">
                     <h2 className="text-[16px] font-semibold text-[#111] truncate">{world.name}</h2>
                     {world.description ? <p className="text-xs text-gray-400 truncate">{world.description}</p> : null}
                 </div>
                 <button
                     type="button"
                     onClick={() => setShowRelations(v => !v)}
-                    className={`flex items-center gap-1 h-8 px-2.5 rounded-full text-[12px] font-medium border transition-all ${
-                        showRelations ? "bg-[#007aff] text-white border-[#007aff]" : "bg-gray-100 text-gray-600 border-transparent"
+                    aria-label="查看角色关系"
+                    className={`char-glass-control relative z-[3] w-11 h-11 rounded-full flex items-center justify-center text-[12px] font-medium transition-all ${
+                        showRelations ? "text-[#007aff]" : "text-gray-600"
                     }`}
                 >
-                    <Link2 size={13} />
-                    <span>关系</span>
+                    <Link2 size={18} />
                 </button>
             </div>
 
