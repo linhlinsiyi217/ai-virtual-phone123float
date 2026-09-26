@@ -32,6 +32,7 @@ import {
   type ReadingProgress,
 } from "@/lib/reading-progress";
 import {
+  addToCollection,
   addToShelf,
   createCollection,
   deleteCollection,
@@ -238,16 +239,6 @@ const SPINE_TONE: Record<BookCoverTone, { bg: string; ink: string }> = {
   warm:  { bg: "#C9CFD6", ink: "#464C55" },
 };
 
-/** Night Pearl 模式下的书脊色 */
-const SPINE_TONE_DARK: Record<BookCoverTone, { bg: string; ink: string }> = {
-  paper: { bg: "#3A3A3E", ink: "#B8B4AC" },
-  blue:  { bg: "#3A4550", ink: "#A0AEBE" },
-  gold:  { bg: "#4A4538", ink: "#C0B8A8" },
-  clay:  { bg: "#3A4550", ink: "#B0BEC8" },
-  ink:   { bg: "#2A2A2E", ink: "#888A90" },
-  warm:  { bg: "#484C52", ink: "#A8ACB2" },
-};
-
 /* ═══════════════════════ 工具函数 ═══════════════════════ */
 
 function resolveBook(bookId: string): Book | null {
@@ -266,18 +257,7 @@ function formatDate(ts?: number): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-/** 
- * 深浅模式通过 CSS variables 切换，组件不再读取 DOM。
- * 保留此函数用于极少数必须在 JS 侧判断的场景（如初始化），
- * 但书架渲染一律通过 CSS var(--bookroom-is-light) 判断。
- */
-function isDarkMode(): boolean {
-  if (typeof window === "undefined") return false;
-  return document.documentElement.classList.contains("dark") ||
-    window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-/** 判断 reduced motion */
+/** 判断 reduced motion（唯一实现；深浅模式经 CSS variables 切换，组件不读 DOM） */
 function prefersReducedMotion(): boolean {
   if (typeof window === "undefined") return false;
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -759,8 +739,7 @@ function PullOutOverlay({
   onFavorite,
   onStatus,
   onRemove,
-  onDeleteImported,
-  onCoverChange,
+  onMore,
   progressMap,
 }: {
   state: PullOutState;
@@ -770,8 +749,8 @@ function PullOutOverlay({
   onFavorite: (fav: boolean) => void;
   onStatus: (s: ShelfStatus) => void;
   onRemove: () => void;
-  onDeleteImported?: () => void;
-  onCoverChange: () => void;
+  /** P0.2-A3：打开「更多操作」面板（ShelfFocusSheet 在视图层按需渲染，不再内嵌本 overlay） */
+  onMore: () => void;
   progressMap: Record<string, ReadingProgress>;
 }) {
   const { book, spineRect, stage } = state;
@@ -932,29 +911,20 @@ function PullOutOverlay({
               <button
                 type="button"
                 className="br2-detail-icon-btn"
+                onClick={onMore}
+                aria-label="更多操作"
+              >
+                <SlidersHorizontal size={14} />
+              </button>
+              <button
+                type="button"
+                className="br2-detail-icon-btn"
                 onClick={onRemove}
                 aria-label="移出书架"
               >
                 <Trash2 size={14} />
               </button>
             </div>
-          </div>
-          {/* More 操作 */}
-          <div className="br2-detail-more">
-            <ShelfFocusSheet
-              book={book}
-              entry={entry}
-              percent={percent}
-              onClose={onClose}
-              onRead={onRead}
-              onDetail={() => {}}
-              onFavorite={onFavorite}
-              onStatus={onStatus}
-              onAddToCollection={() => {}}
-              onRemoveFromShelf={onRemove}
-              onDeleteImported={onDeleteImported}
-              onCoverChange={onCoverChange}
-            />
           </div>
         </div>
       )}
@@ -1141,6 +1111,8 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
 
   const [importOpen, setImportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ book: Book; kind: "remove" | "delete" } | null>(null);
+  /** P0.2-A3：「更多操作」面板目标；独立于 pullOut，避免与抽书 overlay 双 overlay 叠加 */
+  const [moreFocus, setMoreFocus] = useState<{ book: Book; entry: BookshelfEntry } | null>(null);
   const [collectionsOpen, setCollectionsOpen] = useState(false);
 
   // 拖动排序
@@ -1355,6 +1327,27 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
   const confirmDeleteImported = useCallback((book: Book) => {
     setDeleteTarget({ book, kind: "delete" });
   }, []);
+
+  /** 打开「更多操作」面板：先记录目标，再收起抽书 overlay，保证同一时刻只有一套详情体验 */
+  const openMoreSheet = useCallback((book: Book, entry: BookshelfEntry) => {
+    setMoreFocus({ book, entry });
+    closeDetail();
+  }, [closeDetail]);
+
+  const handleAddToCollection = useCallback((bookId: string, collectionId: string) => {
+    addToCollection(bookId, collectionId);
+    refresh();
+  }, [refresh]);
+
+  const handleDetailFromMore = useCallback((book: Book, entry: BookshelfEntry) => {
+    setMoreFocus(null);
+    if (entry.source === "imported") {
+      const full = getImportedBookWithChapters(book.id);
+      onOpenBook(full ?? book);
+    } else {
+      onOpenBook(book);
+    }
+  }, [onOpenBook]);
 
   const handleDeleteConfirm = useCallback(() => {
     if (!deleteTarget) return;
@@ -1726,13 +1719,42 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
           onFavorite={fav => handleFavorite(pullOut.book.id, fav)}
           onStatus={status => handleStatus(pullOut.book.id, status)}
           onRemove={() => confirmRemove(pullOut.book)}
+          onMore={() => openMoreSheet(pullOut.book, pullOut.entry)}
+          progressMap={progressMap}
+        />
+      )}
+
+      {/* 「更多操作」面板：按需渲染在视图层（P0.2-A3），不再内嵌于抽书 overlay，同一时刻只存在一套详情体验 */}
+      {moreFocus && (
+        <ShelfFocusSheet
+          book={moreFocus.book}
+          entry={entries.find(e => e.bookId === moreFocus.book.id) ?? moreFocus.entry}
+          percent={getOverallPercent(moreFocus.book, progressMap[moreFocus.book.id])}
+          onClose={() => setMoreFocus(null)}
+          onRead={() => {
+            const focus = moreFocus;
+            setMoreFocus(null);
+            handleReadFromFocus(focus.book, focus.entry);
+          }}
+          onDetail={() => handleDetailFromMore(moreFocus.book, moreFocus.entry)}
+          onFavorite={fav => handleFavorite(moreFocus.book.id, fav)}
+          onStatus={status => handleStatus(moreFocus.book.id, status)}
+          onAddToCollection={colId => handleAddToCollection(moreFocus.book.id, colId)}
+          onRemoveFromShelf={() => {
+            const focus = moreFocus;
+            setMoreFocus(null);
+            confirmRemove(focus.book);
+          }}
           onDeleteImported={
-            pullOut.book.source === "imported"
-              ? () => confirmDeleteImported(pullOut.book)
+            moreFocus.book.source === "imported"
+              ? () => {
+                  const focus = moreFocus;
+                  setMoreFocus(null);
+                  confirmDeleteImported(focus.book);
+                }
               : undefined
           }
           onCoverChange={refresh}
-          progressMap={progressMap}
         />
       )}
 

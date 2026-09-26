@@ -9017,3 +9017,24 @@
   border: 1px solid var(--glass-night-border);
   box-shadow: var(--glass-night-shadow), inset 0 1px 0 var(--glass-night-inner-highlight);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   P0.2-B · Blur 预算：同一视觉堆栈最多 1 个主要实时 blur 层
+   玻璃容器（Sheet / Drawer / book-glass 面板 / 划词菜单）内的
+   子控件不再二次 blur，仅保留半透明 fill + border + 内高光；
+   共读 Drawer 内的聊天菜单改用不透明的语义面（父层已承担 blur）。
+   纯增量覆盖，不改动任何既有规则。
+   ═══════════════════════════════════════════════════════════════ */
+.bookroom-app .br-sheet .book-icon-btn,
+.bookroom-app .br-coread-drawer .book-icon-btn,
+.bookroom-app .book-glass .book-icon-btn,
+.bookroom-app .reader-select-menu .book-icon-btn,
+.bookroom-app .br-chat-menu .book-icon-btn {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.bookroom-app .br-coread-drawer .br-chat-menu {
+  background: var(--br-surface-strong);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
