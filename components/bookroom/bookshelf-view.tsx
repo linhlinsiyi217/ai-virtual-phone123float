@@ -13,7 +13,7 @@
  *   - 光源统一左上 45°，阴影仅存在底部接触层板与背面贴近背板处
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookPlus,
   ChevronDown,
@@ -130,6 +130,8 @@ type SpineSpec = {
   type: SpineType;
   width: number;   // px
   height: number;  // px
+  /** 所有涉及真实书籍的 spec 都记录对应 bookId（用于搜索/筛选时过滤） */
+  bookId?: string; // standard / booklet / artbook 单书类型
   /** folder / curated 才有：组内书本 id 列表 */
   folderIds?: string[];
   /** 书夹类型标记 */
@@ -264,7 +266,11 @@ function formatDate(ts?: number): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-/** 判断是否为深色模式 */
+/** 
+ * 深浅模式通过 CSS variables 切换，组件不再读取 DOM。
+ * 保留此函数用于极少数必须在 JS 侧判断的场景（如初始化），
+ * 但书架渲染一律通过 CSS var(--bookroom-is-light) 判断。
+ */
 function isDarkMode(): boolean {
   if (typeof window === "undefined") return false;
   return document.documentElement.classList.contains("dark") ||
@@ -297,21 +303,19 @@ type BookSpineProps = {
  * - 顶部轻微装订倒角 1–2px
  * - 无四周 card shadow
  */
-function BookSpineV2({ book, percent, spineType, width, height, onSelect }: BookSpineProps) {
-  const dark = isDarkMode();
-  const tone = dark ? SPINE_TONE_DARK[book.coverTone] : SPINE_TONE[book.coverTone];
-  const palette = morandiPalette(book.id);
+const BookSpineV2 = React.memo(function BookSpineV2({ book, percent, spineType, width, height, onSelect }: BookSpineProps) {
+  // V2 性能优化：深浅模式通过 CSS variables 切换，不再每次 render 读 DOM
+  const palette = useMemo(() => morandiPalette(book.id), [book.id]);
 
   const isNarrow = width < 18;
   const isThin = spineType === "booklet";
 
-  const style: React.CSSProperties = {
+  const style = useMemo<React.CSSProperties>(() => ({
     width,
     height,
-    "--spine-bg": tone.bg,
-    "--spine-ink": tone.ink,
     "--spine-palette-bg": palette.bg,
-  } as React.CSSProperties;
+    "--spine-palette-ink": palette.ink,
+  } as React.CSSProperties), [width, height, palette.bg, palette.ink]);
 
   // 窄书脊不显示文字（V2 第 18 条）
   const showTitle = !isNarrow && !isThin;
@@ -322,6 +326,7 @@ function BookSpineV2({ book, percent, spineType, width, height, onSelect }: Book
       className={`br2-spine br2-spine-${spineType}`}
       onClick={() => onSelect(book)}
       style={style}
+      data-tone={book.coverTone}
       aria-label={`《${book.title}》${book.author}`}
     >
       {/* 左侧 1px 极弱受光高光（光源左上 45°） */}
@@ -349,7 +354,7 @@ function BookSpineV2({ book, percent, spineType, width, height, onSelect }: Book
       )}
     </button>
   );
-}
+});
 
 /* ═══════════════════════ 横放书组 ═══════════════════════ */
 
@@ -358,7 +363,7 @@ type HorizontalStackProps = {
   onSelect: (book: Book) => void;
 };
 
-function HorizontalStack({ books, onSelect }: HorizontalStackProps) {
+const HorizontalStack = React.memo(function HorizontalStack({ books, onSelect }: HorizontalStackProps) {
   const first = books[0];
   const size = horizontalSize(first.id);
   return (
@@ -370,13 +375,12 @@ function HorizontalStack({ books, onSelect }: HorizontalStackProps) {
       aria-label={`《${first.title}》横放`}
     >
       {books.slice(0, 2).map((b, i) => {
-        const t = isDarkMode() ? SPINE_TONE_DARK[b.coverTone] : SPINE_TONE[b.coverTone];
         return (
           <span
             key={b.id}
             className="br2-horizontal-book"
+            data-tone={b.coverTone}
             style={{
-              "--spine-bg": t.bg,
               width: `${100 - i * 4}%`,
               height: `${Math.round(100 / books.length)}%`,
               bottom: `${i * Math.round(100 / books.length)}%`,
@@ -389,14 +393,13 @@ function HorizontalStack({ books, onSelect }: HorizontalStackProps) {
       <span className="br2-horizontal-shadow" aria-hidden />
     </button>
   );
-}
+});
 
 /* ═══════════════════════ 书夹（Folder）V2 ═══════════════════════ */
 
 type FolderProps = {
   folder: SpineSpec;
   books: Book[];
-  dark: boolean;
   onOpen: (book: Book) => void;
 };
 
@@ -407,7 +410,7 @@ type FolderProps = {
  * - 标签极小，视觉权重必须低于书本本体
  * - 数量 >5 才显示 +N
  */
-function BookFolder({ folder, books, dark, onOpen }: FolderProps) {
+const BookFolder = React.memo(function BookFolder({ folder, books, onOpen }: FolderProps) {
   const folderBooks = books.slice(0, 5);
   const count = folderBooks.length;
   const showBadge = count > 5;
@@ -438,20 +441,18 @@ function BookFolder({ folder, books, dark, onOpen }: FolderProps) {
         const offset = i * 7; // 6–8px 偏移
         const h = maxH - i * 3.5; // 高度递减
         const w = spineSize(book.id).w;
-        const tone = dark ? SPINE_TONE_DARK[book.coverTone] : SPINE_TONE[book.coverTone];
         return (
           <button
             key={book.id}
             type="button"
             className="br2-folder-book"
+            data-tone={book.coverTone}
             style={{
               width: w,
               height: h,
               left: offset,
               bottom: 0,
               zIndex: folderBooks.length - i,
-              "--spine-bg": tone.bg,
-              "--spine-ink": tone.ink,
             } as React.CSSProperties}
             onClick={() => onOpen(book)}
             aria-label={`《${book.title}》`}
@@ -482,7 +483,7 @@ function BookFolder({ folder, books, dark, onOpen }: FolderProps) {
       )}
     </div>
   );
-}
+});
 
 /**
  * V2 收藏夹 / 世界卷宗式书夹（Curated Folder）。
@@ -493,16 +494,14 @@ function BookFolder({ folder, books, dark, onOpen }: FolderProps) {
  * - 组内书可共享低饱和同色相家族
  * - 阴影比常规书夹高一档
  */
-function CuratedFolder({ folder, books, dark, onOpen }: FolderProps) {
+const CuratedFolder = React.memo(function CuratedFolder({ folder, books, onOpen }: FolderProps) {
   const folderBooks = books.slice(0, 5);
   const count = folderBooks.length;
   const width = 60 + (count > 4 ? 6 : 0);
   const maxH = 100 + (stableHash(folder.folderIds?.[0] ?? "c") % 15);
 
   // 共享低饱和色相家族（使用第一本书的色调作为基准）
-  const baseTone = dark
-    ? SPINE_TONE_DARK[folderBooks[0]?.coverTone ?? "paper"]
-    : SPINE_TONE[folderBooks[0]?.coverTone ?? "paper"];
+  const baseToneKey = folderBooks[0]?.coverTone ?? "paper";
 
   return (
     <div
@@ -510,18 +509,19 @@ function CuratedFolder({ folder, books, dark, onOpen }: FolderProps) {
       style={{ width, height: maxH + 20 }}
       role="group"
       aria-label={folder.folderName ?? "收藏夹"}
+      data-base-tone={baseToneKey}
     >
       {/* 横放压顶书（卷宗封面） */}
       {folderBooks.length >= 3 && (
         <span
           className="br2-folder-top-stack"
+          data-tone={baseToneKey}
           style={{
             width: width - 20,
             height: 12,
             top: 0,
             left: 10,
-            "--spine-bg": baseTone.bg,
-          } as React.CSSProperties}
+          }}
           aria-hidden
         />
       )}
@@ -529,7 +529,7 @@ function CuratedFolder({ folder, books, dark, onOpen }: FolderProps) {
       <span className="br2-folder-label br2-folder-label-curated" aria-hidden>
         <span
           className="br2-folder-dot"
-          style={{ background: folder.folderDotColor ?? baseTone.bg }}
+          style={{ background: folder.folderDotColor }}
           aria-hidden
         />
         {folder.folderName ?? "合集"}
@@ -541,22 +541,19 @@ function CuratedFolder({ folder, books, dark, onOpen }: FolderProps) {
         const offset = i * 7;
         const h = maxH - i * 3.5;
         const w = spineSize(book.id).w;
-        // 收藏夹使用同色相家族
-        const tone = dark ? SPINE_TONE_DARK[book.coverTone] : SPINE_TONE[book.coverTone];
         return (
           <button
             key={book.id}
             type="button"
             className="br2-folder-book"
+            data-tone={book.coverTone}
             style={{
               width: w,
               height: h,
               left: offset,
               bottom: 0,
               zIndex: folderBooks.length - i,
-              "--spine-bg": tone.bg,
-              "--spine-ink": tone.ink,
-            } as React.CSSProperties}
+            }}
             onClick={() => onOpen(book)}
             aria-label={`《${book.title}》`}
           >
@@ -631,13 +628,28 @@ type PullOutState = {
  * - rotateY 最大 18°（阶段3中间态），perspective 700px
  * - 真实封面 → cover face 直接渲染真实封面
  * - 无真实封面 → cover face 渲染程序生成默认封面（莫兰迪色系）
+ *
+ * 性能优化（B1）：可中断状态机
+ * - 用 useRef 存储定时器句柄，关闭时立即清理
+ * - 从当前视觉状态直接反向，不强制跑完全部阶段
  */
 function usePullOutAnimation() {
   const [state, setState] = useState<PullOutState | null>(null);
   const [isReturning, setIsReturning] = useState(false);
+  const timersRef = useRef<number[]>([]);
   const reducedMotion = prefersReducedMotion();
 
+  // 清理所有未执行的定时器
+  const clearTimers = useCallback(() => {
+    timersRef.current.forEach(id => window.clearTimeout(id));
+    timersRef.current = [];
+  }, []);
+
   const openDetail = useCallback((book: Book, entry: BookshelfEntry, spineEl: HTMLElement) => {
+    // 清理之前的定时器
+    clearTimers();
+    
+    // FLIP First: 读取起点 rect 一次
     const spineRect = spineEl.getBoundingClientRect();
 
     if (reducedMotion) {
@@ -648,51 +660,75 @@ function usePullOutAnimation() {
 
     // 阶段 1: Touch Down
     setState({ book, entry, spineEl, spineRect, stage: "touch" });
-    setTimeout(() => {
+    timersRef.current.push(window.setTimeout(() => {
       setState(prev => prev?.book.id === book.id ? { ...prev, stage: "pull" } : prev);
-    }, 80);
+    }, 80));
 
     // 阶段 2: Pull-out
-    setTimeout(() => {
+    timersRef.current.push(window.setTimeout(() => {
       setState(prev => prev?.book.id === book.id ? { ...prev, stage: "rotate" } : prev);
-    }, 260);
+    }, 260));
 
     // 阶段 3+4: Y-axis rotation + Cover takeover
-    setTimeout(() => {
+    timersRef.current.push(window.setTimeout(() => {
       setState(prev => prev?.book.id === book.id ? { ...prev, stage: "expand" } : prev);
-    }, 460);
+    }, 460));
 
     // 阶段 5: Detail
-    setTimeout(() => {
+    timersRef.current.push(window.setTimeout(() => {
       setState(prev => prev?.book.id === book.id ? { ...prev, stage: "detail" } : prev);
-    }, 720);
-  }, [reducedMotion]);
+    }, 720));
+  }, [reducedMotion, clearTimers]);
 
   const closeDetail = useCallback(() => {
     if (!state) return;
+    
+    // 立即清理未执行的定时器
+    clearTimers();
+    
     if (reducedMotion) {
       setState(null);
       return;
     }
-    // Return：反向执行
+    
+    // Return：从当前 stage 反向执行
     setIsReturning(true);
-    setTimeout(() => {
-      setState(prev => prev ? { ...prev, stage: "expand" } : prev);
-    }, 50);
-    setTimeout(() => {
-      setState(prev => prev ? { ...prev, stage: "rotate" } : prev);
-    }, 310);
-    setTimeout(() => {
-      setState(prev => prev ? { ...prev, stage: "pull" } : prev);
-    }, 510);
-    setTimeout(() => {
-      setState(prev => prev ? { ...prev, stage: "touch" } : prev);
-    }, 690);
-    setTimeout(() => {
-      setState(null);
-      setIsReturning(false);
-    }, 770);
-  }, [state, reducedMotion]);
+    
+    // 如果已经在 detail，正常反向；如果在中间态，直接回退到对应阶段
+    const currentStage = state.stage;
+    
+    if (currentStage === "detail" || currentStage === "expand") {
+      timersRef.current.push(window.setTimeout(() => {
+        setState(prev => prev ? { ...prev, stage: "expand" } : prev);
+      }, 50));
+      timersRef.current.push(window.setTimeout(() => {
+        setState(prev => prev ? { ...prev, stage: "rotate" } : prev);
+      }, 310));
+      timersRef.current.push(window.setTimeout(() => {
+        setState(prev => prev ? { ...prev, stage: "pull" } : prev);
+      }, 510));
+      timersRef.current.push(window.setTimeout(() => {
+        setState(prev => prev ? { ...prev, stage: "touch" } : prev);
+      }, 690));
+      timersRef.current.push(window.setTimeout(() => {
+        setState(null);
+        setIsReturning(false);
+      }, 770));
+    } else {
+      // 如果在早期阶段（touch/pull/rotate），直接快速回退
+      timersRef.current.push(window.setTimeout(() => {
+        setState(null);
+        setIsReturning(false);
+      }, 160));
+    }
+  }, [state, reducedMotion, clearTimers]);
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      clearTimers();
+    };
+  }, [clearTimers]);
 
   return { pullOut: state, openDetail, closeDetail, isReturning };
 }
@@ -746,12 +782,14 @@ function PullOutOverlay({
   const coverSrc = customCover ?? (book.coverUrl || undefined);
   const hasRealCover = Boolean(coverSrc);
 
-  // FLIP 计算：Wrapper 的最终位置
-  const anchorX = window.innerWidth / 2 - 75; // 封面宽度约 150px
-  const anchorY = window.innerHeight * 0.32;
+  // FLIP Last: 计算最终位置（只依赖窗口尺寸，缓存计算）
+  const anchorPos = useMemo(() => ({
+    x: window.innerWidth / 2 - 75, // 封面宽度约 150px
+    y: window.innerHeight * 0.32,
+  }), []);
 
-  // 阶段对应的 transform
-  const stageStyles: Record<PullOutState["stage"], React.CSSProperties> = {
+  // 阶段对应的 transform（useMemo 缓存，避免每次 render 重新构造）
+  const stageStyles = useMemo<Record<PullOutState["stage"], React.CSSProperties>>(() => ({
     idle: {},
     touch: {
       transform: `translate(${spineRect.left}px, ${spineRect.top}px) scale(0.98)`,
@@ -766,14 +804,14 @@ function PullOutOverlay({
       transition: "transform 200ms cubic-bezier(0.22, 1, 0.36, 1)",
     },
     expand: {
-      transform: `translate(${anchorX}px, ${anchorY}px) perspective(700px) rotateY(0deg) scale(1)`,
+      transform: `translate(${anchorPos.x}px, ${anchorPos.y}px) perspective(700px) rotateY(0deg) scale(1)`,
       transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
     },
     detail: {
-      transform: `translate(${anchorX}px, ${anchorY}px) perspective(700px) rotateY(0deg) scale(1)`,
+      transform: `translate(${anchorPos.x}px, ${anchorPos.y}px) perspective(700px) rotateY(0deg) scale(1)`,
       transition: reducedMotion ? "none" : "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
     },
-  };
+  }), [spineRect.left, spineRect.top, anchorPos.x, anchorPos.y, reducedMotion]);
 
   const currentStyle = stageStyles[stage];
 
@@ -1004,6 +1042,7 @@ function assignTiers(
         type: "artbook",
         width: s.w,
         height: s.h,
+        bookId: item.book.id,
       });
       i += 1;
     } else if (mod === 2 && i + 1 < shuffled.length) {
@@ -1025,6 +1064,7 @@ function assignTiers(
         type: "booklet",
         width: s.w,
         height: s.h,
+        bookId: item.book.id,
       });
       i += 1;
     } else {
@@ -1034,6 +1074,7 @@ function assignTiers(
         type: "standard",
         width: s.w,
         height: s.h,
+        bookId: item.book.id,
       });
       i += 1;
     }
@@ -1056,9 +1097,9 @@ function assignTiers(
       if (occupancy < 0.72) {
         const remaining = TIER_WIDTH - currentWidth;
         if (remaining >= 10) {
-          // 用薄册填充
-          current.push({ type: "booklet", width: 10, height: 90 });
-          currentWidth += 10;
+          // 用装饰性 bookend 填充（无 bookId，纯视觉元素）
+          current.push({ type: "bookend", width: 12, height: 60 });
+          currentWidth += 12;
         }
       }
       tiers.push(current);
@@ -1200,11 +1241,55 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
     return arr;
   }, [searched, sortKey, customOrder]);
 
-  /** V2 书架分层 */
-  const tiers = useMemo(() => {
+  /** 
+   * V2 书架分层 - 性能优化：只在 items / collections / mode 变化时重新分层。
+   * sorted 的变化（搜索/筛选/排序）不触发重新分层，只在渲染时按 sorted 顺序取书。
+   */
+  const tierSpecs = useMemo(() => {
     if (mode !== "spine") return [];
-    return assignTiers(sorted, collections);
-  }, [sorted, collections, mode]);
+    // 分层算法基于全部 items，生成 SpineSpec[][]
+    return assignTiers(items, collections);
+  }, [items, collections, mode]);
+
+  /** 
+   * 根据当前 sorted 结果过滤 tier 中的书本。
+   * 搜索/筛选/排序只影响可见性，不触发重新分层（性能优化）。
+   */
+  const visibleTiers = useMemo(() => {
+    if (mode !== "spine" || tierSpecs.length === 0) return [];
+    const sortedIds = new Set(sorted.map(s => s.book.id));
+    
+    // 过滤掉不在 sorted 中的书本
+    return tierSpecs.map(tier => 
+      tier.filter(spec => {
+        // bookend 是装饰性元素，始终保留
+        if (spec.type === "bookend") return true;
+        
+        // folder / curated：只要组内有任意一本书在 sorted 中就保留
+        if (spec.type === "folder" || spec.type === "curated") {
+          return (spec.folderIds ?? []).some(id => sortedIds.has(id));
+        }
+        
+        // horizontal：只要组内有任意一本书在 sorted 中就保留
+        if (spec.type === "horizontal") {
+          return (spec.stackIds ?? []).some(id => sortedIds.has(id));
+        }
+        
+        // cluster：只要组内有任意一本书在 sorted 中就保留
+        if (spec.type === "cluster") {
+          return (spec.clusterIds ?? []).some(id => sortedIds.has(id));
+        }
+        
+        // standard / booklet / artbook：检查 bookId 是否在 sorted 中
+        if (spec.bookId) {
+          return sortedIds.has(spec.bookId);
+        }
+        
+        // 理论上不应该走到这里（所有 spec 都应该有 bookId 或对应的 Ids 字段）
+        return false;
+      })
+    ).filter(tier => tier.length > 0);
+  }, [tierSpecs, sorted, mode]);
 
   /** 判断是否为 Sparse Shelf */
   const isSparse = sorted.length < 8 && sorted.length > 0;
@@ -1352,8 +1437,6 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
     imported: "还没有导入书籍。",
   };
 
-  const dark = isDarkMode();
-
   return (
     <>
       {/* 继续阅读 */}
@@ -1467,7 +1550,7 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
         <p className="book-empty br-shelf-empty">{emptyText[view]}</p>
       ) : mode === "spine" ? (
         <div className={`br2-shelf-board ${isSparse ? "br2-shelf-sparse" : ""}`}>
-          {tiers.map((tier, ti) => (
+          {visibleTiers.map((tier, ti) => (
             <div className="br2-shelf-tier" key={ti}>
               <div className="br2-shelf-spines">
                 {tier.map((spec, si) => {
@@ -1483,7 +1566,6 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
                         key={key}
                         folder={spec}
                         books={folderBooks}
-                        dark={dark}
                         onOpen={b => {
                           const el = document.querySelector(`[data-book-id="${b.id}"]`) as HTMLElement;
                           handleSelect(b, el ?? undefined);
@@ -1494,7 +1576,6 @@ export function BookshelfView({ onOpenBook, onContinue }: Props) {
                         key={key}
                         folder={spec}
                         books={folderBooks}
-                        dark={dark}
                         onOpen={b => {
                           const el = document.querySelector(`[data-book-id="${b.id}"]`) as HTMLElement;
                           handleSelect(b, el ?? undefined);
