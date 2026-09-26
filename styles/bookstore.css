@@ -8211,3 +8211,775 @@
   .bookroom-app .br-chat-send,
   .bookroom-app .reader-select-menu { transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   BOOKROOM · Bookshelf High-Fidelity V2 实现
+   设计依据：《BOOKROOM · Bookshelf High-Fidelity V2 修订稿》
+   基准：390 × 844，层板可用宽度 350px（390 - 20×2 margin）
+   全局光源：左上 45°
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. 书架整体布局 ── */
+.bookroom-app .br2-shelf-board {
+  padding: 12px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── 2. 层板（Shelf Tier）── */
+.bookroom-app .br2-shelf-tier {
+  position: relative;
+  padding: 0 0 16px;
+}
+
+/* 层板背板：Light #F7F5F1 / Night Pearl #1C1C1E */
+.bookroom-app .br2-shelf-tier::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 -8px;
+  border-radius: 2px;
+  background:
+    radial-gradient(ellipse 80% 60% at 30% 20%,
+      rgba(255,255,255,0.03) 0%, transparent 60%),
+    var(--br2-shelf-back, #F7F5F1);
+  /* 极细 noise 1–3% */
+  background-image:
+    radial-gradient(ellipse 80% 60% at 30% 20%, rgba(255,255,255,0.03) 0%, transparent 60%),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.01) 2px, rgba(0,0,0,0.01) 4px);
+}
+
+/* Night Pearl 背板 */
+.bookroom-app .br2-shelf-tier {
+  --br2-shelf-back: #F7F5F1;
+  --br2-shelf-plank: #EDE9E2;
+  --br2-shelf-plank-dark: #2A2A2C;
+  --br2-shelf-plank-hl: rgba(255,255,255,0.85);
+  --br2-shelf-plank-shadow: rgba(0,0,0,0.08);
+}
+
+/* 层板实体：6–8px 厚度，顶部极细高光，底部渐隐压暗 */
+.bookroom-app .br2-shelf-board-plank {
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  bottom: 0;
+  height: 7px;
+  border-radius: 2px;
+  background:
+    /* 顶部 1px 高光 */
+    linear-gradient(180deg,
+      var(--br2-shelf-plank-hl) 0%,
+      transparent 15%),
+    /* 主体：极弱程序化纹理 3–6% */
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,0.02) 0 22px,
+      rgba(255,255,255,0.03) 22px 24px,
+      rgba(0,0,0,0.02) 24px 48px),
+    var(--br2-shelf-plank);
+  box-shadow:
+    /* 底部渐隐压暗 */
+    0 3px 6px -2px var(--br2-shelf-plank-shadow),
+    /* 上层层板对下层的投影延伸（极弱 3–5%） */
+    0 -1px 2px rgba(0,0,0,0.02),
+    inset 0 1px 0 var(--br2-shelf-plank-hl);
+}
+
+/* 层板对下层书本顶部的投影延伸（6–8px 区域，极弱） */
+.bookroom-app .br2-shelf-board-shadow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 8px;
+  background: linear-gradient(180deg,
+    rgba(0,0,0,0.04) 0%,
+    transparent 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── 3. 书本容器 ── */
+.bookroom-app .br2-shelf-spines {
+  display: flex;
+  align-items: flex-end;
+  gap: 0; /* 间距由 margin 控制，支持组间留白 */
+  padding: 0 2px 8px;
+  min-height: 128px;
+  position: relative;
+  z-index: 2;
+}
+
+/* 组间自然留白缝隙 3–6px */
+.bookroom-app .br2-shelf-spines > * + * {
+  margin-left: 2px;
+}
+.bookroom-app .br2-shelf-spines > *:nth-child(3n) {
+  margin-left: 5px; /* 每 3 个元素后加组间留白 */
+}
+.bookroom-app .br2-shelf-spines > *:nth-child(5n) {
+  margin-left: 4px;
+}
+
+/* ── 4. 书脊（Book Spine）── */
+.bookroom-app .br2-spine {
+  position: relative;
+  flex: 0 0 auto;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  background: var(--spine-bg, #8A9AAD);
+  border-radius: 2px 2px 1px 1px;
+  /* 无四周 card shadow — 阴影仅在底部接触层板与背面贴近背板处 */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0 8px;
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* 左侧 1px 极弱受光高光（光源左上 45°） */
+.bookroom-app .br2-spine-hl {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.25) 0%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.02) 100%);
+  pointer-events: none;
+}
+
+/* 右侧 2–3px 纸张切面 */
+.bookroom-app .br2-spine-edge {
+  position: absolute;
+  right: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 2.5px;
+  background: repeating-linear-gradient(180deg,
+    rgba(255,255,255,0.4) 0 1px,
+    rgba(0,0,0,0.08) 1px 2px);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* 顶部装订倒角 1–2px */
+.bookroom-app .br2-spine-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(180deg,
+    rgba(0,0,0,0.06) 0%,
+    transparent 100%);
+  border-radius: 2px 2px 0 0;
+  pointer-events: none;
+}
+
+/* 底部接触层板阴影（真实物理接触关系） */
+.bookroom-app .br2-spine-shadow {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(0,0,0,0.12) 100%);
+  pointer-events: none;
+}
+
+/* 背面贴近背板的 2px 极弱空间阴影（几乎不可察觉，制造进深感） */
+.bookroom-app .br2-spine-back {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -2px;
+  width: 2px;
+  background: linear-gradient(90deg,
+    rgba(0,0,0,0.05) 0%,
+    transparent 100%);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* 书脊文字（V2 第 18 条：窄书脊不硬塞文字） */
+.bookroom-app .br2-spine-title {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-size: calc(10px * var(--app-text-scale, 1));
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  color: var(--spine-ink, #F0F4FA);
+  max-height: 60%;
+  overflow: hidden;
+}
+
+.bookroom-app .br2-spine-author {
+  writing-mode: vertical-rl;
+  font-size: calc(8px * var(--app-text-scale, 1));
+  letter-spacing: 0.1em;
+  color: var(--spine-ink, #F0F4FA);
+  opacity: 0.55;
+  margin-top: 6px;
+  max-height: 20px;
+  overflow: hidden;
+}
+
+/* 薄册点标记（不显示文字时） */
+.bookroom-app .br2-spine-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--spine-ink, #F0F4FA);
+  opacity: 0.4;
+}
+
+/* 进度条 */
+.bookroom-app .br2-spine-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  background: rgba(255,255,255,0.3);
+  border-radius: 0 0 2px 2px;
+  pointer-events: none;
+}
+
+/* 书脊按压反馈 */
+.bookroom-app .br2-spine:active {
+  transform: scale(0.98);
+}
+
+/* ── 5. 横放书组（Horizontal Stack）── */
+.bookroom-app .br2-horizontal {
+  position: relative;
+  flex: 0 0 auto;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+  /* 扁平厚重接触阴影（接触面积大，阴影更宽更柔和） */
+}
+
+.bookroom-app .br2-horizontal-book {
+  position: absolute;
+  left: 0;
+  border-radius: 1px;
+  background: var(--spine-bg, #8A9AAD);
+  /* 横放书阴影：0 2px 4px rgba(0,0,0,0.14) Light / rgba(0,0,0,0.45) Dark */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.14);
+}
+
+/* Night Pearl 横放书阴影 */
+.bookroom-app .br2-horizontal-book {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.14);
+}
+
+.bookroom-app .br2-horizontal-shadow {
+  position: absolute;
+  bottom: -3px;
+  left: 5%;
+  right: 5%;
+  height: 4px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0,0,0,0.18), transparent);
+  filter: blur(2px);
+}
+
+/* ── 6. 小型书组（Cluster）── */
+.bookroom-app .br2-cluster {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  flex: 0 0 auto;
+}
+
+/* ── 7. 书夹（Folder）── */
+.bookroom-app .br2-folder {
+  position: relative;
+  flex: 0 0 auto;
+  /* 阴影比常规书夹高一档：shadow-float-md */
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.12));
+}
+
+/* 书夹标签（视觉权重低于书本本体） */
+.bookroom-app .br2-folder-label {
+  position: absolute;
+  top: -18px;
+  left: 0;
+  right: 0;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  font-weight: 500;
+  color: var(--bookroom-text-2, #59616d);
+  background: rgba(255,255,255,0.45);
+  border-radius: 3px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10;
+}
+
+/* 收藏夹标签（更宽，含色点） */
+.bookroom-app .br2-folder-label-curated {
+  height: 18px;
+  width: 80%;
+  left: 10%;
+  background: rgba(255,255,255,0.5);
+  font-weight: 500;
+  gap: 4px;
+}
+
+.bookroom-app .br2-folder-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+/* 数量角标 */
+.bookroom-app .br2-folder-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bookroom-accent, #3b82f6);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+/* 书夹内的书 */
+.bookroom-app .br2-folder-book {
+  position: absolute;
+  border: none;
+  cursor: pointer;
+  background: var(--spine-bg, #8A9AAD);
+  border-radius: 2px 2px 1px 1px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0 6px;
+  transition: transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.bookroom-app .br2-folder-book:active {
+  transform: translateY(-2px);
+}
+
+.bookroom-app .br2-folder-book-title {
+  writing-mode: vertical-rl;
+  font-size: calc(9px * var(--app-text-scale, 1));
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--spine-ink, #F0F4FA);
+  max-height: 50%;
+  overflow: hidden;
+}
+
+/* 前置横放书（可选变体） */
+.bookroom-app .br2-folder-front-stack {
+  position: absolute;
+  border-radius: 1px;
+  background: var(--spine-bg, #A8A090);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* 横放压顶书（收藏夹卷宗封面） */
+.bookroom-app .br2-folder-top-stack {
+  position: absolute;
+  border-radius: 2px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+/* ── 8. Bookend（书立摆件）── */
+.bookroom-app .br2-bookend {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  color: var(--bookroom-text-3, rgba(17,19,24,0.35));
+  opacity: 0.6;
+}
+
+/* ── 9. 纸签（Sparse Shelf）── */
+.bookroom-app .br2-paper-tag {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #F4F0E8;
+  border-radius: 2px;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  color: var(--bookroom-text-2, #59616d);
+  transform: rotate(-5deg);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  border: none;
+}
+
+/* ── 10. Sparse Shelf ── */
+.bookroom-app .br2-shelf-sparse .br2-shelf-spines {
+  min-height: 100px;
+  justify-content: flex-start;
+  padding-left: 20px;
+}
+
+.bookroom-app .br2-shelf-sparse-guide {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px 24px;
+}
+
+.bookroom-app .br2-shelf-guide-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--bookroom-border, rgba(17,19,24,0.08));
+  background: var(--bookroom-surface, rgba(255,255,255,0.6));
+  color: var(--bookroom-text, #111318);
+  font-size: calc(13px * var(--app-text-scale, 1));
+  cursor: pointer;
+}
+
+/* ── 11. 抽书动画（Pull-out FLIP）── */
+.bookroom-app .br2-pullout-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+}
+
+.bookroom-app .br2-pullout-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: auto;
+  border: none;
+  cursor: pointer;
+  transition: opacity 200ms ease;
+}
+
+/* Book Wrapper：只做 x/y/scale，不做拉伸 */
+.bookroom-app .br2-book-wrapper {
+  pointer-events: none;
+  transform-style: preserve-3d;
+}
+
+.bookroom-app .br2-spine-face,
+.bookroom-app .br2-cover-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bookroom-app .br2-cover-face {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+
+.bookroom-app .br2-cover-real {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.bookroom-app .br2-cover-real img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 程序生成默认封面 */
+.bookroom-app .br2-gen-cover {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 12px;
+  border-radius: 4px;
+  position: relative;
+}
+
+.bookroom-app .br2-gen-cover-rule {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.2;
+}
+
+.bookroom-app .br2-gen-cover-title {
+  font-size: calc(16px * var(--app-text-scale, 1));
+  font-weight: 650;
+  line-height: 1.3;
+  text-align: center;
+  letter-spacing: 0.04em;
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.bookroom-app .br2-gen-cover-author {
+  font-size: calc(11px * var(--app-text-scale, 1));
+  opacity: 0.6;
+  margin-top: 8px;
+  letter-spacing: 0.06em;
+}
+
+.bookroom-app .br2-gen-cover-dot {
+  position: absolute;
+  bottom: 10px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.3;
+}
+
+/* 详情面板：从书封底部生长 */
+.bookroom-app .br2-detail-panel {
+  position: fixed;
+  left: 20px;
+  right: 20px;
+  top: calc(32% + 220px + 16px);
+  border-radius: 16px;
+  padding: 20px;
+  z-index: 101;
+  pointer-events: auto;
+  animation: br2-detail-grow 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes br2-detail-grow {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scaleY(0.96);
+    transform-origin: top center;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    transform-origin: top center;
+  }
+}
+
+.bookroom-app .br2-detail-header {
+  margin-bottom: 16px;
+}
+
+.bookroom-app .br2-detail-title {
+  font-size: calc(17px * var(--app-text-scale, 1));
+  font-weight: 650;
+  color: var(--bookroom-text, #111318);
+  margin: 0 0 4px;
+}
+
+.bookroom-app .br2-detail-author {
+  font-size: calc(13px * var(--app-text-scale, 1));
+  color: var(--bookroom-text-2, #59616d);
+  margin: 0;
+}
+
+.bookroom-app .br2-detail-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.bookroom-app .br2-detail-progress-fill {
+  flex: 1;
+  height: 3px;
+  background: var(--bookroom-accent, #3b82f6);
+  border-radius: 2px;
+}
+
+.bookroom-app .br2-detail-progress span {
+  font-size: calc(12px * var(--app-text-scale, 1));
+  color: var(--bookroom-text-2, #59616d);
+  min-width: 32px;
+}
+
+.bookroom-app .br2-detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bookroom-app .br2-detail-primary {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: var(--bookroom-accent, #3b82f6);
+  color: #fff;
+  font-size: calc(15px * var(--app-text-scale, 1));
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+
+.bookroom-app .br2-detail-primary:active {
+  opacity: 0.85;
+}
+
+.bookroom-app .br2-detail-secondary {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.bookroom-app .br2-detail-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--bookroom-border, rgba(17,19,24,0.08));
+  background: var(--bookroom-surface, rgba(255,255,255,0.6));
+  color: var(--bookroom-text-2, #59616d);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 150ms ease;
+}
+
+.bookroom-app .br2-detail-icon-btn.is-fav {
+  color: #c06660;
+  background: rgba(192, 102, 96, 0.1);
+}
+
+.bookroom-app .br2-detail-icon-btn:active {
+  background: var(--bookroom-surface-strong, rgba(255,255,255,0.9));
+}
+
+.bookroom-app .br2-detail-more {
+  margin-top: 12px;
+}
+
+/* ── 12. Night Pearl 适配 ── */
+[data-theme="dark"] .bookroom-app .br2-shelf-tier,
+.bookroom-app .br2-shelf-tier[data-dark="true"] {
+  --br2-shelf-back: #1C1C1E;
+  --br2-shelf-plank: #2A2A2C;
+  --br2-shelf-plank-hl: rgba(255,255,255,0.08);
+  --br2-shelf-plank-shadow: rgba(0,0,0,0.3);
+}
+
+/* Night Pearl 层板高光大幅减弱 */
+[data-theme="dark"] .bookroom-app .br2-shelf-board-plank,
+.bookroom-app .br2-shelf-board-plank[data-dark="true"] {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 15%),
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,0.03) 0 22px,
+      rgba(255,255,255,0.02) 22px 24px,
+      rgba(0,0,0,0.03) 24px 48px),
+    #2A2A2C;
+  box-shadow:
+    0 3px 6px -2px rgba(0,0,0,0.3),
+    0 -1px 2px rgba(0,0,0,0.05),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* Night Pearl 书脊高光减弱 */
+[data-theme="dark"] .bookroom-app .br2-spine-hl {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.12) 0%,
+    rgba(255,255,255,0.04) 50%,
+    rgba(255,255,255,0.01) 100%);
+}
+
+[data-theme="dark"] .bookroom-app .br2-spine-edge {
+  background: repeating-linear-gradient(180deg,
+    rgba(255,255,255,0.2) 0 1px,
+    rgba(0,0,0,0.12) 1px 2px);
+  opacity: 0.4;
+}
+
+/* Night Pearl 书夹标签 */
+[data-theme="dark"] .bookroom-app .br2-folder-label {
+  background: rgba(42,42,44,0.5);
+  color: var(--bookroom-text-2, #A0AEBE);
+}
+
+[data-theme="dark"] .bookroom-app .br2-folder-label-curated {
+  background: rgba(42,42,44,0.55);
+}
+
+/* Night Pearl 详情面板 */
+[data-theme="dark"] .bookroom-app .br2-detail-panel {
+  background: rgba(30,30,34,0.92);
+  border-color: rgba(255,255,255,0.08);
+}
+
+/* ── 13. Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .bookroom-app .br2-spine,
+  .bookroom-app .br2-folder-book,
+  .bookroom-app .br2-horizontal {
+    transition: none !important;
+  }
+
+  .bookroom-app .br2-book-wrapper {
+    transition: none !important;
+  }
+
+  .bookroom-app .br2-spine-face,
+  .bookroom-app .br2-cover-face {
+    transition: opacity 160ms ease !important;
+  }
+
+  .bookroom-app .br2-detail-panel {
+    animation: br2-detail-fade 160ms ease both !important;
+  }
+
+  @keyframes br2-detail-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
+
+/* ── 14. 性能优化 ── */
+/* 静态书不使用 backdrop-filter（仅交互/悬浮层使用 glass） */
+.bookroom-app .br2-spine,
+.bookroom-app .br2-horizontal,
+.bookroom-app .br2-cluster,
+.bookroom-app .br2-bookend {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* 动画优先使用 transform + opacity */
+.bookroom-app .br2-spine,
+.bookroom-app .br2-book-wrapper,
+.bookroom-app .br2-folder-book {
+  will-change: transform;
+}
