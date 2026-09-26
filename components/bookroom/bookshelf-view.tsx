@@ -567,7 +567,7 @@ const CuratedFolder = React.memo(function CuratedFolder({ folder, books, onOpen 
       })}
     </div>
   );
-}
+});
 
 function showBadge(count: number): boolean {
   return count > 5;
