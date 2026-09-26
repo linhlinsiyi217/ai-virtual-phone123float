@@ -5,10 +5,43 @@ import {
     X, Check, Edit2, ArrowLeft, Trash2, Camera, Link, Plus, 
     ChevronDown, ChevronUp, MessageSquare, ShieldAlert, Sparkles, BookOpen
 } from "lucide-react";
-import type { Character, CharacterGovernancePreset } from "@/lib/character-types";
+import type { Character, CharacterProfileDetails } from "@/lib/character-types";
 import { CharacterGovernancePanel } from "@/components/character/governance-panel";
 import { generateBriefPersonaText, isBriefPersonaStale } from "@/lib/brief-persona";
 import { loadCharacterVersions, switchCharacterVersion, backupCharacterVersion, overwriteCharacterVersion, getCharacterCurrentVersion, getCharacterNextVersion } from "@/lib/character-version-storage";
+
+type ProfileSectionId = "identity" | "appearance" | "story" | "traits" | "interaction";
+const PROFILE_SECTIONS: { id: ProfileSectionId; label: string; fields: { key: keyof CharacterProfileDetails; label: string; hint: string }[] }[] = [
+    { id: "identity", label: "身份名片", fields: [
+        { key: "alias", label: "昵称 / 称呼", hint: "别人如何称呼 TA" },
+        { key: "ageAndBirthday", label: "年龄 / 生日", hint: "例如：26 岁 · 11 月 17 日" },
+        { key: "role", label: "身份与职业", hint: "角色在世界中的身份、工作与社会位置" },
+        { key: "signature", label: "个人签名", hint: "展示在角色主页的一句话介绍" },
+        { key: "memorableQuote", label: "代表语录", hint: "最能代表 TA 的一句话" },
+    ] },
+    { id: "appearance", label: "外貌形象", fields: [
+        { key: "appearance", label: "外貌与体态", hint: "发型、五官、身高、神态和辨识特征" },
+        { key: "clothing", label: "穿衣风格", hint: "日常装束、配饰及不同场景的打扮" },
+    ] },
+    { id: "story", label: "经历动机", fields: [
+        { key: "background", label: "成长背景与重要经历", hint: "家庭、故乡、转折事件与人生轨迹" },
+        { key: "occupation", label: "日常工作与处境", hint: "具体在做什么、所处环境和限制" },
+        { key: "goals", label: "目标与信念", hint: "现在最想实现什么，为什么" },
+        { key: "secrets", label: "秘密与未解心结", hint: "角色不会轻易说出口的事情" },
+    ] },
+    { id: "traits", label: "性格内核", fields: [
+        { key: "strengthsAndFlaws", label: "长处与缺点", hint: "优点、弱点和行为中的矛盾" },
+        { key: "desiresAndFears", label: "渴望与恐惧", hint: "驱动力、最在意的人与事" },
+        { key: "habitsAndHobbies", label: "习惯与爱好", hint: "口头禅、小动作、饮食和兴趣" },
+    ] },
+    { id: "interaction", label: "相处方式", fields: [
+        { key: "relationshipStyle", label: "关系与亲密模式", hint: "对陌生人、朋友和亲密对象的不同态度" },
+        { key: "boundaries", label: "边界与禁忌", hint: "不会做的事、不接受的称呼或情境" },
+        { key: "speakingStyle", label: "说话方式", hint: "语气、用词、回复长度与交流节奏" },
+        { key: "dailyRoutine", label: "作息与生活节奏", hint: "结合时区安排何时活跃、何时休息" },
+        { key: "initiative", label: "主动联系偏好", hint: "何时主动发消息，频率与触发条件" },
+    ] },
+];
 
 export function CharacterDetailView({
     char,
@@ -38,11 +71,23 @@ export function CharacterDetailView({
     const [briefBusy, setBriefBusy] = useState(false);
     const [briefError, setBriefError] = useState("");
     const [avatar, setAvatar] = useState(char.avatar || "");
+    const [faceReferenceImage, setFaceReferenceImage] = useState(char.faceReferenceImage || "");
     const [tags, setTags] = useState<string[]>(char.tags || []);
     const [tagInput, setTagInput] = useState("");
     const [timeZone, setTimeZone] = useState(char.timeZone || "Asia/Shanghai");
+    const [profileDetails, setProfileDetails] = useState<CharacterProfileDetails>(char.profileDetails || {});
+    const [governance, setGovernance] = useState<Partial<Character>>({
+        bannedWordsEnabled: char.bannedWordsEnabled,
+        bannedWords: char.bannedWords,
+        governancePresets: char.governancePresets,
+        activePresetId: char.activePresetId,
+        oocRawComplaint: char.oocRawComplaint,
+        oocPatchPrompt: char.oocPatchPrompt,
+        riskReportPrompt: char.riskReportPrompt,
+        riskReportCollapsed: char.riskReportCollapsed,
+    });
 
-    const [activeSection, setActiveSection] = useState<"basic" | "persona" | "governance" | "image">("basic");
+    const [activeSection, setActiveSection] = useState<"basic" | "persona" | ProfileSectionId | "governance" | "image">("basic");
     const [confirmDelete, setConfirmDelete] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
 
@@ -84,7 +129,10 @@ export function CharacterDetailView({
             briefPersona: briefPersona.trim() || undefined,
             tags,
             avatar: avatar || null,
+            faceReferenceImage: faceReferenceImage || undefined,
             timeZone,
+            profileDetails,
+            ...governance,
         }, isExisting);
     };
 
@@ -95,34 +143,61 @@ export function CharacterDetailView({
                 : "bg-gray-100 text-gray-600 border-transparent dark:bg-white/5 dark:text-gray-400"
         }`;
 
+    const renderProfileFields = (id: ProfileSectionId) => {
+        const section = PROFILE_SECTIONS.find(item => item.id === id);
+        if (!section) return null;
+        return (
+            <div className="space-y-4">
+                {section.fields.map(field => (
+                    <div key={field.key} className="char-detail-panel space-y-2 p-4 rounded-2xl">
+                        <label htmlFor={`char-${field.key}`} className="text-xs font-semibold text-slate-700 dark:text-slate-200">{field.label}</label>
+                        {isEditing ? (
+                            <textarea
+                                id={`char-${field.key}`}
+                                value={profileDetails[field.key] || ""}
+                                onChange={e => setProfileDetails(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                placeholder={field.hint}
+                                rows={field.key === "background" || field.key === "appearance" ? 4 : 2}
+                                className="w-full bg-white/55 dark:bg-black/20 border border-slate-200/70 dark:border-white/10 rounded-xl p-3 text-sm leading-relaxed outline-none focus:border-[#007aff] resize-y text-[#111] dark:text-white"
+                            />
+                        ) : (
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-700 dark:text-slate-200">{profileDetails[field.key] || "尚未填写"}</p>
+                        )}
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-[#16161a]">
+        <div className="char-view-enter flex flex-col h-full bg-[#f7f9fb] dark:bg-[#161a1e]">
             {/* 顶栏 */}
-            <div className="flex items-center justify-between px-4 pt-12 pb-3 border-b border-black/5 dark:border-white/5 shrink-0">
+            <div className="char-view-header flex items-center justify-between gap-2 px-4 pb-3">
                 <button
                     type="button"
                     onClick={onBack}
-                    className="w-9 h-9 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center text-gray-700 dark:text-gray-300 active:scale-95"
+                    aria-label="返回上一页"
+                    className="char-glass-control relative z-[3] w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-gray-700 dark:text-gray-300 active:scale-95"
                 >
                     <ArrowLeft size={18} strokeWidth={2.5} />
                 </button>
-                <h2 className="text-base font-semibold text-[#111] dark:text-white">
+                <h2 className="min-w-0 text-center truncate text-base font-semibold text-[#111] dark:text-white">
                     {isEditing ? (isExisting ? "编辑角色" : "新建角色") : "角色主页"}
                 </h2>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0 relative z-[3]">
                     {isEditing ? (
                         <>
                             <button
                                 type="button"
                                 onClick={onCancelEdit}
-                                className="h-8 px-3 rounded-full bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 text-xs font-semibold active:scale-95 transition-all"
+                                className="char-glass-control min-h-11 px-3 rounded-full text-gray-600 dark:text-gray-300 text-xs font-semibold active:scale-95 transition-all"
                             >
                                 取消
                             </button>
                             <button
                                 type="button"
                                 onClick={handleSave}
-                                className="h-8 px-3 rounded-full bg-[#007aff] text-white text-xs font-semibold active:scale-95 transition-all"
+                                className="char-glass-control min-h-11 px-3 rounded-full text-[#007aff] text-xs font-semibold active:scale-95 transition-all"
                             >
                                 保存
                             </button>
@@ -132,7 +207,7 @@ export function CharacterDetailView({
                             <button
                                 type="button"
                                 onClick={onEdit}
-                                className="flex items-center gap-1 h-8 px-3 rounded-full bg-[#007aff]/10 text-[#007aff] text-xs font-semibold active:scale-95 transition-all"
+                                className="char-glass-control flex items-center gap-1 min-h-11 px-3 rounded-full text-[#007aff] text-xs font-semibold active:scale-95 transition-all"
                             >
                                 <Edit2 size={12} />
                                 <span>编辑</span>
@@ -140,7 +215,8 @@ export function CharacterDetailView({
                             <button
                                 type="button"
                                 onClick={() => setConfirmDelete(true)}
-                                className="w-8 h-8 rounded-full bg-red-50 dark:bg-red-950/20 text-red-500 flex items-center justify-center active:scale-95 transition-all"
+                                aria-label="删除角色"
+                                className="char-glass-control w-11 h-11 rounded-full text-red-500 flex items-center justify-center active:scale-95 transition-all"
                             >
                                 <Trash2 size={14} />
                             </button>
@@ -152,7 +228,7 @@ export function CharacterDetailView({
             {/* 详情主内容区 */}
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6 hide-scrollbar">
                 {/* 角色大头像与核心名片 */}
-                <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50/50 dark:bg-white/1 border border-black/5 dark:border-white/5">
+                <div className="char-detail-panel flex items-center gap-4 p-4 rounded-2xl">
                     <div 
                         onClick={() => {
                             if (isEditing) {
@@ -174,7 +250,7 @@ export function CharacterDetailView({
                         {avatar ? (
                             <img src={avatar} alt={name} className="w-full h-full object-cover" />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-400 to-purple-500 text-white text-3xl font-bold">
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#5c8daa] to-[#2c685c] text-white text-3xl font-bold">
                                 {(name || "?")[0]}
                             </div>
                         )}
@@ -228,13 +304,15 @@ export function CharacterDetailView({
                 {/* 分区可滑动 Tab */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0 hide-scrollbar">
                     <button type="button" onClick={() => setActiveSection("basic")} className={sectionCls("basic")}>基础设定</button>
-                    <button type="button" onClick={() => setActiveSection("persona")} className={sectionCls("persona")}>人设/性格</button>
+                    {PROFILE_SECTIONS.map(section => <button type="button" key={section.id} onClick={() => setActiveSection(section.id)} className={sectionCls(section.id)}>{section.label}</button>)}
+                    <button type="button" onClick={() => setActiveSection("persona")} className={sectionCls("persona")}>原始人设</button>
                     <button type="button" onClick={() => setActiveSection("governance")} className={sectionCls("governance")}>人格治理</button>
                     <button type="button" onClick={() => setActiveSection("image")} className={sectionCls("image")}>形象生成</button>
                 </div>
 
                 {/* 各分区内容 */}
                 <div className="flex-1 min-h-0 flex flex-col">
+                    {PROFILE_SECTIONS.some(section => section.id === activeSection) && renderProfileFields(activeSection as ProfileSectionId)}
                     {activeSection === "basic" && (
                         <div className="space-y-4">
                             <div className="flex flex-col gap-1.5">
@@ -325,11 +403,12 @@ export function CharacterDetailView({
                     {activeSection === "governance" && (
                         <div className="space-y-4">
                             <CharacterGovernancePanel
-                                character={{ ...char, name, persona, personality, tags }}
+                                character={{ ...char, ...governance, name, persona, personality, tags }}
                                 onChange={(updates) => {
                                     if (updates.name !== undefined) setName(updates.name);
                                     if (updates.persona !== undefined) setPersona(updates.persona);
                                     if (updates.personality !== undefined) setPersonality(updates.personality);
+                                    setGovernance(prev => ({ ...prev, ...updates }));
                                 }}
                                 onNotice={onNotice}
                             />
@@ -342,26 +421,25 @@ export function CharacterDetailView({
                             <div className="p-4 rounded-2xl bg-gray-50/30 dark:bg-white/2 border border-black/5 dark:border-white/5 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">面部锁定参考图</h4>
-                                    <span className="text-[10px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400">待生图模块接通</span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/30 text-[#007aff]">仅保存参考图</span>
                                 </div>
                                 <p className="text-[11px] text-gray-400 leading-relaxed">
-                                    上传该角色的面部参考图，未来在生成朋友圈合影或互动图片时，将基于此图进行锁脸生图。
+                                    可保存一张人物参考图。生图模型尚未接通，这张图目前不会用于自动锁脸。
                                 </p>
                                 <div className="flex items-center gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (isEditing) {
-                                                onNotice("由于生图模型后端暂未接通，参考图上传仅作本地保存资产。");
-                                            }
-                                        }}
-                                        className="w-16 h-16 rounded-xl border border-dashed border-gray-300 dark:border-white/10 flex flex-col items-center justify-center text-gray-400 hover:border-[#007aff] hover:text-[#007aff] shrink-0"
-                                    >
-                                        <Camera size={16} />
-                                        <span className="text-[9px] mt-1">上传</span>
-                                    </button>
-                                    <div className="text-xs text-gray-400">
-                                        参考图已保存，生成功能待接入。
+                                    <label className="w-20 h-20 rounded-xl border border-dashed border-gray-300 dark:border-white/10 flex flex-col items-center justify-center text-gray-400 shrink-0 overflow-hidden cursor-pointer">
+                                        {faceReferenceImage ? <img src={faceReferenceImage} alt="面部参考图" className="w-full h-full object-cover" /> : <><Camera size={16} /><span className="text-[9px] mt-1">选择图片</span></>}
+                                        {isEditing && <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={e => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            if (file.size > 800_000) { onNotice("参考图请压缩至 800 KB 以下"); return; }
+                                            const reader = new FileReader();
+                                            reader.onload = () => setFaceReferenceImage(String(reader.result || ""));
+                                            reader.readAsDataURL(file);
+                                        }} />}
+                                    </label>
+                                    <div className="text-xs text-gray-500 dark:text-gray-300">
+                                        {faceReferenceImage ? "本地参考图已选定，点击保存角色后生效" : "选择小于 800 KB 的 PNG、JPEG 或 WebP 图片"}
                                     </div>
                                 </div>
                             </div>
