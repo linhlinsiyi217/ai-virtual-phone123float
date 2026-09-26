@@ -69,6 +69,8 @@ export function ShelfFocusSheet({
 }: Props) {
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [coverOpen, setCoverOpen] = useState(false);
+  const [coverUrl, setCoverUrl] = useState("");
   const [coverHint, setCoverHint] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const favorite = Boolean(entry.favorite);
@@ -153,14 +155,14 @@ export function ShelfFocusSheet({
           <span>{favorite ? "已收藏" : "收藏"}</span>
         </button>
 
-        {/* Phase 9A：自定义封面 / 恢复默认 */}
+        {/* Phase 9B-2：自定义封面（上传 / URL / 恢复默认，仅作用本书） */}
         <button
           type="button"
-          className="br-focus-btn book-pressable"
-          onClick={() => coverInputRef.current?.click()}
+          className={`br-focus-btn book-pressable ${coverOpen ? "is-active" : ""}`}
+          onClick={() => setCoverOpen(v => !v)}
         >
           <ImagePlus size={18} strokeWidth={1.9} />
-          <span>换封面</span>
+          <span>更换封面</span>
         </button>
         {hasCustomCover && (
           <button
@@ -168,6 +170,7 @@ export function ShelfFocusSheet({
             className="br-focus-btn book-pressable"
             onClick={() => {
               setCustomCover(book.id, null);
+              setCoverUrl("");
               setCoverHint("已恢复默认封面");
               onCoverChange?.();
             }}
@@ -206,6 +209,47 @@ export function ShelfFocusSheet({
           <span>加入分组</span>
         </button>
       </section>
+
+      {coverOpen && (
+        <section className="br-sheet-section br-focus-sub-list">
+          <button
+            type="button"
+            className="br-focus-sub-row book-pressable"
+            onClick={() => coverInputRef.current?.click()}
+          >
+            <ImagePlus size={15} strokeWidth={1.9} />
+            <span>上传本地图片</span>
+          </button>
+          <div className="br-cover-url-row">
+            <input
+              type="url"
+              className="br-cover-url-input"
+              placeholder="粘贴封面图片链接"
+              value={coverUrl}
+              onChange={e => setCoverUrl(e.target.value.trim())}
+              aria-label="封面图片链接"
+            />
+            <button
+              type="button"
+              className="br-cover-url-save book-pressable"
+              disabled={!coverUrl}
+              onClick={() => {
+                if (/^(https?:|data:image)/i.test(coverUrl)) {
+                  setCustomCover(book.id, coverUrl);
+                  setCoverHint("封面已更新");
+                  setCoverOpen(false);
+                  onCoverChange?.();
+                } else {
+                  setCoverHint("请输入 http(s) 图片链接");
+                }
+              }}
+            >
+              使用
+            </button>
+          </div>
+          <p className="br-focus-cover-note">自定义封面仅作用于《{book.title}》，不会影响其他书。</p>
+        </section>
+      )}
 
       {statusOpen && (
         <section className="br-sheet-section br-focus-sub-list">
@@ -276,6 +320,7 @@ export function ShelfFocusSheet({
           移出书架不删除原文件；删除导入内容才会清除解析数据。
         </p>
       )}
+      {coverHint && <p className="br-sheet-hint">{coverHint}</p>}
     </BottomSheet>
   );
 }

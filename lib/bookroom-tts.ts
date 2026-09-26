@@ -19,33 +19,101 @@ export function isBookTtsSupported(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
 }
 
+export type BookTtsVoice = {
+  /** SpeechSynthesisVoice.voiceURI */
+  uri: string;
+  name: string;
+  lang: string;
+  /** 由声线名称启发式判断，仅供 UI 筛选 */
+  gender: "female" | "male" | "unknown";
+  /** 优先级分数：zh-CN > zh-TW / zh-HK > 其他中文 */
+  priority: number;
+};
+
+function guessVoiceGender(name: string): BookTtsVoice["gender"] {
+  const n = name.toLowerCase();
+  const femaleHints = /female|woman|girl|xiaoxiao|xiaoyi|yaoyao|huihui|samantha|victoria|zira|susan|karen|moira|tessa|sinji|mei|ting/;
+  const maleHints = /male|man|boy|daniel|alex|fred|david|mark|james|oliver|thomas|george|kangkang|yunjian|dawei/;
+  if (femaleHints.test(n)) return "female";
+  if (maleHints.test(n)) return "male";
+  return "unknown";
+}
+
+/**
+ * 读取设备可用朗读音色，优先 zh-CN / zh-TW / zh-HK。
+ * 部分引擎（Chrome）首次返回空列表，需监听 voiceschanged 后再取。
+ */
+export function getBookTtsVoices(): BookTtsVoice[] {
+  if (!isBookTtsSupported()) return [];
+  return window.speechSynthesis
+    .getVoices()
+    .map((v): BookTtsVoice | null => {
+      const lang = (v.lang || "").toLowerCase();
+      if (lang.startsWith("zh-cn")) {
+        return { uri: v.voiceURI, name: v.name, lang: v.lang, gender: guessVoiceGender(v.name), priority: 30 };
+      }
+      if (lang.startsWith("zh") || lang.startsWith("cmn")) {
+        return { uri: v.voiceURI, name: v.name, lang: v.lang, gender: guessVoiceGender(v.name), priority: 20 };
+      }
+      return null;
+    })
+    .filter((x): x is BookTtsVoice => x !== null)
+    .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name));
+}
+
+/** voiceschanged 监听，返回卸载函数 */
+export function onBookTtsVoicesChanged(callback: () => void): () => void {
+  if (!isBookTtsSupported()) return () => undefined;
+  window.speechSynthesis.addEventListener("voiceschanged", callback);
+  return () => window.speechSynthesis.removeEventListener("voiceschanged", callback);
+}
+
 export type BookTtsController = {
   start: (paragraphs: string[], fromIndex?: number, fromChar?: number) => void;
   pause: () => void;
   resume: () => void;
   stop: () => void;
   setRate: (rate: number) => void;
-  /** Phase 9A：朗读音量（0-1），与环境音音量分离；播放中即时生效（重启当前段） */
+  /** 朗读音量（0-1），与环境音音量分离；播放中即时生效（重启当前段） */
   setVolume: (volume: number) => void;
+  /** Phase 9B-2：朗读音高 0.5~2 */
+  setPitch: (pitch: number) => void;
+  /** Phase 9B-2：切换音色（voiceURI），播放中重启当前段生效 */
+  setVoice: (uri: string) => void;
   getStatus: () => BookTtsStatus;
   getIndex: () => number;
 };
 
 export function createBookTts(
   handlers: BookTtsHandlers = {},
-  opts: { volume?: number } = {},
+  opts: { volume?: number; pitch?: number; voiceURI?: string } = {},
 ): BookTtsController {
   const synth = window.speechSynthesis;
   let paragraphs: string[] = [];
   let index = -1;
   let status: BookTtsStatus = "idle";
   let rate = 1;
+  let pitch = Math.min(2, Math.max(0.5, opts.pitch ?? 1));
   let volume = Math.min(1, Math.max(0, opts.volume ?? 1));
+  let voiceURI = opts.voiceURI ?? "";
   let stopped = false;
+
+  const resolveVoice = (): SpeechSynthesisVoice | null => {
+    if (!voiceURI) return null;
+    return synth.getVoices().find(v => v.voiceURI === voiceURI) ?? null;
+  };
 
   const setStatus = (next: BookTtsStatus) => {
     status = next;
     handlers.onStatus?.(next);
+  };
+
+  /** 重新应用参数：音高/音色/音量/语速在播放中改动都重启当前段 */
+  const restartCurrent = () => {
+    if (status !== "playing" || index < 0) return;
+    stopped = false;
+    synth.cancel();
+    window.setTimeout(() => { if (!stopped) speakIndex(index); }, 60);
   };
 
   const speakIndex = (i: number) => {
@@ -68,6 +136,12 @@ export function createBookTts(
     utterance.lang = /[一-鿿]/.test(text) ? "zh-CN" : "en-US";
     utterance.rate = rate;
     utterance.volume = volume;
+    utterance.pitch = pitch;
+    const voice = resolveVoice();
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    }
     utterance.onend = () => {
       if (stopped) return;
       // Chrome 在 pause 后恢复也可能触发 onend，用状态守门
@@ -114,26 +188,20 @@ export function createBookTts(
       setStatus("idle");
     },
     setRate(nextRate) {
-      const willPlay = status === "playing";
       rate = Math.min(2, Math.max(0.5, nextRate));
-      if (willPlay && index >= 0) {
-        // 从当前段重新开始以应用新语速
-        stopped = false;
-        synth.cancel();
-        setStatus("playing");
-        window.setTimeout(() => { if (!stopped) speakIndex(index); }, 60);
-      }
+      restartCurrent();
     },
     setVolume(nextVolume) {
-      const willPlay = status === "playing";
       volume = Math.min(1, Math.max(0, nextVolume));
-      if (willPlay && index >= 0) {
-        // 与 setRate 同理：重启当前段让新音量生效
-        stopped = false;
-        synth.cancel();
-        setStatus("playing");
-        window.setTimeout(() => { if (!stopped) speakIndex(index); }, 60);
-      }
+      restartCurrent();
+    },
+    setPitch(nextPitch) {
+      pitch = Math.min(2, Math.max(0.5, nextPitch));
+      restartCurrent();
+    },
+    setVoice(uri) {
+      voiceURI = uri || "";
+      restartCurrent();
     },
     getStatus: () => status,
     getIndex: () => index,

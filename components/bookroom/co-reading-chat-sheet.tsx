@@ -1,7 +1,15 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Bookmark, MessageCircleHeart, Quote, Send, Sparkles, X } from "lucide-react";
+import {
+  ArrowUp,
+  Bookmark,
+  ChevronLeft,
+  MessageCircleHeart,
+  MoreHorizontal,
+  Plus,
+  Sparkles,
+} from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
 import { isRealCompanionRole, resolveRoleDisplayById, type CompanionRole } from "@/lib/bookroom-mock";
 import {
@@ -35,6 +43,15 @@ function formatChatTime(ts: number): string {
   if (sameDay) return `${hh}:${mm}`;
   return `${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}`;
 }
+
+/** 左滑查看时间戳时，单条消息显示到分钟 */
+function formatStamp(ts: number): string {
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** 连续消息分组间隔：超过 5 分钟即另起一组（尾巴/头像只在组末出现） */
+const GROUP_GAP = 5 * 60 * 1000;
 
 type Props = {
   book: Book;
@@ -74,11 +91,9 @@ function friendlyError(error: unknown): string {
 }
 
 /**
- * 共读 / 共看半弹层（Phase 3A 接入真实 AI，Phase 5B 接入共读会话记录）。
- * - 角色显示实时解析 canonical 角色卡：改名 / 换头像后自动反映最新；
- * - 打开（真实角色）即开始 / 继续 CoReadingSession，关闭即暂停；
- * - 会话历史走 kv-db（短期），值得保留的事件才写长期记忆（带 sessionId 关联）；
- * - 仅在用户主动发送 / 问 TA / 陪伴反馈时请求 AI，不做每页自动发言。
+ * 共读 / 共看聊天层（真实 AI + 共读会话记录）。
+ * Phase 9B-2：iMessage 化 —— 连续消息分组、克制小尾巴、稀疏时间分隔、
+ * 左滑显示逐条时间、已送达、+ / 自适应输入框 / 圆形发送；抽屉支持右拖关闭。
  */
 export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk, variant = "sheet", onClose }: Props) {
   const contentRef = useMemo(() => buildBookRoomContentRef(book), [book]);
@@ -103,12 +118,19 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<ErrorState | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [revealTime, setRevealTime] = useState(false);
+  const [dragX, setDragX] = useState(0);
+  const [dragging, setDragging] = useState(false);
 
   const listRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const sendingRef = useRef(false);
   const timerRef = useRef<number | null>(null);
   const initialAskFiredRef = useRef(false);
+  const dragRef = useRef<{ startX: number; startY: number; active: boolean; locked: boolean } | null>(null);
 
   // 打开共读层：真实角色才开始 / 继续共读会话；关闭层 = 暂停会话（下次优先继续）
   useEffect(() => {
@@ -144,6 +166,14 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, sending]);
 
+  /* 输入框随内容增高，到 96px 后内部滚动 */
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(96, el.scrollHeight)}px`;
+  }, [draft]);
+
   useEffect(() => () => {
     abortRef.current?.abort();
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
@@ -168,6 +198,8 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
     sendingRef.current = true;
     setSending(true);
     setError(null);
+    setPlusOpen(false);
+    setMoreOpen(false);
 
     const before = loadCoSession(role.id, book.id);
     if (!persistedUser) {
@@ -239,6 +271,7 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
 
   const askRole = () => {
     if (sending) return;
+    setMoreOpen(false);
     send(kind === "manga"
       ? "你怎么看现在这一格分镜？想听听你的感受。"
       : "你怎么看现在这一段？想听听你的感受。");
@@ -246,6 +279,7 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
 
   const companionFeedback = () => {
     if (sending) return;
+    setMoreOpen(false);
     send("我想听听你此刻陪我读的心情。");
   };
 
@@ -276,11 +310,71 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
   /* 引用当前段落进输入框（不自动发送） */
   const quoteCurrent = () => {
     const excerpt = (contentRef.currentExcerpt || contentRef.pageCaption || "").slice(0, 120);
+    setPlusOpen(false);
     if (!excerpt) {
       flashHint("当前位置暂无可引用的段落");
       return;
     }
-    setDraft(draft => `「${excerpt}」${draft}`);
+    setDraft(d => `「${excerpt}」${d}`);
+    textareaRef.current?.focus();
+  };
+
+  /* 消息区左滑：显示每条详细时间；右滑收回 */
+  const onListTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    dragRef.current = { startX: t.clientX, startY: t.clientY, active: true, locked: false };
+  };
+  const onListTouchMove = (e: React.TouchEvent) => {
+    const st = dragRef.current;
+    if (!st?.active) return;
+    const t = e.touches[0];
+    const dx = t.clientX - st.startX;
+    const dy = t.clientY - st.startY;
+    if (!st.locked) {
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.4) st.locked = true;
+      else if (Math.abs(dy) > 8) st.active = false;
+    }
+    if (st.locked) {
+      e.preventDefault();
+      if (dx < -48) setRevealTime(true);
+      else if (dx > 48) setRevealTime(false);
+    }
+  };
+  const onListTouchEnd = () => {
+    dragRef.current = null;
+  };
+
+  /* 抽屉：从头部右拖关闭（transform/opacity，可中断，reduced-motion 由 CSS 降级） */
+  const onHeadPointerDown = (e: React.PointerEvent) => {
+    if (variant !== "drawer") return;
+    dragRef.current = { startX: e.clientX, startY: e.clientY, active: true, locked: false };
+    setDragging(true);
+    const move = (ev: PointerEvent) => {
+      const st = dragRef.current;
+      if (!st?.active) return;
+      const dx = ev.clientX - st.startX;
+      const dy = ev.clientY - st.startY;
+      if (!st.locked) {
+        if (dx > 6 && Math.abs(dx) > Math.abs(dy) * 1.3) st.locked = true;
+        else if (Math.abs(dy) > 10) st.active = false;
+      }
+      if (st.locked) setDragX(Math.max(0, dx));
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      const st = dragRef.current;
+      dragRef.current = null;
+      setDragging(false);
+      const width = listRef.current?.parentElement?.offsetWidth ?? 320;
+      if (st?.locked && ev.clientX - st.startX > width * 0.28) {
+        onClose();
+      } else {
+        setDragX(0);
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   };
 
   // 阅读器划词「问 TA」：挂载后自动发送一次；未选真实角色则先填入输入框
@@ -296,73 +390,145 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** 最后一条非系统消息是否为“我”（用于已送达） */
+  const lastIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role !== "system") return i;
+    }
+    return -1;
+  })();
+
   const chatBody = (
     <>
-      <div className="br-chat-head">
-        <span className="br-chat-avatar">
-          {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
+      <div className="br-chat-head" onPointerDown={onHeadPointerDown}>
+        <button
+          type="button"
+          className="book-icon-btn book-pressable br-chat-close"
+          onClick={onClose}
+          aria-label="关闭聊天"
+        >
+          {variant === "drawer" ? <ChevronLeft size={18} strokeWidth={2} /> : undefined}
+          {variant !== "drawer" ? <span aria-hidden>×</span> : null}
+        </button>
+        <span className="br-chat-who-center">
+          <span className="br-chat-avatar">
+            {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
+          </span>
+          <span className="br-chat-who-text">
+            <span className="br-chat-name">{display.name}</span>
+            <span className="br-chat-sub">
+              <span className={`br-role-dot ${sending ? "br-role-dot-online" : "br-role-dot-reading"}`} />
+              {sending ? "正在输入…" : "共读中"}
+            </span>
+          </span>
         </span>
-        <span className="br-chat-who">
-          <span className="br-chat-name">{display.name}</span>
-          <span className="br-chat-sub">{display.subtitle}</span>
-        </span>
-        <span className="br-chat-state">
-          <span className={`br-role-dot ${sending ? "br-role-dot-online" : "br-role-dot-reading"}`} />
-          {sending ? "回复中" : "共读中"}
-        </span>
-        {variant === "drawer" && (
+        <span className="br-chat-more-wrap">
           <button
             type="button"
-            className="book-icon-btn book-pressable br-chat-close"
-            onClick={onClose}
-            aria-label="关闭聊天"
+            className="book-icon-btn book-pressable br-chat-more-btn"
+            onClick={() => setMoreOpen(v => !v)}
+            aria-label="更多操作"
+            aria-expanded={moreOpen}
           >
-            <X size={16} strokeWidth={2} />
+            <MoreHorizontal size={17} strokeWidth={2} />
           </button>
-        )}
+          {moreOpen && (
+            <span className="br-chat-menu">
+              <button type="button" className="br-chat-menu-item book-pressable" onClick={askRole} disabled={!roleReady || sending}>
+                <Sparkles size={13} strokeWidth={2} />
+                问 TA
+              </button>
+              <button
+                type="button"
+                className="br-chat-menu-item book-pressable"
+                onClick={() => { setMoreOpen(false); flashHint("已为这一段轻轻记下批注"); }}
+              >
+                <Bookmark size={13} strokeWidth={2} />
+                批注
+              </button>
+              <button type="button" className="br-chat-menu-item book-pressable" onClick={companionFeedback} disabled={!roleReady || sending}>
+                <MessageCircleHeart size={13} strokeWidth={2} />
+                陪伴反馈
+              </button>
+            </span>
+          )}
+        </span>
       </div>
 
-      <div className="br-chat-list" ref={listRef}>
+      <div
+        className={`br-chat-list ${revealTime ? "is-time-reveal" : ""}`}
+        ref={listRef}
+        onTouchStart={onListTouchStart}
+        onTouchMove={onListTouchMove}
+        onTouchEnd={onListTouchEnd}
+      >
         {messages.map((message, index) => {
           if (message.role === "system") {
             return <p key={message.id} className="br-chat-system">{message.content}</p>;
           }
-          /* Phase 9B：iMessage 式时间分隔 —— 首条或与上一条间隔超 5 分钟时显示 */
           const prev = messages[index - 1];
-          const showTime = !prev || (message.createdAt - prev.createdAt > 5 * 60 * 1000);
+          const next = messages[index + 1];
           const mine = message.role === "user";
+          const sameWith = (other?: UiMessage) =>
+            Boolean(other && other.role !== "system" && other.role === message.role);
+          const crossDayFromPrev = prev
+            ? new Date(prev.createdAt).toDateString() !== new Date(message.createdAt).toDateString()
+            : false;
+          const groupStart = !sameWith(prev)
+            || message.createdAt - (prev?.createdAt ?? 0) > GROUP_GAP
+            || crossDayFromPrev;
+          const groupEnd = !sameWith(next) || (next?.createdAt ?? 0) - message.createdAt > GROUP_GAP;
+          const showTime = !prev || prev.role === "system"
+            || message.createdAt - prev.createdAt > GROUP_GAP
+            || new Date(prev.createdAt).toDateString() !== new Date(message.createdAt).toDateString();
+          const groupClass = groupStart && groupEnd
+            ? "is-group-single"
+            : groupStart ? "is-group-first"
+            : groupEnd ? "is-group-last"
+            : "is-group-middle";
+
           return (
             <Fragment key={message.id}>
               {showTime && (
                 <p className="br-chat-time">{formatChatTime(message.createdAt)}</p>
               )}
-              <div className={`br-chat-row ${mine ? "is-mine" : ""}`}>
+              <div className={`br-chat-row ${mine ? "is-mine" : "is-other"} ${groupClass}`}>
                 {!mine && (
-                  <span className="br-chat-bubble-avatar">
-                    {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
-                  </span>
+                  groupEnd ? (
+                    <span className="br-chat-bubble-avatar">
+                      {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
+                    </span>
+                  ) : <span className="br-chat-bubble-avatar is-placeholder" aria-hidden />
                 )}
-                <span className="br-chat-bubble">{message.content}</span>
+                <span className="br-chat-bubble-col">
+                  <span className="br-chat-bubble">{message.content}</span>
+                  <span className="br-chat-stamp">{formatStamp(message.createdAt)}</span>
+                </span>
               </div>
+              {mine && index === lastIndex && !sending && !error && (
+                <p className="br-chat-delivered">已送达</p>
+              )}
             </Fragment>
           );
         })}
 
         {sending && (
-          <div className="br-chat-row">
+          <div className="br-chat-row is-other is-group-single">
             <span className="br-chat-bubble-avatar">
               {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
             </span>
-            <span className="br-chat-bubble br-chat-bubble-typing" aria-label="对方正在输入">
-              <i />
-              <i />
-              <i />
+            <span className="br-chat-bubble-col">
+              <span className="br-chat-bubble br-chat-bubble-typing" aria-label="对方正在输入">
+                <i />
+                <i />
+                <i />
+              </span>
             </span>
           </div>
         )}
 
         {error && (
-          <div className="br-chat-row">
+          <div className="br-chat-row is-other is-group-single">
             <span className="br-chat-bubble-avatar">
               {display.avatar ? <img src={display.avatar} alt="" /> : display.name.slice(0, 1)}
             </span>
@@ -383,62 +549,49 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
         )}
       </div>
 
-      <div className="br-chat-actions">
-        <button
-          type="button"
-          className="br-chat-action book-pressable"
-          onClick={askRole}
-          disabled={sending || !roleReady}
-        >
-          <Sparkles size={13} strokeWidth={2} />
-          问 TA
-        </button>
-        <button
-          type="button"
-          className="br-chat-action book-pressable"
-          onClick={() => flashHint("已为这一段轻轻记下批注")}
-        >
-          <Bookmark size={13} strokeWidth={2} />
-          批注
-        </button>
-        <button
-          type="button"
-          className="br-chat-action book-pressable"
-          onClick={companionFeedback}
-          disabled={sending || !roleReady}
-        >
-          <MessageCircleHeart size={13} strokeWidth={2} />
-          陪伴反馈
-        </button>
-      </div>
-
       {roleReady && (
         <div className="br-chat-quick" role="group" aria-label="快捷提问">
           <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("segment")} disabled={sending}>问这一段</button>
           <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("summary")} disabled={sending}>总结</button>
           <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("explain")} disabled={sending}>解释</button>
-          <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("chat")} disabled={sending}>陪我聊聊</button>
+          <button type="button" className="br-chat-quick-chip book-pressable" onClick={() => quickAsk("chat")} disabled={sending}>陪我聊</button>
         </div>
       )}
 
       {roleReady ? (
         <div className="br-chat-inputbar">
-          <button
-            type="button"
-            className="br-chat-quote-btn book-pressable"
-            onClick={quoteCurrent}
-            aria-label="引用当前段落"
-            title="引用当前段落"
-          >
-            <Quote size={15} strokeWidth={2} />
-          </button>
-          <input
-            type="text"
+          <span className="br-chat-plus-wrap">
+            <button
+              type="button"
+              className={`br-chat-plus book-pressable ${plusOpen ? "is-active" : ""}`}
+              onClick={() => setPlusOpen(v => !v)}
+              aria-label="更多输入操作"
+              aria-expanded={plusOpen}
+            >
+              <Plus size={18} strokeWidth={2} />
+            </button>
+            {plusOpen && (
+              <span className="br-chat-menu br-chat-menu-plus">
+                <button type="button" className="br-chat-menu-item book-pressable" onClick={quoteCurrent}>
+                  引用这一段
+                </button>
+                <button type="button" className="br-chat-menu-item book-pressable" onClick={companionFeedback} disabled={sending}>
+                  陪伴反馈
+                </button>
+              </span>
+            )}
+          </span>
+          <textarea
+            ref={textareaRef}
             className="br-chat-input"
+            rows={1}
             value={draft}
             onChange={event => setDraft(event.target.value)}
             onKeyDown={event => {
-              if (event.key === "Enter") send(draft);
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                send(draft);
+              }
             }}
             placeholder={kind === "manga" ? "和 TA 聊聊这一格……" : "和 TA 聊聊这一段……"}
             autoComplete="off"
@@ -451,7 +604,7 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
             disabled={!draft.trim() || sending}
             aria-label="发送"
           >
-            <Send size={15} strokeWidth={2} />
+            <ArrowUp size={16} strokeWidth={2.4} />
           </button>
         </div>
       ) : (
@@ -467,12 +620,15 @@ export function CoReadingChatSheet({ book, role, kind, onChooseRole, initialAsk,
     </>
   );
 
-  /* Phase 9A：阅读页右侧滑出聊天室（复用 br-drawer 骨架，与角色侧栏一致） */
+  /* Phase 9A：阅读页右侧滑出聊天室；Phase 9B-2：宽度 86~92%、独立背景、可右拖关闭 */
   if (variant === "drawer") {
     return (
       <div className="br-drawer-root" role="dialog" aria-label="共读聊天室">
         <button type="button" className="br-drawer-scrim" aria-label="关闭聊天" onClick={onClose} />
-        <aside className="br-drawer br-coread-drawer">
+        <aside
+          className={`br-drawer br-coread-drawer ${dragging ? "is-dragging" : ""}`}
+          style={{ transform: `translateX(${dragX}px)` }}
+        >
           {chatBody}
         </aside>
       </div>

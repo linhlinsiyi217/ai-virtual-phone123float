@@ -255,6 +255,28 @@ export function appearanceToCssVars(tokens: AppearanceTokens): Record<string, st
     ? "linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)), #1A1D24"
     : "linear-gradient(180deg, #F2F4F7, #E7EBF0)";
 
+  /* ── Phase 9B-2：统一 --br-* 语义层（按钮/控件一律用 semantic foreground，禁止写死黑白） ── */
+  const borderColor = dark ? `rgba(255,255,255,${borderAlpha})` : `rgba(17,19,24,${borderAlpha})`;
+  const accentLight = isLightHex(tokens.accent);
+  const accentFg = accentLight ? "#0E1320" : "#F4F8FF";
+  const controlBg = rgba(glassBase, dark ? 0.28 : 0.62);
+  const controlBgActive = tokens.accent;
+  const controlFg = tokens.textPrimary;
+  const glassFill = rgba(glassBase, alpha);
+  const glassBorder = dark
+    ? `rgba(214,224,238,${Math.min(0.22, borderAlpha + 0.04)})`
+    : `rgba(255,255,255,${Math.max(0.55, 1 - borderAlpha * 1.6)})`;
+  const glassHighlight = dark
+    ? `rgba(226,234,246,${Math.min(0.16, 0.05 + tokens.glassHighlight / 900)})`
+    : `rgba(255,255,255,${Math.min(0.9, 0.35 + tokens.glassHighlight / 180)})`;
+  const divider = dark ? "rgba(226,232,240,0.09)" : "rgba(17,19,24,0.07)";
+  /* iMessage 气泡：自己=可识别蓝；对方=浅灰（深模式深灰 surface） */
+  const bubbleMine = tokens.accent;
+  const bubbleMineInk = accentFg;
+  const bubbleOther = dark ? "#222730" : "#E9EDF2";
+  const bubbleOtherInk = dark ? "#E6EAF0" : "#15171C";
+  const scrim = dark ? "rgba(6,8,12,0.55)" : "rgba(17,20,26,0.34)";
+
   return {
     /* ── 旧基础变量（保持全房组件兼容） ── */
     "--book-bg": tokens.bgPrimary,
@@ -296,6 +318,36 @@ export function appearanceToCssVars(tokens: AppearanceTokens): Record<string, st
     "--bookroom-paper": paper,
     "--bookroom-shelf-wood": shelfWood,
     "--bookroom-is-light": light ? "1" : "0",
+
+    /* ── Phase 9B-2：--br-* 统一语义变量（全房控件唯一切入点） ── */
+    "--br-bg": tokens.bgPrimary,
+    "--br-bg-secondary": tokens.bgSecondary,
+    "--br-surface": glassFill,
+    "--br-surface-soft": rgba(glassSoft, dark ? 0.5 : 0.55),
+    "--br-surface-strong": rgba(glassBase, alpha),
+    "--br-text": tokens.textPrimary,
+    "--br-text-secondary": tokens.textSecondary,
+    "--br-text-tertiary": inkTertiary,
+    "--br-border": borderColor,
+    "--br-divider": divider,
+    "--br-accent": tokens.accent,
+    "--br-accent-foreground": accentFg,
+    "--br-control-bg": controlBg,
+    "--br-control-bg-active": controlBgActive,
+    "--br-control-foreground": controlFg,
+    "--br-control-foreground-active": accentFg,
+    "--br-glass-fill": glassFill,
+    "--br-glass-border": glassBorder,
+    "--br-glass-highlight": glassHighlight,
+    "--br-glass-blur": `${tokens.cardBlur}px`,
+    "--br-radius": `${tokens.radius}px`,
+    "--br-shadow": `0 12px 32px rgba(0,0,0,${shadowAlpha})`,
+    "--br-shadow-soft": `0 2px 10px rgba(0,0,0,${(tokens.cardShadow / 100 * 0.06).toFixed(3)})`,
+    "--br-scrim": scrim,
+    "--br-bubble-mine": bubbleMine,
+    "--br-bubble-mine-ink": bubbleMineInk,
+    "--br-bubble-other": bubbleOther,
+    "--br-bubble-other-ink": bubbleOtherInk,
   };
 }
 

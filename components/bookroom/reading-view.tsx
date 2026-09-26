@@ -254,6 +254,8 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
           ttsRef.current?.setRate(next.ttsRate);
           setTtsRate(next.ttsRate);
         }
+        if (next.ttsPitch !== prev.ttsPitch) ttsRef.current?.setPitch(next.ttsPitch);
+        if (next.ttsVoiceURI !== prev.ttsVoiceURI) ttsRef.current?.setVoice(next.ttsVoiceURI);
         return next;
       });
     };
@@ -455,7 +457,10 @@ export function ReadingView({ book, onBack, onOpenNight, onAskRole, onAiWrite, c
         setSheet(current => (current?.kind === "tts" ? null : current));
       },
       onError: message => showToast(message),
-    }, { volume: loadReaderPrefs(book.id).ttsVolume / 100 });
+    }, (() => {
+      const p = loadReaderPrefs(book.id);
+      return { volume: p.ttsVolume / 100, pitch: p.ttsPitch, voiceURI: p.ttsVoiceURI };
+    })());
     ttsRef.current = controller;
     return () => controller.stop();
   }, [ttsSupported, showToast, book.id]);

@@ -64,6 +64,10 @@ export type ReaderPrefs = {
   ttsVolume: number;
   /** Phase 9B：朗读速度 0.5-2 */
   ttsRate: number;
+  /** Phase 9B-2：朗读音高 0.5-2 */
+  ttsPitch: number;
+  /** Phase 9B-2：朗读音色 voiceURI（空串=系统默认中文音色） */
+  ttsVoiceURI: string;
   /** Phase 9B：高亮当前朗读段落 */
   highlightSpeaking: boolean;
   /** 睡眠定时（分钟，0=关闭） */
@@ -96,6 +100,8 @@ export const BUILTIN_READER_PREFS: ReaderPrefs = {
   ambientVolume: 50,
   ttsVolume: 80,
   ttsRate: 1,
+  ttsPitch: 1,
+  ttsVoiceURI: "",
   highlightSpeaking: true,
   sleepTimer: 0,
 };
@@ -113,6 +119,22 @@ const FONT_FAMILY_CSS: Record<ReaderFontFamily, string> = {
   serif: '"Songti SC","STSong","Noto Serif SC",serif',
   sans: '"PingFang SC","Microsoft YaHei",sans-serif',
 };
+
+/** 全部合法环境音（与 bookroom-audio 的 AmbientId 保持同步） */
+const ALL_AMBIENT_IDS: AmbientId[] = [
+  "off",
+  "rain",
+  "night-rain",
+  "wave",
+  "forest",
+  "river",
+  "fireplace",
+  "cafe",
+  "library",
+  "fan",
+  "wind",
+  "train",
+];
 
 /* ── 工具 ── */
 
@@ -156,12 +178,14 @@ function sanitize(raw: unknown): Partial<ReaderPrefs> {
   if (typeof r.textureStrength === "number") out.textureStrength = clamp(r.textureStrength, 0, 100);
   if (r.pageMotion === "scroll" || r.pageMotion === "fade" || r.pageMotion === "flip") out.pageMotion = r.pageMotion;
   if (typeof r.ttsEnabled === "boolean") out.ttsEnabled = r.ttsEnabled;
-  if (r.ambientId === "off" || r.ambientId === "rain" || r.ambientId === "wave" || r.ambientId === "forest" || r.ambientId === "cafe") {
-    out.ambientId = r.ambientId;
+  if (typeof r.ambientId === "string" && ALL_AMBIENT_IDS.includes(r.ambientId as AmbientId)) {
+    out.ambientId = r.ambientId as AmbientId;
   }
   if (typeof r.ambientVolume === "number") out.ambientVolume = clamp(r.ambientVolume, 0, 100);
   if (typeof r.ttsVolume === "number") out.ttsVolume = clamp(r.ttsVolume, 0, 100);
   if (typeof r.ttsRate === "number") out.ttsRate = clamp(r.ttsRate, 0.5, 2);
+  if (typeof r.ttsPitch === "number") out.ttsPitch = clamp(r.ttsPitch, 0.5, 2);
+  if (typeof r.ttsVoiceURI === "string") out.ttsVoiceURI = r.ttsVoiceURI.slice(0, 300);
   if (typeof r.highlightSpeaking === "boolean") out.highlightSpeaking = r.highlightSpeaking;
   if (typeof r.sleepTimer === "number") out.sleepTimer = clamp(r.sleepTimer, 0, 180);
   return out;

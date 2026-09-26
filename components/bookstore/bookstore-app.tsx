@@ -428,7 +428,14 @@ function StoreFolder({ cat, books, onOpenBook }: { cat: string; books: Book[]; o
           aria-label={`展开书夹「${cat}」，共 ${books.length} 本`}
         >
           {peekBooks.map((book, i) => (
-            <span key={book.id} className="br-store-folder-peek-item" style={{ transform: `rotate(${(i - (peekBooks.length - 1) / 2) * 1.6}deg)` }}>
+            <span
+              key={book.id}
+              className="br-store-folder-peek-item"
+              style={{
+                transform: `translateX(${i * 1.6}px) translateY(${i % 2 === 0 ? 0 : 2}px) rotate(${(i - (peekBooks.length - 1) / 2) * 1.8}deg)`,
+                zIndex: i,
+              }}
+            >
               <BookCover book={book} className="br-store-folder-peek-cover" />
             </span>
           ))}

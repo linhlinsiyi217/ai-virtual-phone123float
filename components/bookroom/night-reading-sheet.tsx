@@ -1,8 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { Coffee, CloudRain, Leaf, Moon, Timer, Volume2, Waves } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  CloudMoon,
+  CloudRain,
+  Coffee,
+  Droplets,
+  Fan,
+  Flame,
+  Leaf,
+  Library,
+  Moon,
+  Timer,
+  Train,
+  Volume2,
+  Waves,
+  Wind,
+} from "lucide-react";
 import type { Book } from "@/lib/bookstore-data";
+import {
+  getBookTtsVoices,
+  onBookTtsVoicesChanged,
+  type BookTtsVoice,
+} from "@/lib/bookroom-tts";
 import { BottomSheet, Segmented } from "./bookroom-ui";
 import {
   loadReaderPrefs,
@@ -37,9 +57,16 @@ type Props = {
 const AMBIENTS: { id: AmbientId; label: string; icon: typeof Moon }[] = [
   { id: "off", label: "静音", icon: Moon },
   { id: "rain", label: "雨声", icon: CloudRain },
+  { id: "night-rain", label: "夜雨窗边", icon: CloudMoon },
   { id: "wave", label: "海浪", icon: Waves },
   { id: "forest", label: "森林", icon: Leaf },
-  { id: "cafe", label: "咖啡厅", icon: Coffee },
+  { id: "river", label: "河流", icon: Droplets },
+  { id: "fireplace", label: "壁炉", icon: Flame },
+  { id: "cafe", label: "咖啡馆", icon: Coffee },
+  { id: "library", label: "图书馆", icon: Library },
+  { id: "fan", label: "风扇", icon: Fan },
+  { id: "wind", label: "轻风", icon: Wind },
+  { id: "train", label: "火车远行", icon: Train },
 ];
 
 const TIMERS: { value: number; label: string }[] = [
@@ -133,6 +160,17 @@ export function NightReadingSheet({ book, mode, onClose }: Props) {
   const [hint, setHint] = useState<string | null>(null);
   const [hasBookOverride, setHasBookOverride] = useState(() => hasBookReaderPrefs(book.id));
   const ttsAvailable = isTtsAvailable();
+  const [voices, setVoices] = useState<BookTtsVoice[]>(() => (ttsAvailable ? getBookTtsVoices() : []));
+  const [voiceFilter, setVoiceFilter] = useState<"all" | "female" | "male">("all");
+
+  /* 部分引擎（Chrome）首次音色列表为空，voiceschanged 后刷新 */
+  useEffect(() => {
+    if (!ttsAvailable) return;
+    setVoices(getBookTtsVoices());
+    return onBookTtsVoicesChanged(() => setVoices(getBookTtsVoices()));
+  }, [ttsAvailable]);
+
+  const visibleVoices = voices.filter(v => voiceFilter === "all" || v.gender === voiceFilter);
 
   const flash = (text: string) => {
     setHint(text);
@@ -379,6 +417,42 @@ export function NightReadingSheet({ book, mode, onClose }: Props) {
             {!ttsAvailable && (
               <p className="br-sheet-note">朗读能力准备中 · 当前设备不可用</p>
             )}
+            {ttsAvailable && voices.length === 0 && (
+              <p className="br-sheet-note">当前设备暂无可用朗读音色</p>
+            )}
+            {ttsAvailable && voices.length > 0 && (
+              <div className="br-voice-picker">
+                <div className="br-voice-filter-row">
+                  {([
+                    { value: "all", label: "全部" },
+                    { value: "female", label: "女声" },
+                    { value: "male", label: "男声" },
+                  ] as const).map(item => (
+                    <button key={item.value} type="button"
+                      className={`br-chip br-chip-mini book-pressable ${voiceFilter === item.value ? "is-active" : ""}`}
+                      onClick={() => setVoiceFilter(item.value)}>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="br-chip-row">
+                  <button type="button"
+                    className={`br-chip book-pressable ${!prefs.ttsVoiceURI ? "is-active" : ""}`}
+                    disabled={!prefs.ttsEnabled}
+                    onClick={() => update({ ttsVoiceURI: "" })}>
+                    系统默认
+                  </button>
+                  {visibleVoices.map(v => (
+                    <button key={v.uri} type="button"
+                      className={`br-chip book-pressable ${prefs.ttsVoiceURI === v.uri ? "is-active" : ""}`}
+                      disabled={!prefs.ttsEnabled}
+                      onClick={() => update({ ttsVoiceURI: v.uri })}>
+                      {v.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="br-slider-list">
               <PrefsSlider label="朗读音量" min={0} max={100} step={1} value={prefs.ttsVolume}
                 display={`${Math.round(prefs.ttsVolume)}%`} disabled={!ttsAvailable || !prefs.ttsEnabled}
@@ -386,6 +460,9 @@ export function NightReadingSheet({ book, mode, onClose }: Props) {
               <PrefsSlider label="朗读速度" min={0.5} max={2} step={0.05} value={prefs.ttsRate}
                 display={`${prefs.ttsRate.toFixed(2)}×`} disabled={!ttsAvailable || !prefs.ttsEnabled}
                 onChange={v => update({ ttsRate: v })} />
+              <PrefsSlider label="朗读音高" min={0.5} max={2} step={0.05} value={prefs.ttsPitch}
+                display={`${prefs.ttsPitch.toFixed(2)}`} disabled={!ttsAvailable || !prefs.ttsEnabled}
+                onChange={v => update({ ttsPitch: v })} />
             </div>
             <PrefsSwitch label="高亮当前朗读段落" checked={prefs.highlightSpeaking}
               disabled={!ttsAvailable || !prefs.ttsEnabled}
