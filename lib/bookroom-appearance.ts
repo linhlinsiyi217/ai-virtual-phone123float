@@ -277,6 +277,16 @@ export function appearanceToCssVars(tokens: AppearanceTokens): Record<string, st
   const bubbleOtherInk = dark ? "#E6EAF0" : "#15171C";
   const scrim = dark ? "rgba(6,8,12,0.55)" : "rgba(17,20,26,0.34)";
 
+  /* ── P0.1 Glass Foundation:三层玻璃材质 token ──
+     Clear   = 清透交互层(Dock/浮动控件/Sheet 边缘/阅读器 chrome/共读悬浮入口)
+     Regular = 中强度信息层(设置分组/Mine 信息块/功能面板/阅读设置)
+     Night   = 深色浮层(夜读/深色 Sheet),黑灰半透明+边缘反光,非纯黑 opacity
+     三层均随 light/dark 生成;旧变量经 alias 指向新层,解析值不变,零视觉回归 */
+  const glassBlur = `${tokens.cardBlur}px`;
+  const clearInnerHl = dark ? "rgba(226,234,246,0.10)" : "rgba(255,255,255,0.55)";
+  const regularInnerHl = dark ? "rgba(226,234,246,0.06)" : "rgba(255,255,255,0.35)";
+  const nightInnerHl = "rgba(226,234,246,0.10)";
+
   return {
     /* ── 旧基础变量（保持全房组件兼容） ── */
     "--book-bg": tokens.bgPrimary,
@@ -306,7 +316,7 @@ export function appearanceToCssVars(tokens: AppearanceTokens): Record<string, st
     "--bookroom-border": dark ? `rgba(255,255,255,${borderAlpha})` : `rgba(17,19,24,${borderAlpha})`,
     "--bookroom-highlight": tokens.accent,
     "--bookroom-glass-alpha": String(alpha),
-    "--bookroom-glass-blur": `${tokens.cardBlur}px`,
+    "--bookroom-glass-blur": "var(--glass-regular-blur)",
     "--bookroom-glass-hl": hl,
     "--bookroom-shadow": `0 12px 32px rgba(0,0,0,${shadowAlpha})`,
     "--bookroom-shadow-soft": `0 2px 10px rgba(0,0,0,${(tokens.cardShadow / 100 * 0.06).toFixed(3)})`,
@@ -339,7 +349,7 @@ export function appearanceToCssVars(tokens: AppearanceTokens): Record<string, st
     "--br-glass-fill": glassFill,
     "--br-glass-border": glassBorder,
     "--br-glass-highlight": glassHighlight,
-    "--br-glass-blur": `${tokens.cardBlur}px`,
+    "--br-glass-blur": "var(--glass-clear-blur)",
     "--br-radius": `${tokens.radius}px`,
     "--br-shadow": `0 12px 32px rgba(0,0,0,${shadowAlpha})`,
     "--br-shadow-soft": `0 2px 10px rgba(0,0,0,${(tokens.cardShadow / 100 * 0.06).toFixed(3)})`,
@@ -348,6 +358,32 @@ export function appearanceToCssVars(tokens: AppearanceTokens): Record<string, st
     "--br-bubble-mine-ink": bubbleMineInk,
     "--br-bubble-other": bubbleOther,
     "--br-bubble-other-ink": bubbleOtherInk,
+
+    /* ── P0.1 Glass Foundation 三层材质(基础类专用,现有组件暂不强制接入) ── */
+    "--glass-clear-bg": rgba(glassBase, dark ? 0.16 : 0.3),
+    "--glass-clear-bg-strong": rgba(glassBase, dark ? 0.3 : 0.48),
+    "--glass-clear-blur": glassBlur,
+    "--glass-clear-saturate": "150%",
+    "--glass-clear-border": glassBorder,
+    "--glass-clear-highlight": glassHighlight,
+    "--glass-clear-shadow": `0 8px 24px rgba(0,0,0,${(tokens.cardShadow / 100 * 0.09).toFixed(3)})`,
+    "--glass-clear-inner-highlight": clearInnerHl,
+    "--glass-regular-bg": rgba(glassBase, alpha * 0.82),
+    "--glass-regular-bg-strong": rgba(glassBase, alpha),
+    "--glass-regular-blur": glassBlur,
+    "--glass-regular-saturate": "120%",
+    "--glass-regular-border": borderColor,
+    "--glass-regular-highlight": glassHighlight,
+    "--glass-regular-shadow": `0 12px 32px rgba(0,0,0,${shadowAlpha})`,
+    "--glass-regular-inner-highlight": regularInnerHl,
+    "--glass-night-bg": "rgba(18,21,27,0.58)",
+    "--glass-night-bg-strong": "rgba(18,21,27,0.74)",
+    "--glass-night-blur": glassBlur,
+    "--glass-night-saturate": "115%",
+    "--glass-night-border": "rgba(226,234,246,0.14)",
+    "--glass-night-highlight": "rgba(226,234,246,0.12)",
+    "--glass-night-shadow": "0 16px 40px rgba(0,0,0,0.35)",
+    "--glass-night-inner-highlight": nightInnerHl,
   };
 }
 

@@ -8983,3 +8983,37 @@
 .bookroom-app .br2-folder-book {
   will-change: transform;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   P0.1 · Glass Foundation —— 三层玻璃材质基础类
+   职责:仅材质(background / backdrop-filter / border / box-shadow / 内高光)
+   不负责:尺寸 / padding / margin / position / layout / 组件专属 radius
+   Blur 预算:同一可视页面避免同时存在大量独立实时 blur 层;
+   优先父级玻璃容器统一 blur,子元素继承材质视觉;
+   静态书本 / 书架 / 纸张禁止 backdrop-filter。
+   现有组件本轮不强制套用,后续 P1/P2 逐组件迁移。
+   token 由 lib/bookroom-appearance.ts 按主题注入(--glass-*)。
+   ═══════════════════════════════════════════════════════════════ */
+.bookroom-app .bookroom-glass-clear {
+  background: var(--glass-clear-bg);
+  backdrop-filter: blur(var(--glass-clear-blur)) saturate(var(--glass-clear-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-clear-blur)) saturate(var(--glass-clear-saturate));
+  border: 1px solid var(--glass-clear-border);
+  box-shadow: var(--glass-clear-shadow), inset 0 1px 0 var(--glass-clear-inner-highlight);
+}
+
+.bookroom-app .bookroom-glass-regular {
+  background: var(--glass-regular-bg);
+  backdrop-filter: blur(var(--glass-regular-blur)) saturate(var(--glass-regular-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-regular-blur)) saturate(var(--glass-regular-saturate));
+  border: 1px solid var(--glass-regular-border);
+  box-shadow: var(--glass-regular-shadow), inset 0 1px 0 var(--glass-regular-inner-highlight);
+}
+
+.bookroom-app .bookroom-glass-night {
+  background: var(--glass-night-bg);
+  backdrop-filter: blur(var(--glass-night-blur)) saturate(var(--glass-night-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-night-blur)) saturate(var(--glass-night-saturate));
+  border: 1px solid var(--glass-night-border);
+  box-shadow: var(--glass-night-shadow), inset 0 1px 0 var(--glass-night-inner-highlight);
+}
