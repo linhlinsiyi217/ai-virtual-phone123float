@@ -48,14 +48,16 @@ export default function RootLayout({
         {children}
         
         <script dangerouslySetInnerHTML={{ __html: `
-          setTimeout(function() {
-            window.dispatchEvent(new CustomEvent('ai-message', { detail: "自动测试成功！" }));
-          }, 3000);
-          window.addEventListener('ai-message', function(e) {
-            if (window.MyApp && window.MyApp.showIsland) {
-              window.MyApp.showIsland(e.detail);
-            }
-          });
+          // 强制重置本地数据
+          if (localStorage.getItem('reset_flag') !== 'true') {
+            localStorage.clear();
+            indexedDB.databases().then(dbs => {
+              dbs.forEach(db => indexedDB.deleteDatabase(db.name));
+            });
+            localStorage.setItem('reset_flag', 'true');
+            alert('系统已重置，页面即将刷新');
+            window.location.reload();
+          }
         `}} />
       </body>
     </html>
